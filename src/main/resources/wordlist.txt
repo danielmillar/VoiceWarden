@@ -1,0 +1,417 @@
+# NevusVoice English transcript moderation. One word or phrase per line.
+# [LANG-PROFANITY] = staff alert; [LANG-MUTE] = contributes to auto-muting.
+# Case/accents/punctuation are ignored. word* = prefix; *word = suffix; *word* = substring.
+# This is a curated detection list, not an endorsement of these terms.
+# Exact forms are used for ambiguous roots; legitimate wildcard exceptions live in rules.yml.
+# Neutral identities (gay, trans, Jewish, Muslim, Black, autistic, etc.) are deliberately absent.
+# Review your community's policy before enabling automatic enforcement.
+
+[EN-PROFANITY]
+
+# General profanity and compounds.
+fuck*
+*fucker
+motherfuck*
+mutha fuck*
+mother fuck*
+mofo
+mofos
+mf
+wtf
+stfu
+gtfo
+fml
+fubar
+fuk
+fuks
+fukking
+fuker
+fukers
+fook
+fooking
+feck*
+frick
+fricking
+effing
+shit*
+*shit
+bullshit*
+bull shit
+horseshit*
+horse shit
+batshit*
+dipshit*
+dogshit*
+apeshit*
+shite*
+shat
+bitch*
+*bitch
+son of a bitch
+biatch*
+beeyotch*
+bastard*
+ass
+asses
+asshole*
+ass hole
+arse
+arses
+arsehole*
+arse hole
+jackass*
+dumbass*
+dumb ass
+smartass*
+badass*
+*asshole*
+damn
+damned
+damning
+goddamn*
+god damn
+goddammit
+dammit
+hell
+hellish
+hellhole*
+crap
+crappy
+crapper*
+piss*
+take the piss
+bollock*
+ballsack*
+ball sack
+bugger*
+bloody hell
+sod off
+sodding
+
+# Sexual profanity and insults: staff review.
+dick
+dicks
+dickhead*
+dick head
+dickwad*
+dickweed*
+dickbag*
+dickface*
+dickless
+cock
+cocks
+cockhead*
+cockwomble*
+cocksuck*
+cock suck*
+cockface*
+cockbag*
+cunt*
+twat
+twats
+twatface*
+twatwaffle*
+wank*
+prick
+pricks
+bellend*
+bell end
+knobhead*
+knob head
+nobhead*
+toss off
+tosser*
+jerk off
+jerkoff*
+jack off
+jackoff*
+scumbag*
+shitbag*
+shithead*
+shit head
+shitface*
+shitstain*
+shitshow*
+shit show
+shitstick*
+shitlord*
+asshat*
+assclown*
+butthead*
+buttface*
+douche
+douches
+douchebag*
+douche bag
+jizz*
+cum
+cums
+cumming
+cumshot*
+cumslut*
+cumdump*
+blowjob*
+blow job
+handjob*
+hand job
+tits
+titties
+titty
+pussy
+pussies
+slut
+sluts
+slutty
+whore
+whores
+whoreson*
+skank
+skanks
+skanky
+screw you
+fucking hell
+shut the fuck up
+
+# Ableist/body-based abuse and terms with legitimate alternatives: staff review.
+# Avoid broad fag*, dyke*, homo*, retard* patterns that match ordinary speech.
+retard
+retards
+retarded
+retardation
+spaz
+spazz
+spastic
+spastics
+mong
+mongs
+mongoloid
+mongoloids
+cripple
+cripples
+lardass*
+fatass*
+fat ass
+fag
+fags
+dyke
+dykes
+homo
+homos
+poof
+poofs
+poofter*
+pouf
+poufs
+poufter*
+tranny
+trannies
+trannys
+shemale*
+heshe
+she male
+whitey
+honky
+honkies
+honkey
+sambo
+sambos
+cotton picker
+cotton pickers
+
+# Pornography, sexual abuse and exploitation terminology: staff review.
+# Exact forms protect ordinary words such as grape, therapist, Essex, Sussex and analysis.
+# "CP", "DP", "OF" and "BBC" are not standalone patterns: they have common innocent meanings.
+porn
+porns
+porno
+pornos
+pornography
+pornographic
+pornographer*
+pornhub*
+xvideos
+xnxx
+xhamster
+redtube
+youporn
+onlyfans
+only fans
+hentai*
+rule 34
+rule thirty four
+r34
+xxx
+nsfw
+smut
+smutty
+sexting
+sext
+sexts
+sex tape
+sex tapes
+sex video
+sex videos
+sex chat
+cybersex
+cyber sex
+phone sex
+camgirl
+camgirls
+camboy
+camboys
+webcam sex
+nudes
+nude pics
+nude pictures
+explicit pictures
+explicit videos
+deepfake porn
+revenge porn
+nonconsensual porn
+non consensual porn
+rape
+rapes
+raped
+raping
+rapist*
+date rape
+gang rape
+gangrape*
+sexual assault
+sexual violence
+sexual abuse
+molest
+molests
+molested
+molesting
+molester*
+molestation
+pedophile*
+paedophile*
+pedophilia
+paedophilia
+pedo
+pedos
+paedo
+paedos
+child porn
+child pornography
+childporn
+underage porn
+underage pornography
+underage nudes
+minor nudes
+kiddie porn
+child sexual abuse
+child exploitation
+csam
+csem
+child groomer
+child groomers
+sexual groomer
+sexual grooming
+sex trafficking
+human trafficking
+sextortion
+sexual blackmail
+incest
+incestuous
+bestiality
+zoophilia
+necrophilia
+necrophile*
+
+[EN-MUTE]
+
+# Racial/ethnic slurs and explicit hate epithets.
+nigger*
+nigga*
+niggar*
+nigguh*
+niggah*
+chink
+chinks
+gook
+gooks
+spic
+spics
+spick
+spicks
+kike
+kikes
+kyke
+kykes
+wetback*
+wet back
+beaner
+beaners
+raghead*
+rag head
+towelhead*
+towel head
+coon
+coons
+coontown
+jigaboo*
+jiggaboo*
+jiggabo*
+pickaninny
+pickaninnies
+piccaninny
+piccaninnies
+darkie
+darkies
+darky
+paki
+pakis
+zipperhead*
+zipper head
+porch monkey
+porch monkeys
+sand nigger*
+sand nigga*
+dune coon
+curry muncher
+camel jockey
+rice nigger*
+rice nigga*
+bootlip*
+mudslime
+mudslimes
+musrat
+musrats
+heeb
+heebs
+hymie
+hymies
+hook nosed jew
+jewboy*
+jew boy
+christ killer
+christ killers
+golliwog*
+golliwogg*
+wog
+wogs
+
+# Explicit homophobic/transphobic epithets. Neutral identity words are not rules.
+faggot*
+faggit*
+faggat*
+fag bag
+fudge packer
+fudgepack*
+shirt lifter
+shirtlift*
+batty boy
+battyboy*
+batti boy
+bumboy*
+bum boy
+bum boys
+butt pirate
+buttpirate*
+carpet muncher
+carpetmunch*
+troon
+troons

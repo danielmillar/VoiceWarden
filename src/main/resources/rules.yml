@@ -1,0 +1,476 @@
+# NevusVoice matches the ORIGINAL speech transcript and keeps the matched text for staff review.
+# Words/phrases ignore case, accents and punctuation; internal apostrophes disappear (you're = youre).
+# Wildcards apply to whole words: word* (prefix), *word (suffix), *word* (substring).
+# FLAG alerts staff; MUTE also contributes weight towards the configured auto-mute threshold.
+# Overlapping hits count once: MUTE wins, then greater weight, longer text, then earlier position.
+# Regex runs against original text, with Unicode case-insensitive matching and a 50 ms time budget.
+# Curated English rules. MUTE is reserved for explicit abuse; ambiguous speech is FLAG for staff review.
+# Recognition variants are alerts: never auto-mute innocent homophones such as "bigger" or "nagger".
+# Each non-overlapping MUTE match contributes its rule's weight to the flag threshold.
+
+# Exact words protected from word patterns, including patterns used inside phrases.
+# Regex rules are independent of this list. Extend it when adding broader wildcard patterns.
+allowlist:
+  - assassin
+  - assassins
+  - assassination
+  - class
+  - classes
+  - classic
+  - classical
+  - grass
+  - grassy
+  - scunthorpe
+  - cocktail
+  - cocktails
+  - cockatoo
+  - cockatoos
+  - cockerel
+  - cockerels
+  - cockroach
+  - cockroaches
+  - cockpit
+  - cockpits
+  - hello
+  - hellos
+  - hellenic
+  - dickens
+  - dickinson
+  - dickson
+  - prickle
+  - prickles
+  - prickly
+  - wankel
+  - shiitake
+  - shih
+  - pakistan
+  - pakistani
+  - raccoon
+  - raccoons
+  - gookin
+  - snigger
+  - sniggers
+  - sniggered
+  - sniggering
+  - sniggeringly
+  - sniggerer
+  - sniggerers
+  - schwarzenegger
+  - shitake
+  - shitakes
+
+rules:
+  # Directed self-harm instructions and threats about finding a player outside the game.
+  harassment:
+    enabled: true
+    category: Harassment
+    action: MUTE
+    weight: 1
+    words: [kys]
+    phrases:
+      - kill yourself
+      - kill your self
+      - go kill yourself
+      - go die
+      - hope you die
+      - i hope you die
+      - neck yourself
+      - neck your self
+      - hang yourself
+      - hang your self
+      - end your life
+      - you should die
+      - you should kill yourself
+      - just kill yourself
+      - go and kill yourself
+      - do us a favor and die
+      - do us a favour and die
+      - jump off a bridge
+      - jump off the bridge
+      - slit your wrists
+      - cut your wrists
+      - drink bleach
+      - i will find you
+      - i know where you live
+      - ill find you in real life
+      - i will find you in real life
+      - ill kill you in real life
+      - i will kill you in real life
+      - im going to kill you in real life
+    regex: []
+    allow: []
+
+  # Unwanted sexual requests alert staff for contextual review.
+  sexual-harassment:
+    enabled: true
+    category: Sexual harassment
+    action: FLAG
+    weight: 1
+    words: []
+    phrases:
+      - suck my dick
+      - suck my cock
+      - send nudes
+      - show me your tits
+      - show me your boobs
+      - show me your pussy
+      - send me nudes
+      - send me a nude
+      - send naked pictures
+      - send me naked pictures
+      - show me your dick
+      - show me your cock
+      - show me your ass
+      - show me your arse
+      - get on your knees
+      - sit on my face
+      - suck me off
+    regex: []
+    allow: []
+
+  # Detect invitations and written/spoken server domains. Domains can also occur innocently.
+  # YAML single quotes preserve regex backslashes. Add/remove TLDs to suit your community.
+  advertising:
+    enabled: true
+    category: Advertising
+    action: FLAG
+    weight: 1
+    words: []
+    phrases:
+      - join my server
+      - join our server
+      - come to my server
+      - come to our server
+      - join my discord
+      - join our discord
+      - use my referral code
+    regex:
+      - '\b(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?\.)+(?:com|net|org|gg|io|co|uk|me|xyz|online|games)\b'
+      - '\b(?:[\p{L}\p{N}][\p{L}\p{N}-]*\s+dot\s+)+(?:com|net|org|gg|io|co|uk|me|xyz|online|games)\b'
+    allow: []
+
+  # In-game combat talk is ambiguous; staff review, not an automatic mute.
+  threats:
+    enabled: true
+    category: Threats
+    action: FLAG
+    weight: 1
+    words: []
+    phrases:
+      - i will kill you
+      - ill kill you
+      - im going to kill you
+      - im gonna kill you
+      - i am going to kill you
+      - i will hurt you
+      - ill hurt you
+      - i will beat you up
+      - ill beat you up
+      - i will stab you
+      - ill stab you
+      - i will shoot you
+      - ill shoot you
+    regex: []
+    allow: []
+
+  targeted-abuse:
+    enabled: true
+    category: Targeted abuse
+    action: FLAG
+    weight: 1
+    words: []
+    phrases:
+      - you are an idiot
+      - youre an idiot
+      - you are a loser
+      - youre a loser
+      - you are worthless
+      - youre worthless
+      - nobody likes you
+      - nobody would miss you
+      - nobody will miss you
+      - nobody wants you here
+      - you dont belong here
+      - you are a retard
+      - youre a retard
+      - you are retarded
+      - youre retarded
+      - you are a spastic
+      - youre a spastic
+      - you are a mong
+      - youre a mong
+    regex: []
+    allow: []
+
+  # Identity terms on their own remain clean. These phrases supply the hostile context.
+  identity-abuse:
+    enabled: true
+    category: Identity-based harassment
+    action: FLAG
+    weight: 1
+    words: []
+    phrases:
+      - thats so gay
+      - that is so gay
+      - you sound gay
+      - go back to your country
+      - go back where you came from
+      - go back to where you came from
+      - you people dont belong here
+      - your kind doesnt belong here
+      - your kind are not welcome
+      - your kind arent welcome
+      - you are not a real woman
+      - youre not a real woman
+      - you are not a real man
+      - youre not a real man
+    regex:
+      - '\b(?:dirty|filthy|disgusting|worthless)\s+(?:gay|lesbian|trans|transgender|jew|muslim|immigrant)\b'
+      - '\b(?:dirty|filthy|disgusting|worthless)\s+(?:black|asian|jewish|autistic|disabled)\s+(?:person|people|kid|man|woman|boy|girl|player)\b'
+    allow: []
+
+  hate-incitement:
+    enabled: true
+    category: Hate incitement
+    action: MUTE
+    weight: 2
+    words: []
+    phrases:
+      - kill all jews
+      - kill all the jews
+      - gas the jews
+      - gas all jews
+      - hitler was right
+      - hitler did nothing wrong
+      - bring back slavery
+      - white power forever
+      - white power white pride
+    regex:
+      - '^\s*white\s+power[!.,\s]*$'
+      - '\b(?:kill|exterminate|execute)\s+(?:all\s+)?(?:the\s+)?(?:jews|muslims|gays|lesbians|immigrants|blacks|asians|transgender\s+people|trans\s+people)\b'
+      - '\ball\s+(?:jews|muslims|gays|lesbians|immigrants|blacks|asians|transgender\s+people|trans\s+people)\s+(?:should|must|deserve\s+to)\s+die\b'
+    allow: []
+
+  extremist-slogans:
+    enabled: true
+    category: Extremist slogans
+    action: MUTE
+    weight: 1
+    words: []
+    phrases:
+      - heil hitler
+      - sieg heil
+      - blood and soil
+    regex: []
+    allow: []
+
+  sexual-threats:
+    enabled: true
+    category: Sexual threats
+    action: MUTE
+    weight: 2
+    words: []
+    phrases:
+      - i will rape you
+      - ill rape you
+      - im going to rape you
+      - im gonna rape you
+      - i am going to rape you
+      - you deserve to be raped
+      - you should be raped
+      - i will sexually assault you
+      - ill sexually assault you
+      - im going to sexually assault you
+      - i will molest you
+      - ill molest you
+      - i will drug you
+      - ill drug you
+      - i will rape your mother
+      - ill rape your mother
+      - i will rape your sister
+      - ill rape your sister
+      - i will rape her
+      - ill rape her
+      - i will rape him
+      - ill rape him
+    regex: []
+    allow: []
+
+  # Mentions are review alerts, including reports and safeguarding conversations.
+  # No broad sex*, rape*, pedo*, or cp pattern: grape, therapist, Sussex and checkpoint stay clean.
+  pornography:
+    enabled: true
+    category: Pornography / explicit sexual content
+    action: FLAG
+    weight: 1
+    words: [porn, porno, pornos, pornography, pornographic, 'pornographer*', 'pornhub*', xvideos, xnxx, xhamster,
+            redtube, youporn, onlyfans, 'hentai*', r34, xxx, nsfw, smut, smutty, cybersex, sexting]
+    phrases:
+      - only fans
+      - rule 34
+      - rule thirty four
+      - sex tape
+      - sex tapes
+      - sex video
+      - sex videos
+      - sex chat
+      - cyber sex
+      - phone sex
+      - webcam sex
+      - watch porn
+      - porn site
+      - porn website
+      - adult video
+      - adult videos
+      - explicit video
+      - explicit videos
+      - deepfake porn
+      - revenge porn
+      - non consensual porn
+    regex:
+      - '(?<![\p{L}\p{N}])p[o0]rn(?:[o0]|[o0]graphy|[o0]graphic)?(?![\p{L}\p{N}])'
+    allow: []
+
+  sexual-abuse:
+    enabled: true
+    category: Sexual abuse / sexual violence
+    action: FLAG
+    weight: 1
+    words: [rape, rapes, raped, raping, 'rapist*', molest, molests, molested, molesting, 'molester*', molestation,
+            sextortion, incest, incestuous, bestiality, zoophilia, necrophilia, 'necrophile*']
+    phrases:
+      - date rape
+      - gang rape
+      - sexual assault
+      - sexual violence
+      - sexual abuse
+      - sexual blackmail
+      - sex trafficking
+      - human trafficking
+      - rape joke
+      - rape jokes
+    regex: []
+    allow: []
+
+  child-safety:
+    enabled: true
+    category: Child safety / possible exploitation
+    action: FLAG
+    weight: 1
+    words: ['pedophile*', 'paedophile*', pedophilia, paedophilia, pedo, pedos, paedo, paedos, csam, csem, childporn]
+    phrases:
+      - child porn
+      - child pornography
+      - kiddie porn
+      - underage porn
+      - underage pornography
+      - underage nudes
+      - minor nudes
+      - child sexual abuse
+      - child exploitation
+      - sexual grooming
+      - child groomer
+      - child groomers
+      - sexual groomer
+      - child sex trafficking
+    regex: []
+    allow: []
+
+  # Requests/offers involving exploitation material are high-severity matches.
+  # Reporting, prohibition and condemnation words downgrade to the child-safety review alert.
+  # Whole-utterance negative guard avoids muting "don't share child porn" or "report anyone selling CSAM".
+  child-exploitation:
+    enabled: true
+    category: Child exploitation solicitation
+    action: MUTE
+    weight: 3
+    words: []
+    phrases: []
+    regex:
+      - '\A(?![\s\S]*\b(?:dont|don[''’]t|not|never|stop|report(?:ed|ing)?|illegal|disgusting|ban(?:ned)?|against)\b)[\s\S]*?\b(?:send|share|trade|sell|buy|upload|post|distribute|download|watch|want|looking\s+for)\s+(?:(?:me|us|some|your|the|more|with\s+me)\s+){0,3}(?:child\s+porn(?:ography)?|childporn|kiddie\s+porn|underage\s+(?:porn(?:ography)?|nudes?)|minor\s+nudes?|csam|csem)\b'
+    allow: []
+
+  sexual-coercion:
+    enabled: true
+    category: Sexual coercion / blackmail
+    action: MUTE
+    weight: 2
+    words: []
+    phrases: []
+    regex:
+      - '\A(?![\s\S]*\b(?:dont|don[''’]t|not|never|stop|report(?:ed|ing)?|illegal|disgusting|ban(?:ned)?|against)\b)[\s\S]*?\b(?:send|show|give)\s+(?:me\s+)?(?:nudes?|naked\s+pictures|explicit\s+pictures)\s+or\s+(?:(?:i|ill|i[''’]ll|will|im|i[''’]m|going|gonna|to)\s+){0,6}(?:leak|post|share|release|expose|hurt|kill|dox|doxx)\b'
+    allow: []
+
+  doxxing-threats:
+    enabled: true
+    category: Doxxing threats
+    action: MUTE
+    weight: 2
+    words: []
+    phrases:
+      - i will leak your address
+      - ill leak your address
+      - im going to leak your address
+      - i will post your address
+      - ill post your address
+      - i will dox you
+      - ill dox you
+      - im going to dox you
+      - i will doxx you
+      - ill doxx you
+      - im going to doxx you
+      - i will swat you
+      - ill swat you
+      - im going to swat you
+      - im gonna swat you
+      - i will send the police to your house
+    regex: []
+    allow: []
+
+  # Bounded separators and whole-token boundaries prevent matches inside ordinary words.
+  # Letter-by-letter speech (e.g. "N I G G E R") is also handled by the word matcher.
+  obfuscated-slurs:
+    enabled: true
+    category: Obfuscated slurs
+    action: MUTE
+    weight: 1
+    words: []
+    phrases: []
+    regex:
+      - '(?<![\p{L}\p{N}])(?!n(?:igger|igga)s?\b)n[._-]{0,2}[i1!][._-]{0,2}g[._-]{0,2}g[._-]{0,2}(?:[e3][._-]{0,2}r|[a4@])[s5]?(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])(?!faggots?\b)f[._-]{0,2}[a4@][._-]{0,2}g[._-]{0,2}g[._-]{0,2}[o0][._-]{0,2}t[s5]?(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])(?!kikes?\b)k[._-]{0,2}[i1!][._-]{0,2}k[._-]{0,2}[e3][s5]?(?![\p{L}\p{N}])'
+    allow: []
+
+  # Fused ASR words appeared in the test incidents. Flag them without treating uncertain recognition as proof.
+  recognition-variants:
+    enabled: true
+    category: Possible slur / speech recognition variant
+    action: FLAG
+    weight: 1
+    words: ['*nigger*', '*nigga*', '*negger', nibba, nibbas, nibber, nibbers]
+    phrases:
+      - nig ger
+      - nig gah
+      - nig ga
+      - fag got
+      - n word
+      - the nword
+      - f slur
+    regex: []
+    allow: [snigger, sniggers, sniggered, sniggering, sniggeringly, sniggerer, sniggerers, schwarzenegger]
+
+  # Potential personal information: staff review only, because sharing one's own details is possible.
+  # Recognises 7-15 digit tokens, or spoken digit names (zero/oh/one/.../nine); not arbitrary numbers.
+  doxxing:
+    enabled: true
+    category: Possible doxxing
+    action: FLAG
+    weight: 1
+    words: []
+    phrases: []
+    regex:
+      - '\bmy\s+address\s+is\b'
+      - '(?<![\p{L}\p{N}])(?:\d[\s().-]*){6,14}\d(?![\p{L}\p{N}]|[\s().-]*\d)'
+      - '\b(?:(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)[\s,.-]+){6,14}(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\b(?![\s,.-]+(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\b)'
+    allow: []

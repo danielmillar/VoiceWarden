@@ -1,0 +1,277 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  NevusVoice: local, real-time voice chat moderation for Simple Voice Chat
+#
+#  All speech recognition runs on THIS machine with an embedded model:
+#  no external processor, no API keys, and no audio ever leaves the server
+#  (except evidence you choose to send to Discord).
+#
+#  Durations accept: 500ms, 30s, 5m, 1h30m, 2d, 1w
+#  Apply changes with /nevusvoice reload (no restart needed, even for model changes).
+# ──────────────────────────────────────────────────────────────────────────────
+config-version: 1
+
+# Master switch. When false, voice is not transcribed or moderated (existing mutes are still enforced).
+enabled: true
+
+# Name of this server, shown in Discord embeds. Useful when several servers share a webhook.
+server-name: ""
+
+# ── Speech-to-text ───────────────────────────────────────────────────────────
+speech-to-text:
+  # Model preset (downloaded automatically on first start into plugins/NevusVoice/models):
+  #   parakeet-tdt-v2  English. Fast CPU transcription. ~670 MB download, ~1 GB RAM.
+  #   parakeet-tdt-v3  25 European languages, auto-detected. ~670 MB download, ~1 GB RAM.
+  #   whisper-small-en English. Lower CPU cost than Turbo; catches the recorded whisper bypass. ~376 MB download.
+  #   whisper-turbo    Whisper Large-v3 Turbo, English transcription. ~1.04 GB download; higher CPU/RAM cost.
+  #   custom           Your own sherpa-onnx transducer or English Whisper model (see 'custom' below).
+  # Keep VAD enabled to reject non-speech before recognition, especially when using Whisper.
+  model: parakeet-tdt-v2
+  auto-download: true
+
+  # Directory containing the sherpa-onnx native libraries. Leave empty to download them automatically for
+  # this OS/CPU. Only needed for unusual platforms (e.g. Alpine/musl) or custom GPU builds.
+  native-library-path: ""
+
+  # Transcription workers share ONE copy of the model; concurrent inference still needs working memory.
+  # Start with 1 worker, especially for Whisper Turbo, then measure queue/drops in /nv stats on your server.
+  workers: 1
+  # CPU threads the model's math may use (shared by all workers). Keep workers + cpu-threads below your core
+  # count so the Minecraft server thread always has a core to itself.
+  cpu-threads: 2
+  # Utterances submitted together. Parakeet benefits from batching; Whisper decodes them sequentially.
+  max-batch-size: 4
+
+  queue:
+    # Utterances waiting for transcription. When full, the oldest are dropped (logged in /nv stats).
+    max-size: 200
+    # Stops one player from flooding the queue.
+    max-per-player: 6
+    # Utterances older than this are skipped instead of transcribed (moderation would be too stale).
+    max-age: 30s
+
+  # Boost quiet speech before BOTH voice detection and transcription. Captured evidence stays unchanged.
+  # Gain never reduces loud speech or exceeds full scale. VAD still rejects silence and non-speech noise.
+  input-gain:
+    enabled: true
+    # Target for the loudest 20 ms frame; surrounding silence does not inflate the gain.
+    target-dbfs: -20
+    # Maximum amplification in dB (40 dB = 100x). Avoid increasing this to compensate for noisy microphones.
+    max-gain-db: 40
+
+  # Silero voice-activity detection. Rejects audio without detected speech before transcription.
+  vad:
+    enabled: true
+    # Speech probability threshold (0-1). Raise if background noise is being transcribed.
+    threshold: 0.5
+    min-speech: 100ms
+    min-silence: 300ms
+    # Preserve the full utterance: quiet first/last words can fall outside the detected speech span.
+    # Enable trimming only if you have measured the accuracy tradeoff for your microphones.
+    trim-silence: false
+    # When trimming is enabled, audio kept around detected speech.
+    padding: 250ms
+
+  # Used when model: custom. Paths are relative to plugins/NevusVoice.
+  # For an English Whisper model, set model-type: whisper; joiner is unused.
+  custom:
+    model-type: nemo_transducer
+    encoder: models/custom/encoder.onnx
+    decoder: models/custom/decoder.onnx
+    joiner: models/custom/joiner.onnx
+    tokens: models/custom/tokens.txt
+
+# ── Audio capture ────────────────────────────────────────────────────────────
+audio:
+  # An utterance ends after this much silence, or immediately when the speaker releases push-to-talk.
+  silence-timeout: 500ms
+  # Shorter utterances are ignored. Keep this low enough to capture short, single-word speech.
+  min-utterance: 160ms
+  # Longer speech is split at the quietest point so moderation never waits too long.
+  max-utterance: 15s
+  # Silence floor before gain: keep quiet/whispered speech, then let VAD reject non-speech.
+  min-level-dbfs: -65
+  # Ignore Simple Voice Chat's whisper-key packets. Physical whispers still use the normal audio pipeline.
+  ignore-whispers: false
+  # Opus decode threads. 0 = automatic (1 per 4 cores, max 4).
+  decode-threads: 0
+  # Per-player decoder state is freed after this long without speech.
+  idle-session-timeout: 5m
+  # Undecoded 20 ms frames buffered per player before new packets are dropped (protects memory under overload).
+  max-buffered-frames: 250
+
+# ── Moderation ───────────────────────────────────────────────────────────────
+# Word lists live in wordlist.txt ([LANG-PROFANITY] / [LANG-MUTE] sections) and rules.yml (phrases, regex,
+# wildcards, allowlist). PROFANITY/FLAG hits alert staff. MUTE hits count towards an auto-mute.
+moderation:
+  # Alert staff and Discord but never punish anyone. Use this while tuning your word lists.
+  dry-run: false
+  # How many MUTE-list flags within 'flag-window' trigger an auto-mute. 1 = first hit mutes.
+  flag-threshold: 1
+  flag-window: 10m
+  # Warn the player when they are flagged but have not yet reached the threshold.
+  warn-below-threshold: true
+  # Auto-mute length when the mute ladder is disabled.
+  mute-duration: 60m
+
+  # Escalating auto-mute durations for repeat offenders. The offense count is stored in LuckPerms meta, so it
+  # follows the player across restarts and across servers that share LuckPerms storage.
+  mute-ladder:
+    enabled: true
+    tiers:
+      1: 5m
+      2: 15m
+      3: 30m
+      4: 1h
+      5: 6h
+    # Used for offenses beyond the last tier.
+    max-tier-duration: 24h
+    # The offense count resets when a player's last auto-mute is older than this many days. 0 = never.
+    reset-after-days: 30
+
+  # Earlier utterances from the same player included with alerts for context.
+  context-lines: 3
+  # wordlist.txt sections to load, e.g. [en, es]. Use parakeet-tdt-v3 for non-English speech.
+  languages: [en]
+  # If non-empty, these REPLACE the wordlist.txt PROFANITY / MUTE sections.
+  profanity-words: []
+  mute-words: []
+
+# ── Muting ───────────────────────────────────────────────────────────────────
+mute:
+  # Muted players also cannot hear anyone else (full voice mute).
+  disable-listening: false
+  luckperms:
+    # Also deny the Simple Voice Chat speak permission with a temporary LuckPerms node. The mute then survives
+    # restarts and applies on every server sharing your LuckPerms storage.
+    enabled: true
+    speak-permission: voicechat.speak
+    listen-permission: voicechat.listen
+    # Only mute on this LuckPerms 'server' context (e.g. "survival"). Empty = all servers.
+    server-context: ""
+  # Tell players when muted/warned/unmuted, and show a custom action bar when they attempt blocked speech.
+  # Action-bar text is configurable under player.*-actionbar in messages.yml.
+  notify-player: true
+
+# ── Staff alerts ─────────────────────────────────────────────────────────────
+alerts:
+  # In-game alerts for players with voicesentinel.alerts (toggle per player with /nv alerts).
+  staff: true
+  # Log flagged speech to the console.
+  console: true
+
+# ── Custom commands ──────────────────────────────────────────────────────────
+# Console commands run on the main thread when something happens. Placeholders:
+#   {player} {uuid} {words} {transcript} {duration} {offense} {categories}
+custom-commands:
+  # After an automatic mute.
+  mute: []
+  # When speech is flagged but nobody is muted (profanity-only, or below the flag threshold).
+  profanity: []
+  # When a player is warned.
+  warn: []
+  # Example:
+  # mute:
+  #   - "say [Voice] {player} was muted for {duration}: {words}"
+
+# ── Transcript buffer (powers context, /viewreport and /reportvoice) ─────────
+transcript-buffer:
+  enabled: true
+  retention: 12h
+  max-lines-per-player: 500
+  # Recent speech audio kept in memory so voice reports can include a recording. Shared by all players;
+  # 64 MB holds roughly 30 minutes of total speech. 0 = no audio in reports.
+  audio-memory-mb: 64
+
+# ── Voice reports (/reportvoice) ─────────────────────────────────────────────
+voice-report:
+  enabled: true
+  default-window: 5m
+  min-window: 30s
+  max-window: 30m
+  # Per-reporter cooldown.
+  cooldown: 60s
+  # Also print the full transcript in staff chat (can be noisy).
+  staff-chat-full-transcript: false
+
+# ── Recordings / evidence ────────────────────────────────────────────────────
+recordings:
+  # none    = keep nothing on disk
+  # flagged = keep flagged speech and voice reports (recommended)
+  # all     = also keep every transcribed utterance (large!)
+  mode: flagged
+  directory: recordings
+  save-audio: true
+  retention-days: 30
+  max-total-size-mb: 2048
+
+# ── Discord ──────────────────────────────────────────────────────────────────
+# Three independent webhooks. Treat webhook URLs as secrets. Test with /nevusvoice discordtest all
+discord:
+  timeout-seconds: 10
+  retry-attempts: 3
+  max-queue-size: 100
+
+  # Every flagged utterance (flag, warning or auto-mute).
+  flags:
+    enabled: false
+    webhook-url: ""
+    username: NevusVoice
+    avatar-url: ""
+    # Hex colour like "#E74C3C". Empty = colour by action.
+    color: ""
+    # Role id to ping, e.g. "123456789012345678". Empty = no ping.
+    ping-role-id: ""
+    include-audio: true
+    include-transcript: true
+    include-context: true
+    include-server-info: true
+    spoiler-flagged-words: true
+    # Placeholders: {player} {action} {duration} {id} {server}. Empty = default.
+    title: ""
+    footer: ""
+
+  # Auto-mutes, staff mutes and unmutes. If this uses the same URL as 'flags', auto-mutes are posted once.
+  mutes:
+    enabled: false
+    webhook-url: ""
+    username: NevusVoice
+    avatar-url: ""
+    color: ""
+    ping-role-id: ""
+    include-audio: true
+    include-transcript: true
+    include-context: true
+    include-server-info: true
+    spoiler-flagged-words: true
+    title: ""
+    footer: ""
+
+  # Player voice reports.
+  reports:
+    enabled: false
+    webhook-url: ""
+    username: NevusVoice
+    avatar-url: ""
+    color: ""
+    ping-role-id: ""
+    include-audio: true
+    include-transcript: true
+    include-context: true
+    include-server-info: true
+    spoiler-flagged-words: false
+    title: ""
+    footer: ""
+
+# ── Privacy ──────────────────────────────────────────────────────────────────
+privacy:
+  # Tell players on join that voice chat is transcribed and moderated (text in messages.yml).
+  join-message: true
+
+# ── Logging & health ─────────────────────────────────────────────────────────
+logging:
+  # Write every transcript to plugins/NevusVoice/logs/transcripts-YYYY-MM-DD.log
+  transcripts: false
+  debug: false
+
+# How often the engine health check runs (queue backlog, latency, failures).
+health-check-interval: 30s

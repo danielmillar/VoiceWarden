@@ -1,0 +1,48 @@
+name: NevusVoice
+version: '${version}'
+main: dev.danielmillar.voicesentinel.VoiceSentinelPlugin
+api-version: '26.1'
+description: 'NevusVoice: real-time, fully local voice chat moderation for Simple Voice Chat.'
+author: danielmillar
+website: https://github.com/danielmillar
+dependencies:
+  server:
+    voicechat:
+      load: BEFORE
+      required: true
+      join-classpath: true
+    LuckPerms:
+      load: BEFORE
+      required: true
+      join-classpath: true
+permissions:
+  voicesentinel.admin:
+    description: Full access to NevusVoice commands (does not include bypass).
+    default: op
+    children:
+      voicesentinel.alerts: true
+      voicesentinel.reload: true
+      voicesentinel.stats: true
+      voicesentinel.vcmute: true
+      voicesentinel.report.review: true
+  voicesentinel.bypass:
+    description: Voice is never transcribed or moderated, and the player cannot be voice-muted.
+    default: false
+  voicesentinel.alerts:
+    description: Receive in-game alerts when voice is flagged.
+    default: op
+  voicesentinel.reload:
+    description: Use /nevusvoice reload.
+    default: op
+  voicesentinel.stats:
+    description: Use /nevusvoice stats.
+    default: op
+  voicesentinel.vcmute:
+    description: Use /nevusvoice vcmute, unvcmute, mutes and offenses.
+    default: op
+  voicesentinel.report:
+    description: Use /reportvoice to report a player's voice chat.
+    default: true
+  voicesentinel.report.review:
+    description: Receive voice report alerts and use /viewreport, /reportinbox and /nevusvoice history.
+    default: op

@@ -1,0 +1,92 @@
+# NevusVoice messages: MiniMessage format (https://docs.advntr.dev/minimessage/format.html)
+# Every message can use the theme colours as tags (<accent>text</accent>) and <prefix>. Player-provided text
+# (names, transcripts) is always inserted as plain text, so it can never inject formatting or click events.
+
+# Colour palette available in every message as tags. Values are hex (#RRGGBB) or named colours.
+# Change these to re-theme the whole plugin.
+theme:
+  body: "#E4E4EC"
+  muted: "#8B8B9A"
+  accent: "#FFC857"
+  success: "#6EE7A0"
+  error: "#FF7A7A"
+
+# Reusable MiniMessage snippets available as tags, e.g. <prefix>. Their styles carry into the text after them.
+prefixes:
+  prefix: "<gradient:#FFD36E:#F59E0B><b>ɴᴇᴠᴜꜱ</b></gradient> <dark_gray>»</dark_gray> <body>"
+
+privacy-join: "<prefix>Voice chat on this server is transcribed and automatically moderated. <muted>Flagged speech may be recorded as evidence for staff."
+
+alert:
+  # <player> <transcript> <categories> <action> <duration> <offense> <flags> <threshold> <id>
+  flag: "<prefix><accent><player></accent><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted> <dark_gray>[<muted><categories></muted>]</dark_gray>"
+  warn: "<prefix><accent><player></accent> was warned <dark_gray>(<muted><flags>/<threshold></muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted> <dark_gray>[<muted><categories></muted>]</dark_gray>"
+  mute: "<prefix><error><player></error> was auto-muted for <error><duration></error> <dark_gray>(<muted>offense #<offense></muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted>"
+  already-muted: "<prefix><accent><player></accent> <dark_gray>(<muted>already muted</muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted>"
+  dry-run-suffix: " <dark_gray><italic>(dry run, not applied)</italic></dark_gray>"
+  # Hover text on alerts. <context> = earlier lines, <location> = world x, y, z
+  hover: "<accent>Incident <id></accent>\n<muted>Flags: <body><flags>/<threshold></body>\nLocation: <body><location></body></muted>\n<context>\n\n<muted>Click to prepare a voice mute"
+  context-line: "<dark_gray><ago></dark_gray> <muted><text></muted>"
+  no-context: "<dark_gray>(no earlier speech)</dark_gray>"
+  staff-mute: "<prefix><accent><actor></accent> voice-muted <error><player></error> for <accent><duration></accent><muted><reason></muted>"
+  staff-unmute: "<prefix><accent><actor></accent> removed the voice mute from <success><player></success>"
+
+player:
+  warned: "<prefix>Please keep voice chat respectful. <muted>Further violations will get you voice-muted."
+  muted: "<prefix>You have been voice-muted for <error><duration></error>. <muted>Reason: <reason>"
+  muted-permanent: "<prefix>You have been voice-muted <error>permanently</error>. <muted>Reason: <reason>"
+  muted-actionbar: "<prefix><error>You cannot speak: you are voice-muted.</error> <muted><remaining> remaining"
+  muted-permanent-actionbar: "<prefix><error>You cannot speak: you are permanently voice-muted.</error>"
+  no-speak-permission-actionbar: "<prefix><error>You don't have permission to speak in voice chat.</error>"
+  unmuted: "<prefix>You can use voice chat again. <success>Welcome back!</success>"
+
+command:
+  no-permission: "<prefix><error>You don't have permission to do that."
+  player-not-found: "<prefix>Player <accent><name></accent> was not found."
+  invalid-duration: "<prefix><accent><input></accent> is not a valid duration. <muted>Examples: 30m, 2h, 1d, perm"
+  muted: "<prefix>Voice-muted <accent><player></accent> for <accent><duration></accent>."
+  unmuted: "<prefix>Removed the voice mute from <accent><player></accent>."
+  not-muted: "<prefix><accent><player></accent> is not voice-muted."
+  cannot-mute-bypass: "<prefix><accent><player></accent> has <accent>voicesentinel.bypass</accent> and cannot be voice-muted."
+  mutes-header: "<prefix>Active voice mutes <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"
+  mutes-entry: " <dark_gray>▪</dark_gray> <accent><player></accent> <dark_gray>»</dark_gray> <body><remaining> left <dark_gray>•</dark_gray> <muted><reason> (by <actor>)"
+  mutes-empty: "<prefix>Nobody is voice-muted."
+  reloading: "<prefix><muted>Reloading…"
+  reloaded: "<prefix>Reloaded in <accent><time>ms</accent>. <muted><details>"
+  reload-warning: "<prefix><accent>⚠ <warning></accent>"
+  reload-failed: "<prefix>Reload failed<dark_gray>:</dark_gray> <error><reason></error>"
+  alerts-on: "<prefix>Voice alerts <success>enabled</success>."
+  alerts-off: "<prefix>Voice alerts <error>disabled</error>."
+  history-header: "<prefix>Recent speech from <accent><player></accent> <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"
+  history-line: " <dark_gray><time></dark_gray> <muted><text></muted>"
+  history-empty: "<prefix>No recent speech from <accent><player></accent>."
+  test-result: "<prefix>Matches<dark_gray>:</dark_gray> <transcript> <dark_gray>[<muted><categories></muted>]</dark_gray>"
+  test-none: "<prefix><success>No rules matched."
+  offenses: "<prefix><accent><player></accent> has <accent><count></accent> auto-mute offense(s). <muted>Next auto-mute: <body><next></body>."
+  offenses-reset: "<prefix>Reset the offense count of <accent><player></accent>."
+  discordtest-sent: "<prefix><muted>Sending Discord test payloads…"
+  discordtest-line: "<prefix>Discord <muted><line>"
+
+stats:
+  - "<prefix>Engine<dark_gray>:</dark_gray> <accent><state></accent> <dark_gray>(<muted><model></muted>)</dark_gray>"
+  - " <dark_gray>▪</dark_gray> <muted>Active speakers <accent><speakers></accent> <dark_gray>•</dark_gray> Queue <accent><queue></accent> <dark_gray>•</dark_gray> Workers <accent><workers></accent>"
+  - " <dark_gray>▪</dark_gray> <muted>Utterances <accent><transcribed></accent> transcribed, <accent><no-speech></accent> no speech, <accent><dropped></accent> dropped"
+  - " <dark_gray>▪</dark_gray> <muted>Latency <accent><latency-avg></accent> avg, <accent><latency-p95></accent> p95 <dark_gray>•</dark_gray> Speed <accent><rtf>×</accent> real time"
+  - " <dark_gray>▪</dark_gray> <muted>Incidents <accent><incidents></accent> <dark_gray>•</dark_gray> Auto-mutes <accent><automutes></accent> <dark_gray>•</dark_gray> Active mutes <accent><mutes></accent>"
+  - " <dark_gray>▪</dark_gray> <muted>Discord <accent><discord-sent></accent> sent, <accent><discord-queue></accent> queued, <accent><discord-failed></accent> failed"
+
+report:
+  disabled: "<prefix><error>Voice reports are disabled."
+  usage: "<prefix>Usage<dark_gray>:</dark_gray> <accent>/reportvoice <player> [minutes]</accent>"
+  self: "<prefix><error>You can't report yourself."
+  cooldown: "<prefix>Please wait <accent><remaining></accent> before reporting again."
+  nothing: "<prefix>There is no recent speech from <accent><player></accent> to report."
+  submitted: "<prefix>Thanks! Your report about <accent><player></accent> <dark_gray>(<muted><lines> lines</muted>)</dark_gray> was sent to staff."
+  staff-alert: "<prefix><accent><reporter></accent> reported <accent><player></accent>'s voice chat <dark_gray>(<muted><lines> lines, last <window></muted>)</dark_gray> <click:run_command:'/viewreport <id>'><hover:show_text:'<muted>Open report'><accent>[View]</accent></hover></click>"
+  staff-transcript-line: " <dark_gray><time></dark_gray> <muted><text></muted>"
+  inbox-header: "<prefix>Open voice reports <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"
+  inbox-entry: " <dark_gray>▪</dark_gray> <click:run_command:'/viewreport <id>'><hover:show_text:'<muted>Open report'><accent><id></accent></hover></click> <dark_gray>»</dark_gray> <body><player></body> <muted>by <reporter>, <ago> ago (<lines> lines)</muted> <click:run_command:'/reportinbox review <id>'><hover:show_text:'<muted>Mark reviewed'><success>[✔]</success></hover></click>"
+  inbox-empty: "<prefix>No open voice reports."
+  reviewed: "<prefix>Report <accent><id></accent> marked as <success>reviewed</success>."
+  not-found: "<prefix>Report <accent><id></accent> was not found."
+  book-title: "Voice report: <player>"

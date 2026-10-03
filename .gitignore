@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# Local Paper development server
+run/
+
+# Private deployment backups, credentials and recorded benchmark output
+backups/
+benchmarks/.cache/
+benchmarks/private-results/
+
+# macOS
+.DS_Store
