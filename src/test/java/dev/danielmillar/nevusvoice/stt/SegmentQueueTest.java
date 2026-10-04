@@ -27,6 +27,19 @@ class SegmentQueueTest {
     private final UUID alice = new UUID(0, 1);
     private final UUID bob = new UUID(0, 2);
 
+    @Test void discardInvalidatesTakenBatchAndResetsPerPlayerAccounting() throws Exception {
+        queue.offer(segment(alice, "in-flight", false), 10, 1);
+        var old = queue.takeBatchSnapshot(1, 0, Long.MAX_VALUE, metrics);
+        queue.offer(segment(alice, "queued", false), 10, 1);
+        assertEquals(1, queue.clear());
+        assertNotEquals(old.generation(), queue.generation());
+        assertEquals(0, queue.size());
+        assertEquals(0, queue.offer(segment(alice, "new", false), 10, 1));
+        var fresh = queue.takeBatchSnapshot(1, 0, Long.MAX_VALUE, metrics);
+        assertEquals(queue.generation(), fresh.generation());
+        assertEquals(List.of("new"), names(fresh.segments()));
+    }
+
     @Test void playerCapDropsThatPlayersOldestRatherThanAnotherPlayersItem() throws Exception {
         assertEquals(0, queue.offer(segment(bob, "b1", false), 10, 2));
         queue.offer(segment(alice, "a1", false), 10, 2);

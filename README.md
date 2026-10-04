@@ -15,8 +15,10 @@ key. The only audio that ever leaves your server is a recording you choose to se
   Like any speech recognition, it can make mistakes, so test it with your own microphones before relying on it.
 - **Spots bad language.** It checks for swear words, slurs, threats, harassment, advertising and more. You can add or
   remove words and rules to suit your community.
-- **Mutes automatically.** Players are warned first. If they keep breaking the rules, they are muted, and repeat
-  offenders get longer mutes each time. A muted player can also be stopped from hearing others if you want.
+- **Mutes automatically.** You choose how many mute-rule hits within a time window trigger a mute
+  (`moderation.flag-threshold` and `moderation.flag-window`). The default threshold is 1, so the first hit mutes. With
+  a higher threshold, players can be warned until they reach it (`moderation.warn-below-threshold`). Repeat offenders
+  get longer mutes each time. A muted player can also be stopped from hearing others if you want.
 - **Helps your staff.** Staff see an in-game alert showing what was said, what was said just before, and where the
   player is, with a button to mute them. Alerts can also go to Discord with the recording attached.
 - **Lets players report each other.** Players can report someone with `/reportvoice`. Staff can review reports and
@@ -52,8 +54,9 @@ key. The only audio that ever leaves your server is a recording you choose to se
 **Trying it out safely.** In `config.yml`, set `moderation.dry-run: true`. NevusVoice will then report problems to
 staff but never mute anyone. Switch it back when you're happy with how it behaves.
 
-**Server with no internet?** Set `speech-to-text.auto-download: false` and put the files in place yourself. The
-console tells you exactly which files and where to get them.
+**Server with no internet?** Set `speech-to-text.auto-download: false`. This disables all automatic downloads, both
+the speech model and the native libraries. Once you have put the required files for your platform in place, the console
+gives the paths and download links for anything still missing.
 
 ## Using it
 
@@ -94,6 +97,9 @@ The main command is `/nevusvoice`, or `/nv` for short.
 | `nevusvoice.admin` | Operators | Everything above except bypass. |
 | `nevusvoice.bypass` | Nobody | Players with this are never listened to or muted. |
 | `nevusvoice.alerts` | Operators | Receiving in-game alerts. |
+| `nevusvoice.reload` | Operators | Using `/nv reload`. |
+| `nevusvoice.stats` | Operators | Using `/nv stats`. |
+| `nevusvoice.vcmute` | Operators | Using `/nv vcmute`, `unvcmute`, `mutes` and `offenses`. |
 | `nevusvoice.report` | Everyone | Using `/reportvoice`. |
 | `nevusvoice.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/nv history`. |
 
@@ -105,8 +111,13 @@ The main command is `/nevusvoice`, or `/nv` for short.
    - **mutes**, which adds points towards an automatic mute. Serious rules add more points.
 3. If a player collects enough points in a short time, they are muted. The length comes from the **mute ladder**:
    a first offence gets a short mute and repeat offences get longer ones. If they are below the limit, they get a
-   warning instead.
+   warning instead when `moderation.warn-below-threshold` is on.
 4. Staff are alerted either way, and the mute is remembered even if the player leaves or the server restarts.
+   New mutes store the identity of their LuckPerms mirror, so they can still be cleaned up after a config change.
+   Mutes saved by an older version have no stored identity, so cleanup assumes your current config. If you changed the
+   mute permission or context before upgrading, remove the old LuckPerms entry by hand.
+   An unmute completes only after that cleanup succeeds. An expired mute is no longer enforced, but its record is kept
+   until cleanup succeeds; a failed cleanup is retried on the expiry sweep and at startup, or by unmuting.
 
 A few things to know:
 
@@ -127,12 +138,20 @@ All files are in `plugins/NevusVoice/`.
 | `wordlist.txt` | Your list of swear words and words that cause a mute. Wildcards such as `word*` are allowed. |
 | `rules.yml` | More advanced rules, such as phrases and an "always allowed" list. |
 | `recordings/` | Saved recordings used as evidence. Old ones are deleted automatically based on age and size. |
-| `data/` | Active mutes and reports. |
+| `data/` | Active mutes and reports. If a mutes or reports file is corrupt, it is moved next to the original with a `.corrupt-<UUID>` suffix before fresh state is started. If it can't be preserved, writes are suspended. |
 | `models/` and `natives/` | The downloaded speech recognition files. |
 
 **Updating:** NevusVoice never overwrites your `wordlist.txt` or `rules.yml` when you install a new version, so you
 won't get new default rules automatically. Back them up before comparing them with the newest defaults. Use `/nv reload`
-after editing files. Restart the server after changing the plugin file itself.
+after editing files. Restart the server after changing the plugin file itself. Changing `audio.decode-threads` needs a
+server restart to apply, and `/nv reload` tells you so.
+
+Setting `enabled: false` stops voice capture, drops queued utterances and discards results from transcription already
+running (a native call may still finish). Existing mutes stay enforced. `discord.max-queue-size` applies on
+`/nv reload`.
+
+On shutdown, NevusVoice finishes running transcription and saves its data in the background, so the Minecraft thread
+is not blocked. Native or disk work can delay the process exiting.
 
 ## Troubleshooting
 
@@ -157,7 +176,7 @@ non-speech. Set `speech-to-text.model` to choose:
 | Model | Notes | Download |
 |---|---|---|
 | NVIDIA Parakeet TDT 0.6B (default) | Fast on CPU | about 670 MB |
-| `whisper-small-en` | Lowest CPU cost | 376 MB |
+| `whisper-small-en` | Lower CPU cost than Turbo; accuracy depends on the microphone | 376 MB |
 | `whisper-turbo` | Highest accuracy, needs the most CPU and RAM | 1.04 GB |
 
 Whisper is configured for English. Model memory is outside the Java heap, so measure server RSS under load. The first
@@ -202,9 +221,7 @@ SVC packet thread ── O(1) ──▶ per-player lock-free inbox ──▶ dec
 - Extra workers share one model but need additional working memory. Start with one worker and measure.
 - Measured on an Apple M-series CPU with `cpu-threads: 2`, Parakeet transcribes a 3.6 s sentence in about 190 ms after
   the speaker stops, and Whisper Small a 2.86 s clip in about 500 ms. One Parakeet worker with 2 threads covers roughly
-  6-8 people talking at the same moment. In a local Turbo comparison, median decoding was about 2.1 s with a peak of
-  2.17 GiB, passing 35/37 checks. That is a small regression sample, not an accuracy guarantee. See
-  [the comparison report](backups/advanced-model-comparison-20261003/comparison.md).
+  6-8 people talking at the same moment. These are single-machine measurements, not an accuracy guarantee.
 
 ### Staging Turbo with a code update
 
@@ -236,8 +253,7 @@ To replay recorded speech through an installed model:
 ```
 
 Use your platform's native-library directory in place of `osx-aarch64`, and 16 kHz mono PCM WAVs. Use
-`-PsherpaModel=whisper-small-en` for Small, or omit it for Parakeet; the WhisperTest bypass test is expected to fail
-with Small. Optional fixtures (`WhisperTest.wav`, `WhisperTest.48k.wav`, `clean-whisper.wav`, `test.wav`) are described
+`-PsherpaModel=whisper-small-en` for Small, or omit it for Parakeet. Optional fixtures (`WhisperTest.wav`, `WhisperTest.48k.wav`, `clean-whisper.wav`, `test.wav`) are described
 in `SherpaOnnxEngineIT`.
 
 ## Licences and attribution

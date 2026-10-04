@@ -46,6 +46,7 @@ command:
   invalid-duration: "<prefix><accent><input></accent> is not a valid duration. <muted>Examples: 30m, 2h, 1d, perm"
   muted: "<prefix>Voice-muted <accent><player></accent> for <accent><duration></accent>."
   unmuted: "<prefix>Removed the voice mute from <accent><player></accent>."
+  action-failed: "<prefix><error>That action failed<dark_gray>:</dark_gray> <reason></error>"
   not-muted: "<prefix><accent><player></accent> is not voice-muted."
   cannot-mute-bypass: "<prefix><accent><player></accent> has <accent>nevusvoice.bypass</accent> and cannot be voice-muted."
   mutes-header: "<prefix>Active voice mutes <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"

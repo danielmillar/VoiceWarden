@@ -41,6 +41,7 @@ public final class ReportStore {
     private final AtomicBoolean savePending = new AtomicBoolean();
     private final AtomicBoolean dirty = new AtomicBoolean();
     private final Object saveLock = new Object();
+    private boolean writable = true;
 
     public ReportStore(Path dataFolder, Executor io, Logger logger) {
         this.file = dataFolder.resolve("data").resolve("reports.json");
@@ -54,11 +55,22 @@ public final class ReportStore {
         }
         try {
             List<StoredReport> stored = JsonFiles.read(file, new TypeToken<List<StoredReport>>() { }.getType());
-            if (stored != null) {
-                stored.stream().filter(r -> r != null && r.id() != null).forEach(r -> reports.put(r.id(), r));
+            if (stored == null || stored.stream().anyMatch(r -> r == null || r.id() == null
+                    || r.createdAt() == null || r.targetId() == null || r.targetName() == null
+                    || r.reporterName() == null || r.lines() == null
+                    || r.lines().stream().anyMatch(line -> line == null || line.spokenAt() == null || line.text() == null))) {
+                throw new IOException("Invalid report state");
             }
+            stored.forEach(r -> reports.put(r.id(), r));
         } catch (IOException | RuntimeException e) {
-            logger.log(Level.WARNING, "Could not read " + file + "; starting with an empty report inbox", e);
+            try {
+                Path preserved = JsonFiles.quarantine(file);
+                logger.log(Level.WARNING, "Could not read " + file + "; preserved original at " + preserved, e);
+            } catch (IOException preservationFailure) {
+                writable = false;
+                e.addSuppressed(preservationFailure);
+                logger.log(Level.SEVERE, "Could not preserve " + file + "; report saves are suspended", e);
+            }
         }
     }
 
@@ -118,7 +130,7 @@ public final class ReportStore {
     public void saveNow() {
         synchronized (saveLock) {
             savePending.set(false);
-            if (!dirty.getAndSet(false)) {
+            if (!writable || !dirty.getAndSet(false)) {
                 return;
             }
             try {

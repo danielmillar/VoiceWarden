@@ -2,6 +2,7 @@ package dev.danielmillar.nevusvoice.concurrent;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -13,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -79,8 +81,8 @@ public final class PluginExecutors implements AutoCloseable {
 
     /**
      * Executor for non-critical IO (evidence files) that refuses work beyond {@code maxPending} queued/running tasks
-     * instead of accumulating unbounded tasks (each holding audio) when storage is slow. Refused tasks are dropped
-     * and counted; callers must not wait on them.
+     * instead of accumulating unbounded tasks (each holding audio) when storage is slow. Refused work throws
+     * {@link RejectedExecutionException}; callers must handle it and must not wait on queued tasks.
      */
     public static Executor bounded(Executor delegate, int maxPending, Logger logger, String what) {
         Semaphore permits = new Semaphore(maxPending);
@@ -90,9 +92,9 @@ public final class PluginExecutors implements AutoCloseable {
                 long now = System.currentTimeMillis();
                 long last = lastWarn.get();
                 if (now - last > 60_000 && lastWarn.compareAndSet(last, now)) {
-                    logger.warning(what + " is falling behind (" + maxPending + " pending); skipping new work. Check disk speed.");
+                    logger.warning(what + " is falling behind (" + maxPending + " pending); rejecting new work. Check disk speed.");
                 }
-                return;
+                throw new RejectedExecutionException(what + " queue full");
             }
             try {
                 delegate.execute(() -> {
@@ -104,8 +106,37 @@ public final class PluginExecutors implements AutoCloseable {
                 });
             } catch (RuntimeException e) {
                 permits.release();
+                throw e;
             }
         };
+    }
+
+    public CompletableFuture<Void> shutdownAfter(CompletableFuture<Void> workers, Runnable persistence) {
+        timer.shutdown();
+        decode.shutdown();
+        var finished = new CompletableFuture<Void>();
+        Thread.ofPlatform().daemon(false).name("NevusVoice-Shutdown").start(() -> {
+            try {
+                workers.handle((ignored, error) -> {
+                    if (error != null) {
+                        logger.log(Level.WARNING, "Speech engine shutdown failed", error);
+                    }
+                    return null;
+                }).join();
+                io.shutdown();
+                for (ExecutorService executor : List.of(timer, decode, io)) {
+                    while (!executor.isTerminated()) {
+                        executor.awaitTermination(1, TimeUnit.DAYS);
+                    }
+                }
+                persistence.run();
+                finished.complete(null);
+            } catch (Throwable error) {
+                finished.completeExceptionally(error);
+                logger.log(Level.SEVERE, "Shutdown could not fully save plugin state. Recent mutes or reports may be missing from disk.", error);
+            }
+        });
+        return finished;
     }
 
     /** Stops all executors, waiting at most {@code timeoutMillis} in total. */

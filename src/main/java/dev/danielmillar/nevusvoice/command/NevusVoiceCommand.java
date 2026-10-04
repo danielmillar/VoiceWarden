@@ -10,7 +10,7 @@ import dev.danielmillar.nevusvoice.config.Durations;
 import dev.danielmillar.nevusvoice.config.Messages;
 import dev.danielmillar.nevusvoice.config.PluginConfig;
 import dev.danielmillar.nevusvoice.health.Metrics;
-import dev.danielmillar.nevusvoice.moderation.StaffAction;
+import dev.danielmillar.nevusvoice.moderation.StaffModerationService;
 import dev.danielmillar.nevusvoice.moderation.TranscriptLine;
 import dev.danielmillar.nevusvoice.moderation.rules.RuleMatch;
 import dev.danielmillar.nevusvoice.mute.MuteService;
@@ -24,7 +24,6 @@ import org.bukkit.entity.Player;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
@@ -157,23 +156,21 @@ final class NevusVoiceCommand {
             return 0;
         }
         String why = reason == null || reason.isBlank() ? "Muted by staff" : reason.strip();
-        Targets.resolve(plugin, name).thenAccept(target -> {
+        Targets.resolve(plugin, name).thenCompose(target -> {
             if (target.isEmpty()) {
                 sender.sendMessage(msg().render("command.player-not-found", Messages.text("name", name)));
-                return;
+                return java.util.concurrent.CompletableFuture.completedFuture(null);
             }
             Targets.Target t = target.get();
-            if (plugin.isBypassed(plugin.players().get(t.id()))) {
-                sender.sendMessage(msg().render("command.cannot-mute-bypass", Messages.text("player", t.name())));
-                return;
-            }
-            plugin.mutes().mute(t.id(), t.name(), duration, why, sender.getName(), false);
-            sender.sendMessage(msg().render("command.muted", Messages.text("player", t.name()),
-                    Messages.text("duration", Durations.format(duration))));
-            StaffAction action = new StaffAction(StaffAction.Type.MUTE, t.id(), t.name(), sender.getName(), duration, why, Instant.now());
-            plugin.alerts().staffAction(action);
-            plugin.discord().submitStaffAction(action);
-        });
+            return plugin.staffModeration().mute(t.id(), t.name(), duration, why, sender.getName()).thenAccept(result -> {
+                if (result == StaffModerationService.Result.BYPASSED) {
+                    sender.sendMessage(msg().render("command.cannot-mute-bypass", Messages.text("player", t.name())));
+                } else {
+                    sender.sendMessage(msg().render("command.muted", Messages.text("player", t.name()),
+                            Messages.text("duration", Durations.format(duration))));
+                }
+            });
+        }).whenComplete((ignored, error) -> actionError(sender, error));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -191,17 +188,10 @@ final class NevusVoiceCommand {
                 return java.util.concurrent.CompletableFuture.completedFuture(null);
             }
             Targets.Target t = target.get();
-            return plugin.mutes().unmute(t.id()).thenAccept(wasMuted -> {
-                if (!wasMuted && !plugin.config().mute().luckPerms()) {
-                    sender.sendMessage(msg().render("command.not-muted", Messages.text("player", t.name())));
-                    return;
-                }
-                sender.sendMessage(msg().render("command.unmuted", Messages.text("player", t.name())));
-                StaffAction action = new StaffAction(StaffAction.Type.UNMUTE, t.id(), t.name(), sender.getName(), null, null, Instant.now());
-                plugin.alerts().staffAction(action);
-                plugin.discord().submitStaffAction(action);
-            });
-        });
+            return plugin.staffModeration().unmute(t.id(), t.name(), sender.getName()).thenAccept(result ->
+                    sender.sendMessage(msg().render(result == StaffModerationService.Result.NOT_MUTED
+                                    ? "command.not-muted" : "command.unmuted", Messages.text("player", t.name()))));
+        }).whenComplete((ignored, error) -> actionError(sender, error));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -300,6 +290,13 @@ final class NevusVoiceCommand {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    private void actionError(CommandSender sender, Throwable error) {
+        if (error != null) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING, "Staff moderation failed", error);
+            sender.sendMessage(msg().render("command.action-failed", Messages.text("reason", "The action failed; see the console.")));
+        }
+    }
 
     private Messages msg() {
         return plugin.messages();

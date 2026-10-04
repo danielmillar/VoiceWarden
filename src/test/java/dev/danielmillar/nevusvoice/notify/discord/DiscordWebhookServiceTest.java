@@ -18,7 +18,6 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
-import java.util.function.BooleanSupplier;
 import java.util.logging.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,6 +42,7 @@ class DiscordWebhookServiceTest {
     private DiscordWebhookService service;
     private BlockingQueue<Captured> requests;
     private List<LogRecord> logs;
+    private BlockingQueue<LogRecord> logEvents;
     private volatile Reply reply;
     private AtomicInteger attempts;
     private String url;
@@ -52,10 +52,11 @@ class DiscordWebhookServiceTest {
         requests = new LinkedBlockingQueue<>();
         attempts = new AtomicInteger();
         logs = new CopyOnWriteArrayList<>();
+        logEvents = new LinkedBlockingQueue<>();
         logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
-            @Override public void publish(LogRecord record) { logs.add(record); }
+            @Override public void publish(LogRecord record) { logs.add(record); logEvents.add(record); }
             @Override public void flush() {}
             @Override public void close() {}
         });
@@ -115,7 +116,7 @@ class DiscordWebhookServiceTest {
         assertArrayEquals(expected, Arrays.copyOfRange(request.bytes(), start, start + expected.length));
         String boundary = request.contentType().substring(request.contentType().indexOf("boundary=") + 9);
         assertTrue(binary.endsWith("\r\n--" + boundary + "--\r\n"));
-        await(() -> service.sentCount() == 1);
+        deliveries(1, 0);
     }
 
     @Test void jsonOnlyEscapesPlayerTextAndHighlightsActualOffsets() throws Exception {
@@ -167,7 +168,7 @@ class DiscordWebhookServiceTest {
         service.submitIncident(TestFixtures.incident());
         service.submitIncident(TestFixtures.incident());
         take(); take();
-        await(() -> service.sentCount() == 2);
+        deliveries(2, 0);
         assertEquals(1, logs.stream().filter(record -> record.getMessage().contains("role id")).count());
         assertFalse(logThreads.contains(Thread.currentThread().threadId()));
     }
@@ -216,8 +217,8 @@ class DiscordWebhookServiceTest {
         start(); service.start();
         service.submitIncident(TestFixtures.incident("Alex", "badword", ModerationAction.mute(Duration.ofMinutes(90)), TestFixtures.AUDIO));
         JsonObject embed = embed(take());
-        await(() -> service.sentCount() == 1);
-        assertNull(requests.poll(100, TimeUnit.MILLISECONDS));
+        deliveries(1, 0);
+        assertTrue(requests.isEmpty());
         assertEquals("Voice auto-mute: Alex", embed.get("title").getAsString());
         assertEquals(0xE74C3C, embed.get("color").getAsInt());
         assertEquals("Muted for 1h 30m \\(offense \\#2\\) — dry run, not applied", field(embed, "Action"));
@@ -301,7 +302,7 @@ class DiscordWebhookServiceTest {
         start(); service.submitIncident(TestFixtures.incident());
         Captured first = take(), second = take();
         assertTrue(second.receivedAt() - first.receivedAt() >= TimeUnit.MILLISECONDS.toNanos(75));
-        await(() -> service.sentCount() == 1);
+        deliveries(1, 0);
         assertEquals(0, service.failedCount());
     }
 
@@ -312,7 +313,7 @@ class DiscordWebhookServiceTest {
             respond(exchange, attempt == 1 ? 429 : 204, attempt == 1 ? "invalid json" : "");
         };
         start(waits::add); service.submitIncident(TestFixtures.incident());
-        take(); take(); await(() -> service.sentCount() == 1);
+        take(); take(); deliveries(1, 0);
         assertEquals(1, waits.size());
         assertTrue(waits.getFirst().toMillis() >= 200);
     }
@@ -321,7 +322,7 @@ class DiscordWebhookServiceTest {
         config.set(settings(config.get().flags(), WebhookSettings.disabled(), WebhookSettings.disabled(), 10, 0));
         reply = (exchange, attempt) -> respond(exchange, 429, "{\"retry_after\":0}");
         start(duration -> {}); service.submitIncident(TestFixtures.incident());
-        await(() -> service.failedCount() == 1);
+        deliveries(0, 1);
         assertEquals(5, attempts.get());
         assertEquals(0, service.sentCount());
     }
@@ -337,14 +338,14 @@ class DiscordWebhookServiceTest {
         start(); service.submitIncident(TestFixtures.incident()); service.submitIncident(TestFixtures.incident());
         Captured first = take(), second = take();
         assertTrue(second.receivedAt() - first.receivedAt() >= TimeUnit.MILLISECONDS.toNanos(75));
-        await(() -> service.sentCount() == 2);
+        deliveries(2, 0);
     }
 
     @Test void serverErrorsUseExponentialBackoffThenSucceed() throws Exception {
         List<Duration> waits = new CopyOnWriteArrayList<>();
         reply = (exchange, attempt) -> respond(exchange, attempt <= 2 ? 503 : 204, attempt <= 2 ? "busy" : "");
         start(waits::add); service.submitIncident(TestFixtures.incident());
-        take(); take(); take(); await(() -> service.sentCount() == 1);
+        take(); take(); take(); deliveries(1, 0);
         assertEquals(List.of(Duration.ofSeconds(1), Duration.ofSeconds(2)), waits);
         assertEquals(0, service.failedCount());
     }
@@ -354,7 +355,7 @@ class DiscordWebhookServiceTest {
         List<Duration> waits = new CopyOnWriteArrayList<>();
         start(waits::add);
         assertTrue(service.submitIncident(TestFixtures.incident()));
-        await(() -> service.failedCount() == 1);
+        deliveries(0, 1);
         assertEquals(List.of(Duration.ofSeconds(1), Duration.ofSeconds(2)), waits);
         assertEquals(0, service.sentCount());
     }
@@ -370,7 +371,7 @@ class DiscordWebhookServiceTest {
         start(waits::add); service.submitIncident(TestFixtures.incident());
         Captured first = take(), second = take();
         assertTrue(second.receivedAt() - first.receivedAt() >= TimeUnit.MILLISECONDS.toNanos(900));
-        await(() -> service.sentCount() == 1);
+        deliveries(1, 0);
         assertEquals(List.of(Duration.ofSeconds(1)), waits);
         release.countDown();
     }
@@ -386,7 +387,7 @@ class DiscordWebhookServiceTest {
     @Test void terminal404IsNotRetriedAndTokenNeverAppearsInLogs() throws Exception {
         reply = (exchange, attempt) -> respond(exchange, 404, "{\"message\":\"Unknown Webhook " + url + "\"}");
         start(duration -> fail("Should not retry 404")); service.submitIncident(TestFixtures.incident());
-        take(); await(() -> service.failedCount() == 1); await(() -> !logs.isEmpty());
+        take(); deliveries(0, 1); logMatching(record -> true);
         assertEquals(1, attempts.get());
         assertTrue(logs.stream().anyMatch(record -> record.getMessage().contains("404 Unknown Webhook")));
         assertTrue(logs.stream().noneMatch(record -> record.getMessage().contains("secret-token")));
@@ -410,8 +411,40 @@ class DiscordWebhookServiceTest {
         take(); Captured second = take();
         assertTrue(second.path().endsWith("-new"));
         assertEquals("Voice flag: Second", embed(second).get("title").getAsString());
-        await(() -> service.sentCount() == 2);
+        deliveries(2, 0);
         assertEquals(0, service.queueSize());
+    }
+
+    @Test void capacityReloadShrinksAndGrowsWithoutDiscardingQueuedMessages() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        reply = (exchange, attempt) -> {
+            if (attempt == 1) { entered.countDown(); release.await(); }
+            respond(exchange, 204, "");
+        };
+        config.set(settings(config.get().flags(), WebhookSettings.disabled(), WebhookSettings.disabled(), 3, 0));
+        start();
+        assertTrue(service.submitIncident(TestFixtures.incident()));
+        assertTrue(entered.await(3, TimeUnit.SECONDS));
+        try {
+            assertTrue(service.submitIncident(TestFixtures.incident("Second", "badword", ModerationAction.NONE, TestFixtures.AUDIO)));
+            assertTrue(service.submitIncident(TestFixtures.incident("Third", "badword", ModerationAction.NONE, TestFixtures.AUDIO)));
+            config.set(settings(config.get().flags(), WebhookSettings.disabled(), WebhookSettings.disabled(), 1, 0));
+            assertFalse(service.submitIncident(TestFixtures.incident()));
+            assertEquals(2, service.queueSize());
+            config.set(settings(config.get().flags(), WebhookSettings.disabled(), WebhookSettings.disabled(), 4, 0));
+            assertTrue(service.submitIncident(TestFixtures.incident("Fourth", "badword", ModerationAction.NONE, TestFixtures.AUDIO)));
+            var completed = service.sendTest(WebhookTestTarget.MUTE);
+            release.countDown();
+            take();
+            assertEquals("Voice flag: Second", embed(take()).get("title").getAsString());
+            assertEquals("Voice flag: Third", embed(take()).get("title").getAsString());
+            assertEquals("Voice flag: Fourth", embed(take()).get("title").getAsString());
+            assertEquals(List.of("mutes: disabled"), completed.get(5, TimeUnit.SECONDS));
+            assertEquals(4, service.sentCount());
+            assertEquals(1, service.droppedCount());
+        } finally {
+            release.countDown();
+        }
     }
 
     @Test void overflowWarningsAreRateLimited() throws Exception {
@@ -423,10 +456,12 @@ class DiscordWebhookServiceTest {
         config.set(settings(config.get().flags(), WebhookSettings.disabled(), WebhookSettings.disabled(), 1, 0));
         start(); service.submitIncident(TestFixtures.incident());
         assertTrue(entered.await(3, TimeUnit.SECONDS));
-        assertTrue(service.submitIncident(TestFixtures.incident()));
+        var completion = service.sendTest(WebhookTestTarget.FLAG);
         for (int index = 0; index < 20; index++) assertFalse(service.submitIncident(TestFixtures.incident()));
-        release.countDown(); await(() -> service.sentCount() == 2);
-        await(() -> logs.stream().anyMatch(record -> record.getMessage().contains("queue full")));
+        release.countDown();
+        assertEquals(List.of("flags: OK (204)"), completion.get(5, TimeUnit.SECONDS));
+        assertEquals(2, service.sentCount());
+        logMatching(record -> record.getMessage().contains("queue full"));
         assertEquals(20, service.droppedCount());
         assertEquals(1, logs.stream().filter(record -> record.getMessage().contains("queue full")).count());
     }
@@ -465,8 +500,7 @@ class DiscordWebhookServiceTest {
         long before = System.nanoTime(); service.close();
         assertTrue(System.nanoTime() - before < TimeUnit.MILLISECONDS.toNanos(200));
         assertEquals(List.of("test: FAILED service closed"), pending.get(3, TimeUnit.SECONDS));
-        await(() -> service.droppedCount() == 1);
-        await(() -> logs.stream().anyMatch(record -> record.getMessage().contains("discarded 1 pending")));
+        logMatching(record -> record.getMessage().contains("discarded 1 pending"));
         assertFalse(service.submitIncident(TestFixtures.incident()));
         service.start();
         assertFalse(service.submitIncident(TestFixtures.incident()));
@@ -488,7 +522,7 @@ class DiscordWebhookServiceTest {
         service.start();
         assertFalse(service.submitIncident(TestFixtures.incident()));
         assertFalse(service.submitIncident(TestFixtures.incident()));
-        await(() -> logs.size() == 1);
+        logMatching(record -> true);
         assertFalse(logs.getFirst().getMessage().contains("secret-token"));
         assertTrue(logs.getFirst().getMessage().contains("/api/webhooks/123/***"));
         config.set(DiscordSettings.disabled());
@@ -526,10 +560,22 @@ class DiscordWebhookServiceTest {
         exchange.sendResponseHeaders(status, status == 204 ? -1 : bytes.length);
         if (status != 204) exchange.getResponseBody().write(bytes);
     }
-    private static void await(BooleanSupplier predicate) throws InterruptedException {
+    private void deliveries(long sent, long failed) throws Exception {
+        DiscordSettings current = config.get();
+        WebhookTestTarget disabled = !current.mutes().enabled() ? WebhookTestTarget.MUTE
+                : !current.reports().enabled() ? WebhookTestTarget.REPORT : WebhookTestTarget.FLAG;
+        var barrier = service.sendTest(disabled).get(5, TimeUnit.SECONDS);
+        assertTrue(barrier.getFirst().endsWith(": disabled"), barrier.toString());
+        assertEquals(sent, service.sentCount());
+        assertEquals(failed, service.failedCount());
+    }
+
+    private void logMatching(java.util.function.Predicate<LogRecord> predicate) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (!predicate.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(5);
-        assertTrue(predicate.getAsBoolean(), "Condition did not become true");
+        while (logs.stream().noneMatch(predicate)) {
+            long left = deadline - System.nanoTime();
+            assertTrue(left > 0 && logEvents.poll(left, TimeUnit.NANOSECONDS) != null, "Expected log was not published");
+        }
     }
     private static WebhookSettings webhook(String url, boolean audio, String role, boolean spoiler) {
         return new WebhookSettings(true, url, "", "", -1, role, audio, true, true, true, spoiler, "", "");

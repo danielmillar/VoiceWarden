@@ -24,15 +24,17 @@ class EvidenceStoreTest {
     private AtomicReference<EvidenceSettings> config;
     private EvidenceStore store;
     private List<LogRecord> logs;
+    private CountDownLatch logged;
 
     @BeforeEach void setup() {
         executor = Executors.newSingleThreadExecutor();
         config = new AtomicReference<>(new EvidenceSettings(EvidenceSettings.Mode.ALL, directory, true, 0, 0));
         logs = new CopyOnWriteArrayList<>();
+        logged = new CountDownLatch(1);
         Logger logger = Logger.getAnonymousLogger();
         logger.setUseParentHandlers(false);
         logger.addHandler(new Handler() {
-            @Override public void publish(LogRecord record) { logs.add(record); }
+            @Override public void publish(LogRecord record) { logs.add(record); logged.countDown(); }
             @Override public void flush() {}
             @Override public void close() {}
         });
@@ -153,8 +155,7 @@ class EvidenceStoreTest {
         executor.shutdown();
         var future = assertDoesNotThrow(() -> store.saveReport(TestFixtures.report()));
         assertThrows(ExecutionException.class, () -> future.get(3, TimeUnit.SECONDS));
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-        while (logs.isEmpty() && System.nanoTime() < deadline) Thread.sleep(5);
+        assertTrue(logged.await(2, TimeUnit.SECONDS));
         assertEquals(1, logs.size());
     }
 

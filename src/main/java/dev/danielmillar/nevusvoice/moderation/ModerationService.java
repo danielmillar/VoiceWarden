@@ -30,8 +30,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Decides what happens to each transcript. Runs on speech-to-text worker threads; everything it triggers is either
- * O(1) (mute map, counters) or handed off asynchronously (LuckPerms, Discord, evidence files, console commands).
+ * Decides what happens to each transcript. Runs on speech-to-text worker threads; it never runs on the server or
+ * voice packet threads. Mute checks and counters are O(1); LuckPerms writes, Discord, evidence files and console
+ * commands are handed off asynchronously. The one exception is an offense count that is not cached yet (an offline
+ * player): loading it from LuckPerms can block this worker.
  *
  * <p>FLAG/profanity hits alert staff only. MUTE-list hits add flags; when
  * the flags inside {@code flag-window} reach {@code flag-threshold} the player is auto-muted for the ladder duration of
@@ -82,6 +84,9 @@ public final class ModerationService {
     /** Speech-to-text worker thread. */
     public void onTranscript(Transcript transcript) {
         PluginConfig cfg = config.get();
+        if (!cfg.enabled()) {
+            return;
+        }
         AudioSegment segment = transcript.segment();
         UUID id = segment.playerId();
         String text = transcript.text();
@@ -114,6 +119,9 @@ public final class ModerationService {
                 muteFlags += match.weight();
             }
         }
+        var storedOffenses = muteFlags > 0 && !mutes.isMuted(id)
+                ? offenses.lookup(id, mod.ladder().resetAfterDays()).join()
+                : dev.danielmillar.nevusvoice.luckperms.LuckPermsHook.Offenses.NONE;
         boolean dryRun = mod.dryRun();
         boolean alreadyMuted = false;
         ModerationAction action = ModerationAction.NONE;
@@ -121,8 +129,11 @@ public final class ModerationService {
         int offense = 0;
         Incident incident;
         // Several workers may hold transcripts of the same player: check → count → mute must be atomic per player,
-        // or two utterances could both cross the threshold and record two offenses. Striped, held for microseconds.
+        // or two utterances could both cross the threshold and record two offenses. Striped lock.
         synchronized (stripes[Math.floorMod(id.hashCode(), stripes.length)]) {
+            if (!config.get().enabled()) {
+                return;
+            }
             if (muteFlags > 0) {
                 if (mutes.isMuted(id)) {
                     alreadyMuted = true; // e.g. speech queued before the mute landed: don't stack punishments
@@ -130,7 +141,7 @@ public final class ModerationService {
                     inWindow = flags.add(id, muteFlags, System.currentTimeMillis(), mod.flagWindow().toMillis());
                     if (inWindow >= mod.flagThreshold()) {
                         int resetDays = mod.ladder().resetAfterDays();
-                        offense = dryRun ? offenses.peekNext(id, resetDays) : offenses.recordNext(id, resetDays);
+                        offense = dryRun ? offenses.peekNext(id, resetDays, storedOffenses) : offenses.recordNext(id, resetDays, storedOffenses);
                         action = ModerationAction.mute(mod.muteDurationFor(offense));
                         flags.reset(id);
                     } else if (mod.warnBelowThreshold()) {

@@ -133,6 +133,105 @@ class MuteServiceTest {
         assertEquals(Duration.ZERO, mute.remaining(201));
     }
 
+    @Test void unmuteCleansStoredMirrorAfterConfigChangesAndRestart() throws Exception {
+        config = Fakes.with(config, "mute", Fakes.with(config.mute(), "disableListening", true));
+        MuteService original = service();
+        original.mute(alice, "Alice", null, "reason", "staff", false).join();
+        var known = original.get(alice).orElseThrow().mirrors();
+        assertEquals(1, known.size());
+        assertEquals(config.mute().speakPermission(), known.getFirst().speakPermission());
+        assertEquals(config.mute().listenPermission(), known.getFirst().listenPermission());
+        original.close();
+        config = Fakes.with(config, "mute", Fakes.with(config.mute(), "luckPerms", false));
+        MuteService reloaded = service();
+        reloaded.start(timer);
+        int before = luckPermsCalls.get();
+        assertEquals(known, reloaded.get(alice).orElseThrow().mirrors());
+        assertTrue(reloaded.unmute(alice).join());
+        assertEquals(before + 1, luckPermsCalls.get());
+        assertFalse(reloaded.isMuted(alice));
+        reloaded.close();
+    }
+
+    @Test void replacementAndReloadRetainEveryAppliedIdentity() {
+        MuteService service = service();
+        service.mute(alice, "Alice", null, "first", "staff", false).join();
+        var first = service.get(alice).orElseThrow().mirrors().getFirst();
+        config = Fakes.with(config, "mute", Fakes.with(config.mute(), "serverContext", "other"));
+        service.reconcileMirrors();
+        var second = service.get(alice).orElseThrow().mirrors();
+        assertEquals(2, second.size());
+        assertEquals(first, second.getFirst());
+        assertEquals("other", second.getLast().serverContext());
+        config = Fakes.with(config, "mute", Fakes.with(config.mute(), "speakPermission", "custom.speak"));
+        service.mute(alice, "Alice", Duration.ofMinutes(1), "replacement", "staff", false).join();
+        assertEquals(3, service.get(alice).orElseThrow().mirrors().size());
+        assertTrue(service.unmute(alice).join());
+    }
+
+    @Test void failedCleanupRetainsLocalMuteForRetry() {
+        MuteService service = service();
+        service.mute(alice, "Alice", null, "reason", "staff", false).join();
+        var original = service.get(alice).orElseThrow();
+        var failed = new CompletableFuture<Void>();
+        UserManager users = Fakes.proxy(UserManager.class, (p, m, a) -> failed);
+        hook = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, a) -> users));
+        MuteService pending = service();
+        pending.mute(alice, "Alice", null, "reason", "staff", false);
+        var removal = pending.unmute(alice);
+        failed.completeExceptionally(new IllegalStateException("storage unavailable"));
+        assertThrows(java.util.concurrent.CompletionException.class, removal::join);
+        assertTrue(pending.isMuted(alice));
+        assertEquals(original.mirrors(), pending.get(alice).orElseThrow().mirrors());
+    }
+
+    @Test void finalSaveWaitsForPendingUnmuteStateChange() {
+        var write = new CompletableFuture<Void>();
+        UserManager users = Fakes.proxy(UserManager.class, (p, m, a) -> write);
+        hook = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, a) -> users));
+        MuteService service = service();
+        service.mute(alice, "Alice", null, "reason", "staff", false);
+        var unmute = service.unmute(alice);
+        var flush = service.flushMirrors();
+        assertFalse(flush.isDone());
+        assertTrue(service.isMuted(alice));
+        write.complete(null);
+        flush.join();
+        assertTrue(unmute.join());
+        assertFalse(service.isMuted(alice));
+    }
+
+    @Test void queuedExpiryCannotRemoveReplacementMute() {
+        var io = new Fakes.Executor(false);
+        MuteService service = service(io);
+        service.mute(alice, "Alice", Duration.ZERO, "expired", "staff", false).join();
+        assertFalse(service.isMuted(alice));
+        service.mute(alice, "Alice", null, "replacement", "staff", false).join();
+        io.drain();
+        assertTrue(service.isMuted(alice));
+        assertEquals("replacement", service.get(alice).orElseThrow().reason());
+    }
+
+    @Test void unreadableMuteStateIsPreservedBeforeFreshSave() throws Exception {
+        Path file = folder.resolve("data/mutes.json");
+        Files.createDirectories(file.getParent());
+        String original = "[unreadable original state";
+        Files.writeString(file, original);
+        MuteService service = service();
+        service.start(timer);
+        service.mute(alice, "Alice", null, "new", "staff", false).join();
+        service.close();
+        try (var files = Files.list(file.getParent())) {
+            var preserved = files.filter(path -> path.getFileName().toString().startsWith("mutes.json.corrupt-")).toList();
+            assertEquals(1, preserved.size());
+            assertEquals(original, Files.readString(preserved.getFirst()));
+        }
+        MuteService reloaded = service();
+        reloaded.start(timer);
+        assertEquals("new", reloaded.get(alice).orElseThrow().reason());
+        reloaded.close();
+    }
+
     private MuteService service() { return service(Runnable::run); }
     private MuteService service(java.util.concurrent.Executor io) {
         return new MuteService(() -> config, () -> messages, hook, new OnlinePlayers(), io, Logger.getLogger("MuteServiceTest"), folder);

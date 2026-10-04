@@ -14,6 +14,8 @@ import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -28,6 +30,7 @@ public final class LuckPermsHook {
     private static final String LAST_OFFENSE_KEY = "nevusvoice-last-offense";
 
     private final LuckPerms luckPerms;
+    private final ConcurrentHashMap<UUID, CompletableFuture<Void>> changes = new ConcurrentHashMap<>();
     private @Nullable EventSubscription<UserDataRecalculateEvent> recalcSubscription;
 
     public LuckPermsHook(LuckPerms luckPerms) {
@@ -40,27 +43,60 @@ public final class LuckPermsHook {
      */
     public CompletableFuture<Void> applyVoiceMute(UUID player, @Nullable Duration duration, String speakPermission,
                                                   @Nullable String listenPermission, String serverContext) {
-        return luckPerms.getUserManager().modifyUser(player, user -> {
-            clearDenied(user, speakPermission, serverContext);
-            user.data().add(denyNode(speakPermission, duration, serverContext),
-                    TemporaryNodeMergeStrategy.REPLACE_EXISTING_IF_DURATION_LONGER);
-            if (listenPermission != null && !listenPermission.isBlank()) {
-                clearDenied(user, listenPermission, serverContext);
-                user.data().add(denyNode(listenPermission, duration, serverContext),
-                        TemporaryNodeMergeStrategy.REPLACE_EXISTING_IF_DURATION_LONGER);
-            }
-        });
+        var mirror = new VoiceMute(speakPermission, listenPermission == null ? "" : listenPermission, serverContext);
+        return replaceVoiceMute(player, List.of(mirror), mirror, duration);
     }
 
     /** Removes denied speak/listen nodes (only {@code value=false} nodes, so admin grants are untouched). */
     public CompletableFuture<Void> clearVoiceMute(UUID player, String speakPermission, String listenPermission,
                                                   String serverContext) {
-        return luckPerms.getUserManager().modifyUser(player, user -> {
-            clearDenied(user, speakPermission, serverContext);
-            if (!listenPermission.isBlank()) {
-                clearDenied(user, listenPermission, serverContext);
+        return replaceVoiceMute(player, List.of(new VoiceMute(speakPermission, listenPermission, serverContext)), null, null);
+    }
+
+    public record VoiceMute(String speakPermission, String listenPermission, String serverContext) { }
+
+    public CompletableFuture<Void> replaceVoiceMute(UUID player, List<VoiceMute> previous,
+                                                     @Nullable VoiceMute next, @Nullable Duration duration) {
+        if (previous.isEmpty() && next == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return modify(player, user -> {
+            for (VoiceMute mirror : previous) {
+                clearDenied(user, mirror.speakPermission(), mirror.serverContext());
+                if (!mirror.listenPermission().isBlank()) {
+                    clearDenied(user, mirror.listenPermission(), mirror.serverContext());
+                }
+            }
+            if (next != null) {
+                user.data().add(denyNode(next.speakPermission(), duration, next.serverContext()),
+                        TemporaryNodeMergeStrategy.REPLACE_EXISTING_IF_DURATION_LONGER);
+                if (!next.listenPermission().isBlank()) {
+                    user.data().add(denyNode(next.listenPermission(), duration, next.serverContext()),
+                            TemporaryNodeMergeStrategy.REPLACE_EXISTING_IF_DURATION_LONGER);
+                }
             }
         });
+    }
+
+    public CompletableFuture<Boolean> hasPermission(UUID player, String permission) {
+        return user(player).thenApply(user -> user.getCachedData()
+                .getPermissionData(luckPerms.getContextManager().getStaticQueryOptions())
+                .checkPermission(permission).asBoolean());
+    }
+
+    private CompletableFuture<User> user(UUID player) {
+        User loaded = luckPerms.getUserManager().getUser(player);
+        return loaded == null ? luckPerms.getUserManager().loadUser(player) : CompletableFuture.completedFuture(loaded);
+    }
+
+    private CompletableFuture<Void> modify(UUID player, Consumer<User> action) {
+        CompletableFuture<Void> next = changes.compute(player, (id, previous) -> {
+            CompletableFuture<Void> ready = previous == null ? CompletableFuture.completedFuture(null) : previous;
+            return ready.handle((ignored, error) -> null).thenCompose(ignored ->
+                    luckPerms.getUserManager().modifyUser(player, action));
+        });
+        next.whenComplete((ignored, error) -> changes.remove(player, next));
+        return next;
     }
 
     private static Node denyNode(String permission, @Nullable Duration duration, String serverContext) {
@@ -90,11 +126,8 @@ public final class LuckPermsHook {
 
     /** Reads offenses from cached data when the user is loaded (online), else loads them from storage. */
     public CompletableFuture<Offenses> offenses(UUID player) {
-        User loaded = luckPerms.getUserManager().getUser(player);
-        if (loaded != null) {
-            return CompletableFuture.completedFuture(readOffenses(loaded));
-        }
-        return luckPerms.getUserManager().loadUser(player).thenApply(LuckPermsHook::readOffenses);
+        CompletableFuture<Void> pending = changes.getOrDefault(player, CompletableFuture.completedFuture(null));
+        return pending.handle((ignored, error) -> null).thenCompose(ignored -> user(player)).thenApply(LuckPermsHook::readOffenses);
     }
 
     /** Synchronous read for an online player; empty if LuckPerms has not loaded the user. Thread-safe and fast. */
@@ -111,7 +144,7 @@ public final class LuckPermsHook {
     }
 
     public CompletableFuture<Void> storeOffenses(UUID player, Offenses offenses) {
-        return luckPerms.getUserManager().modifyUser(player, user -> {
+        return modify(player, user -> {
             user.data().clear(NodeType.META.predicate(m -> m.getMetaKey().equals(OFFENSES_KEY)
                     || m.getMetaKey().equals(LAST_OFFENSE_KEY)));
             if (offenses.count() > 0) {
@@ -130,6 +163,10 @@ public final class LuckPermsHook {
     public void onUserRecalculate(Object plugin, Consumer<UUID> listener) {
         recalcSubscription = luckPerms.getEventBus().subscribe(plugin, UserDataRecalculateEvent.class,
                 event -> listener.accept(event.getUser().getUniqueId()));
+    }
+
+    public CompletableFuture<Void> flush() {
+        return CompletableFuture.allOf(changes.values().toArray(CompletableFuture[]::new));
     }
 
     public void close() {

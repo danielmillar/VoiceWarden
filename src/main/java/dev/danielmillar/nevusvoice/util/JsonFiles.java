@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.util.UUID;
 
 /** Gson with java.time support plus atomic file writes. */
 public final class JsonFiles {
@@ -51,6 +52,12 @@ public final class JsonFiles {
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             return GSON.fromJson(reader, type);
         }
+    }
+
+    public static Path quarantine(Path file) throws IOException {
+        Path preserved = file.resolveSibling(file.getFileName() + ".corrupt-" + UUID.randomUUID());
+        Files.move(file, preserved);
+        return preserved;
     }
 
     public static void writeAtomically(Path file, Object value) throws IOException {

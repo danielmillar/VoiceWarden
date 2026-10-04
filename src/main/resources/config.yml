@@ -6,7 +6,7 @@
 #  (except evidence you choose to send to Discord).
 #
 #  Durations accept: 500ms, 30s, 5m, 1h30m, 2d, 1w
-#  Apply changes with /nevusvoice reload (no restart needed, even for model changes).
+#  Apply changes with /nevusvoice reload (no restart needed, even for model changes; audio.decode-threads is the exception).
 # ──────────────────────────────────────────────────────────────────────────────
 config-version: 1
 
@@ -21,7 +21,7 @@ speech-to-text:
   # Model preset (downloaded automatically on first start into plugins/NevusVoice/models):
   #   parakeet-tdt-v2  English. Fast CPU transcription. ~670 MB download, ~1 GB RAM.
   #   parakeet-tdt-v3  25 European languages, auto-detected. ~670 MB download, ~1 GB RAM.
-  #   whisper-small-en English. Lower CPU cost than Turbo; catches the recorded whisper bypass. ~376 MB download.
+  #   whisper-small-en English. Lower CPU cost than Turbo; accuracy depends on the microphone. ~376 MB download.
   #   whisper-turbo    Whisper Large-v3 Turbo, English transcription. ~1.04 GB download; higher CPU/RAM cost.
   #   custom           Your own sherpa-onnx transducer or English Whisper model (see 'custom' below).
   # Keep VAD enabled to reject non-speech before recognition, especially when using Whisper.
@@ -92,7 +92,7 @@ audio:
   min-level-dbfs: -65
   # Ignore Simple Voice Chat's whisper-key packets. Physical whispers still use the normal audio pipeline.
   ignore-whispers: false
-  # Opus decode threads. 0 = automatic (1 per 4 cores, max 4).
+  # Opus decode threads. 0 = automatic (1 per 4 cores, max 4). Needs a server restart to change.
   decode-threads: 0
   # Per-player decoder state is freed after this long without speech.
   idle-session-timeout: 5m
