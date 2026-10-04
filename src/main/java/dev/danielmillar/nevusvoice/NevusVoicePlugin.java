@@ -13,6 +13,7 @@ import dev.danielmillar.nevusvoice.luckperms.LuckPermsHook;
 import dev.danielmillar.nevusvoice.moderation.CustomCommandRunner;
 import dev.danielmillar.nevusvoice.moderation.ModerationService;
 import dev.danielmillar.nevusvoice.moderation.OffenseTracker;
+import dev.danielmillar.nevusvoice.moderation.StaffModerationService;
 import dev.danielmillar.nevusvoice.moderation.TranscriptBuffer;
 import dev.danielmillar.nevusvoice.moderation.TranscriptLog;
 import dev.danielmillar.nevusvoice.moderation.rules.RuleEngine;
@@ -42,6 +43,7 @@ import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -74,6 +76,7 @@ public final class NevusVoicePlugin extends JavaPlugin {
     private EvidenceStore evidence;
     private TranscriptLog transcriptLog;
     private ModerationService moderation;
+    private StaffModerationService staffModeration;
     private TranscriptionService transcription;
     private AudioIngestService ingest;
     private @Nullable VoiceChatBridge bridge;
@@ -82,7 +85,7 @@ public final class NevusVoicePlugin extends JavaPlugin {
     private ReportService reports;
     private ReportStore reportStore;
     private HealthMonitor health;
-    private boolean started;
+    private volatile boolean started;
 
     @Override
     public void onEnable() {
@@ -135,6 +138,10 @@ public final class NevusVoicePlugin extends JavaPlugin {
         mutes = new MuteService(this::config, this::messages, luckPerms, players, executors.io(), getLogger(), dataFolder);
         alerts = new StaffAlertService(this::config, this::messages, players, getLogger());
         discord = new DiscordWebhookService(() -> config.discord(), http, getLogger());
+        staffModeration = new StaffModerationService(mutes, this::isBypassed, action -> {
+            alerts.staffAction(action);
+            discord.submitStaffAction(action);
+        });
         evidence = new EvidenceStore(() -> config.recordings(),
                 PluginExecutors.bounded(executors.io(), 64, getLogger(), "Evidence storage"), getLogger());
         transcriptLog = new TranscriptLog(dataFolder.resolve("logs"), executors.io(), getLogger());
@@ -197,24 +204,28 @@ public final class NevusVoicePlugin extends JavaPlugin {
         if (!started) {
             return;
         }
-        // Order: stop intake → retire engine → stop notifications → persist state → stop threads.
-        // Nothing here waits on native code or the network: the engine is released by a reaper thread once its
-        // workers exit, Discord/HTTP are cancelled, and the only synchronous IO is writing the small state files when
-        // they changed since their last (debounced) save. Executors get a 250 ms grace period, then are interrupted.
         if (bridge != null) {
             bridge.deactivate();
         }
         ingest.close();
-        transcription.close();
+        started = false;
+        staffModeration.close();
+        CompletableFuture<Void> workers = transcription.closeAsync();
         health.close();
         discord.close();
-        mutes.close();
-        reportStore.saveNow();
-        transcriptLog.close();
         luckPerms.close();
-        executors.shutdown(250);
         http.shutdownNow();
-        started = false;
+        executors.shutdownAfter(workers, () -> {
+            CompletableFuture.allOf(mutes.flushMirrors(), luckPerms.flush()).handle((ignored, error) -> {
+                if (error != null) {
+                    getLogger().log(Level.WARNING, "Could not update the LuckPerms mirror during shutdown", error);
+                }
+                return null;
+            }).join();
+            mutes.close();
+            reportStore.saveNow();
+            transcriptLog.close();
+        });
     }
 
     /** Result of {@link #reload()}. */
@@ -231,11 +242,17 @@ public final class NevusVoicePlugin extends JavaPlugin {
             } catch (IOException e) {
                 throw new IllegalStateException(e.getMessage(), e);
             }
+            if (!started) {
+                throw new IllegalStateException("NevusVoice is stopping");
+            }
             PluginConfig previous = config;
             config = bundle.config();
             messages = bundle.messages();
             rules = bundle.rules();
             transcriptBuffer.setLimits(bufferLimits(config));
+            if (!config.mute().equals(previous.mute())) {
+                mutes.reconcileMirrors();
+            }
             health.start(executors.timer());
 
             String engineNote = "";
@@ -246,6 +263,9 @@ public final class NevusVoicePlugin extends JavaPlugin {
                 engineNote = engineDown ? ", starting speech engine" : ", reloading speech engine in the background";
             }
             ingest.setAccepting(config.enabled() && transcription.state() == TranscriptionService.State.READY);
+            if (!config.enabled()) {
+                transcription.discardQueued();
+            }
             if (config.audio().decodeThreads() != previous.audio().decodeThreads()) {
                 engineNote += " (audio.decode-threads applies after a restart)";
             }
@@ -325,7 +345,13 @@ public final class NevusVoicePlugin extends JavaPlugin {
         return executors;
     }
 
-    public boolean isBypassed(@Nullable Player player) {
-        return player != null && player.hasPermission(AudioIngestService.BYPASS_PERMISSION);
+    public StaffModerationService staffModeration() {
+        return staffModeration;
+    }
+
+    public CompletableFuture<Boolean> isBypassed(UUID id) {
+        Player online = players.get(id);
+        return online == null ? luckPerms.hasPermission(id, AudioIngestService.BYPASS_PERMISSION)
+                : CompletableFuture.completedFuture(online.hasPermission(AudioIngestService.BYPASS_PERMISSION));
     }
 }

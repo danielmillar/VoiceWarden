@@ -60,7 +60,6 @@ public final class DiscordWebhookService implements AutoCloseable {
     private static final int NEW = 0, STARTING = 1, RUNNING = 2, CLOSED = 3;
     private final AtomicInteger lifecycle = new AtomicInteger(NEW);
     private volatile Thread consumer;
-    private int capacity;
     private boolean overflowWarned;
     private long lastOverflowWarning;
 
@@ -85,7 +84,6 @@ public final class DiscordWebhookService implements AutoCloseable {
     public void start() {
         if (!lifecycle.compareAndSet(NEW, STARTING)) return;
         try {
-            capacity = Math.max(0, settings.get().maxQueueSize());
             Thread thread = Thread.ofVirtual().name("NevusVoice-Discord").unstarted(this::consume);
             consumer = thread;
             if (lifecycle.compareAndSet(STARTING, RUNNING)) thread.start();
@@ -116,7 +114,7 @@ public final class DiscordWebhookService implements AutoCloseable {
         int size;
         do {
             size = queued.get();
-            if (size >= capacity) {
+            if (size >= Math.max(0, settings.get().maxQueueSize())) {
                 dropped.incrementAndGet();
                 if (overflowNotice.compareAndSet(false, true)) available.release();
                 return false;

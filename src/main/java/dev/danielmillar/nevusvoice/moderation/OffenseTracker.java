@@ -27,17 +27,27 @@ public final class OffenseTracker {
 
     /** The offense number the next auto-mute would be (1-based), without recording it. */
     public int peekNext(UUID player, int resetAfterDays) {
-        return effective(current(player), resetAfterDays, System.currentTimeMillis()).count() + 1;
+        return peekNext(player, resetAfterDays, current(player));
     }
 
     /** Records an auto-mute and returns its offense number (1-based). */
     public int recordNext(UUID player, int resetAfterDays) {
+        return recordNext(player, resetAfterDays, current(player));
+    }
+
+    int peekNext(UUID player, int resetAfterDays, Offenses stored) {
+        Offenses cached = cache.get(player);
+        return effective(cached != null ? cached : stored, resetAfterDays, System.currentTimeMillis()).count() + 1;
+    }
+
+    int recordNext(UUID player, int resetAfterDays, Offenses stored) {
         long now = System.currentTimeMillis();
         Offenses updated = cache.compute(player, (k, v) -> {
-            Offenses base = effective(v != null ? v : luckPerms.cachedOffenses(k).orElse(Offenses.NONE), resetAfterDays, now);
-            return new Offenses(base.count() + 1, now);
+            Offenses base = effective(v != null ? v : stored, resetAfterDays, now);
+            Offenses next = new Offenses(base.count() + 1, now);
+            persist(player, next);
+            return next;
         });
-        persist(player, updated);
         return updated.count();
     }
 
@@ -48,8 +58,12 @@ public final class OffenseTracker {
     }
 
     public CompletableFuture<Void> reset(UUID player) {
-        cache.put(player, Offenses.NONE);
-        return luckPerms.storeOffenses(player, Offenses.NONE);
+        var result = new java.util.concurrent.atomic.AtomicReference<CompletableFuture<Void>>();
+        cache.compute(player, (id, previous) -> {
+            result.set(luckPerms.storeOffenses(player, Offenses.NONE));
+            return Offenses.NONE;
+        });
+        return result.get();
     }
 
     /** Forget the in-memory copy (player left) so the next lookup sees changes made on other servers. */
@@ -59,7 +73,7 @@ public final class OffenseTracker {
 
     private Offenses current(UUID player) {
         Offenses cached = cache.get(player);
-        return cached != null ? cached : luckPerms.cachedOffenses(player).orElse(Offenses.NONE);
+        return cached != null ? cached : luckPerms.offenses(player).join();
     }
 
     private static Offenses effective(Offenses o, int resetAfterDays, long now) {

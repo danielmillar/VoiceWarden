@@ -26,8 +26,8 @@ import java.util.logging.Logger;
  * <p>Concurrency rules:
  * <ul>
  *   <li>Loads are serialised by {@link #loadLock} and run on an IO thread (downloads can take minutes).</li>
- *   <li>The active {@link Runtime} is published, started and retired only under {@link #swapLock}, which is held for
- *       microseconds and never across IO or native calls. Each runtime is retired exactly once.</li>
+ *   <li>The active {@link Runtime} is published and started only under {@link #swapLock}, which is not held across
+ *       IO or native calls. Each runtime is retired exactly once.</li>
  *   <li>Retiring never blocks the caller: workers are signalled and a reaper thread waits for them to leave native
  *       code before releasing the model. A model is never freed while a worker might still be using it, and is always
  *       freed eventually.</li>
@@ -52,9 +52,11 @@ public final class TranscriptionService implements AutoCloseable {
     private final Object swapLock = new Object();
     private final AtomicLong lastErrorLog = new AtomicLong();
     private final AtomicLong lastDropLog = new AtomicLong();
+    private final Object admissionLock = new Object();
 
     private volatile State state = State.STOPPED;
     private volatile String stateDetail = "";
+    private final List<Runtime> liveRuntimes = new ArrayList<>();
     private @Nullable Runtime runtime; // guarded by swapLock
     private volatile int workerCount;
     private volatile boolean closed;
@@ -89,7 +91,7 @@ public final class TranscriptionService implements AutoCloseable {
             if (!reloading) {
                 setState(State.PREPARING, "checking model files");
             }
-            Path natives = NativeLibraries.ensure(dataFolder, settings.nativeLibraryPath(), downloader, logger);
+            Path natives = NativeLibraries.ensure(dataFolder, settings.nativeLibraryPath(), settings.autoDownload(), downloader, logger);
             NativeLibraries.use(natives);
             ModelManager.ResolvedModel model = ModelManager.resolve(settings, dataFolder, downloader);
             if (!reloading) {
@@ -101,15 +103,20 @@ public final class TranscriptionService implements AutoCloseable {
 
             Runtime next = new Runtime(engine, settings);
             Runtime previous;
+            boolean publish;
             synchronized (swapLock) {
-                if (closed) {
-                    engine.close(); // no worker ever saw it
-                    return;
-                }
+                publish = !closed;
                 previous = runtime;
-                next.start();
-                runtime = next;
-                workerCount = next.threads.size();
+                if (publish) {
+                    liveRuntimes.add(next);
+                    next.start();
+                    runtime = next;
+                    workerCount = next.threads.size();
+                }
+            }
+            if (!publish) {
+                engine.close();
+                return;
             }
             if (previous != null) {
                 previous.retire();
@@ -159,11 +166,14 @@ public final class TranscriptionService implements AutoCloseable {
 
     /** Called from decode threads. Never blocks on anything but a short queue lock. */
     public void submit(AudioSegment segment) {
-        if (closed) {
-            return;
+        int dropped;
+        synchronized (admissionLock) {
+            if (closed || !config.get().enabled()) {
+                return;
+            }
+            PluginConfig.SpeechToText s = config.get().speechToText();
+            dropped = queue.offer(segment, s.queueMaxSize(), s.queueMaxPerPlayer());
         }
-        PluginConfig.SpeechToText s = config.get().speechToText();
-        int dropped = queue.offer(segment, s.queueMaxSize(), s.queueMaxPerPlayer());
         if (dropped > 0) {
             metrics.queueDropped.add(dropped);
             long now = System.currentTimeMillis();
@@ -172,6 +182,12 @@ public final class TranscriptionService implements AutoCloseable {
                 logger.warning("Speech-to-text is falling behind: dropped " + dropped + " queued utterance(s). "
                         + "Consider more speech-to-text.workers / cpu-threads, or check CPU load. (logged at most once a minute)");
             }
+        }
+    }
+
+    public void discardQueued() {
+        synchronized (admissionLock) {
+            metrics.queueDropped.add(queue.clear());
         }
     }
 
@@ -197,21 +213,33 @@ public final class TranscriptionService implements AutoCloseable {
         this.stateDetail = detail;
     }
 
-    /** Returns immediately: workers are signalled and the model is released by a reaper thread once they exit. */
+    /** Same as {@link #closeAsync()}, ignoring the result. */
     @Override
     public void close() {
+        closeAsync();
+    }
+
+    /**
+     * Returns immediately after signalling the workers. The future completes once every runtime, including ones
+     * retired earlier by a reload, has stopped its workers and released its model.
+     */
+    public CompletableFuture<Void> closeAsync() {
         Runtime r;
+        CompletableFuture<Void> stopped;
         synchronized (swapLock) {
             closed = true;
             r = runtime;
             runtime = null;
             workerCount = 0;
+            stopped = CompletableFuture.allOf(liveRuntimes.stream().map(live -> live.stopped)
+                    .toArray(CompletableFuture[]::new));
         }
         readyListener.accept(false);
         if (r != null) {
             r.retire();
         }
         setState(State.STOPPED, "");
+        return stopped;
     }
 
     /** One loaded engine and its worker threads. */
@@ -219,6 +247,7 @@ public final class TranscriptionService implements AutoCloseable {
         final SherpaOnnxEngine engine;
         final PluginConfig.SpeechToText settings;
         final List<Thread> threads = new ArrayList<>();
+        final CompletableFuture<Void> stopped = new CompletableFuture<>();
         final AtomicBoolean retired = new AtomicBoolean();
         volatile boolean running = true;
 
@@ -241,9 +270,9 @@ public final class TranscriptionService implements AutoCloseable {
             try (SherpaOnnxEngine.Worker worker = engine.newWorker()) {
                 long maxAge = settings.queueMaxAge().toNanos();
                 while (running) {
-                    List<AudioSegment> batch = queue.takeBatch(settings.maxBatchSize(), 250, maxAge, metrics);
-                    if (!batch.isEmpty()) {
-                        process(worker, batch);
+                    SegmentQueue.Batch batch = queue.takeBatchSnapshot(settings.maxBatchSize(), 250, maxAge, metrics);
+                    if (!batch.segments().isEmpty()) {
+                        process(worker, batch.segments(), batch.generation());
                     }
                 }
             } catch (InterruptedException e) {
@@ -253,7 +282,11 @@ public final class TranscriptionService implements AutoCloseable {
             }
         }
 
-        private void process(SherpaOnnxEngine.Worker worker, List<AudioSegment> batch) {
+        private void process(SherpaOnnxEngine.Worker worker, List<AudioSegment> batch, long generation) {
+            if (!config.get().enabled() || generation != queue.generation()) {
+                metrics.queueDropped.add(batch.size());
+                return;
+            }
             List<SherpaOnnxEngine.Result> results;
             long t0 = System.nanoTime();
             try {
@@ -268,8 +301,16 @@ public final class TranscriptionService implements AutoCloseable {
                 return;
             }
             long done = System.nanoTime();
+            if (!config.get().enabled() || generation != queue.generation()) {
+                metrics.queueDropped.add(batch.size());
+                return;
+            }
             metrics.decodeMillis.add(TimeUnit.NANOSECONDS.toMillis(done - t0));
             for (int i = 0; i < batch.size(); i++) {
+                if (!config.get().enabled() || generation != queue.generation()) {
+                    metrics.queueDropped.add(batch.size() - i);
+                    return;
+                }
                 AudioSegment segment = batch.get(i);
                 SherpaOnnxEngine.Result result = results.get(i);
                 if (result.text() == null) {
@@ -315,7 +356,16 @@ public final class TranscriptionService implements AutoCloseable {
                         Thread.currentThread().interrupt();
                     }
                 }
-                engine.close();
+                try {
+                    engine.close();
+                    stopped.complete(null);
+                } catch (Throwable error) {
+                    stopped.completeExceptionally(error);
+                } finally {
+                    synchronized (swapLock) {
+                        liveRuntimes.remove(this);
+                    }
+                }
             });
         }
     }

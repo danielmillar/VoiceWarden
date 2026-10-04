@@ -38,10 +38,18 @@ public final class NativeLibraries {
     }
 
     /**
-     * @param overrideDir user-provided directory, or blank to download automatically
+     * Always allows downloading.
+     *
+     * @param overrideDir user-provided directory, or blank to use the copy under the plugin data folder, downloading it if missing
      * @return the directory containing the native libraries
      */
     public static Path ensure(Path dataFolder, String overrideDir, Downloader downloader, Logger logger)
+            throws IOException, InterruptedException {
+        return ensure(dataFolder, overrideDir, true, downloader, logger);
+    }
+
+    /** As above; with {@code autoDownload} false, missing libraries fail with manual install steps instead of downloading. */
+    public static Path ensure(Path dataFolder, String overrideDir, boolean autoDownload, Downloader downloader, Logger logger)
             throws IOException, InterruptedException {
         String jni = System.mapLibraryName("sherpa-onnx-jni");
         String ort = System.mapLibraryName("onnxruntime");
@@ -63,6 +71,11 @@ public final class NativeLibraries {
         }
         URI uri = URI.create("https://github.com/k2-fsa/sherpa-onnx/releases/download/v" + VERSION
                 + "/sherpa-onnx-native-lib-" + platform + "-" + VERSION + ".jar");
+        if (!autoDownload) {
+            throw new IOException("Native libraries for " + platform + " are missing from " + dir
+                    + " and speech-to-text.auto-download is false. Download " + uri
+                    + " and extract " + jni + " and " + ort + " into " + dir + ", then restart.");
+        }
         Path jar = dir.resolveSibling(platform + ".jar");
         downloader.download(uri, jar, -1, sha, "speech engine native libraries (" + platform + ")");
         Files.createDirectories(dir);

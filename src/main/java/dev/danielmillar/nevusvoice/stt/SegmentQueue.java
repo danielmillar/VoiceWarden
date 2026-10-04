@@ -22,6 +22,9 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 final class SegmentQueue {
 
+    record Batch(List<AudioSegment> segments, long generation) { }
+
+    private volatile long generation;
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition notEmpty = lock.newCondition();
     private final ArrayDeque<AudioSegment> queue = new ArrayDeque<>();
@@ -65,12 +68,16 @@ final class SegmentQueue {
      * @return possibly empty list (timeout or only stale items)
      */
     List<AudioSegment> takeBatch(int max, long timeoutMillis, long maxAgeNanos, Metrics metrics) throws InterruptedException {
+        return takeBatchSnapshot(max, timeoutMillis, maxAgeNanos, metrics).segments();
+    }
+
+    Batch takeBatchSnapshot(int max, long timeoutMillis, long maxAgeNanos, Metrics metrics) throws InterruptedException {
         lock.lockInterruptibly();
         try {
             long nanos = TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
             while (queue.isEmpty()) {
                 if (nanos <= 0) {
-                    return List.of();
+                    return new Batch(List.of(), generation);
                 }
                 nanos = notEmpty.awaitNanos(nanos);
             }
@@ -89,7 +96,7 @@ final class SegmentQueue {
             if (!queue.isEmpty()) {
                 notEmpty.signal(); // let another idle worker take the rest
             }
-            return batch;
+            return new Batch(batch, generation);
         } finally {
             lock.unlock();
         }
@@ -97,6 +104,24 @@ final class SegmentQueue {
 
     int size() {
         return size.get();
+    }
+
+    long generation() {
+        return generation;
+    }
+
+    int clear() {
+        lock.lock();
+        try {
+            generation++;
+            int dropped = queue.size();
+            queue.clear();
+            perPlayer.clear();
+            size.set(0);
+            return dropped;
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void decrement(UUID player) {

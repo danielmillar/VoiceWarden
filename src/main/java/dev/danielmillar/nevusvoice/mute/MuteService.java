@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,7 +47,12 @@ public final class MuteService implements AutoCloseable {
 
     /** @param expiresAt epoch millis, or {@link #PERMANENT} */
     public record Mute(UUID playerId, String playerName, long createdAt, long expiresAt, String reason, String actor,
-                       boolean automatic) {
+                       boolean automatic, List<LuckPermsHook.VoiceMute> mirrors) {
+        public Mute(UUID playerId, String playerName, long createdAt, long expiresAt, String reason, String actor,
+                    boolean automatic) {
+            this(playerId, playerName, createdAt, expiresAt, reason, actor, automatic, null);
+        }
+
         public boolean expired(long now) {
             return now >= expiresAt;
         }
@@ -64,6 +71,9 @@ public final class MuteService implements AutoCloseable {
     private final Logger logger;
     private final Path file;
     private final AtomicBoolean saveScheduled = new AtomicBoolean();
+    private boolean writable = true;
+    private final Set<CompletableFuture<?>> pending = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> expiring = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean dirty = new AtomicBoolean();
     private final Object saveLock = new Object();
     private volatile Consumer<StaffAction> expiryListener = action -> { };
@@ -81,21 +91,32 @@ public final class MuteService implements AutoCloseable {
         this.file = dataFolder.resolve("data").resolve("mutes.json");
     }
 
-    /** Loads persisted mutes synchronously (startup only; a small file) and starts the expiry sweeper. */
+    /** Loads persisted mutes synchronously (startup only) and starts the expiry sweeper. */
     public void start(ScheduledExecutorService timer) {
         this.timer = timer;
         if (Files.exists(file)) {
             try {
                 List<Mute> stored = JsonFiles.read(file, new TypeToken<List<Mute>>() { }.getType());
-                long now = System.currentTimeMillis();
-                if (stored != null) {
-                    stored.stream().filter(m -> m != null && m.playerId() != null && !m.expired(now))
-                            .forEach(m -> mutes.put(m.playerId(), m));
+                if (stored == null || stored.stream().anyMatch(m -> m == null || m.playerId() == null
+                        || m.playerName() == null || m.reason() == null || m.actor() == null
+                        || (m.mirrors() != null && m.mirrors().stream().anyMatch(v -> v == null
+                        || v.speakPermission() == null || v.listenPermission() == null || v.serverContext() == null)))) {
+                    throw new IOException("Invalid mute state");
                 }
+                stored.forEach(m -> mutes.put(m.playerId(), withMirrors(m, mirrors(m))));
             } catch (IOException | RuntimeException e) {
-                logger.log(Level.WARNING, "Could not read " + file + "; starting with no local mutes", e);
+                try {
+                    Path preserved = JsonFiles.quarantine(file);
+                    logger.log(Level.WARNING, "Could not read " + file + "; moved it to " + preserved
+                            + " and started with empty state.", e);
+                } catch (IOException preservationFailure) {
+                    writable = false;
+                    e.addSuppressed(preservationFailure);
+                    logger.log(Level.SEVERE, "Could not preserve " + file + "; writes are suspended to avoid overwriting it.", e);
+                }
             }
         }
+        reconcileMirrors();
         sweeper = timer.scheduleWithFixedDelay(this::sweepExpired, 1, 1, TimeUnit.SECONDS);
     }
 
@@ -110,9 +131,7 @@ public final class MuteService implements AutoCloseable {
             return false;
         }
         if (mute.expired(System.currentTimeMillis())) {
-            if (mutes.remove(player, mute)) {
-                io.execute(() -> expired(mute));
-            }
+            expireLater(mute);
             return false;
         }
         return true;
@@ -142,68 +161,151 @@ public final class MuteService implements AutoCloseable {
                                        String actor, boolean automatic) {
         long now = System.currentTimeMillis();
         long expires = duration == null ? PERMANENT : now + duration.toMillis();
-        mutes.put(playerId, new Mute(playerId, playerName, now, expires, reason, actor, automatic));
-        scheduleSave();
         PluginConfig.Mute settings = config.get().mute();
+        var result = new AtomicReference<CompletableFuture<Void>>();
+        mutes.compute(playerId, (id, previous) -> {
+            var known = new ArrayList<LuckPermsHook.VoiceMute>(previous == null ? List.of() : mirrors(previous));
+            LuckPermsHook.VoiceMute next = mirror(settings);
+            if (next != null && !known.contains(next)) {
+                known.add(next);
+            }
+            result.set(luckPerms.replaceVoiceMute(playerId, known, next, duration));
+            return new Mute(playerId, playerName, now, expires, reason, actor, automatic, List.copyOf(known));
+        });
+        scheduleSave();
         Player online = players.get(playerId);
         if (online != null && settings.notifyPlayer()) {
             online.sendMessage(messages.get().render(duration == null ? "player.muted-permanent" : "player.muted",
                     Messages.text("duration", Durations.format(duration)), Messages.text("reason", reason)));
         }
-        if (!settings.luckPerms()) {
-            return CompletableFuture.completedFuture(null);
-        }
-        return luckPerms.applyVoiceMute(playerId, duration, settings.speakPermission(),
-                        settings.disableListening() ? settings.listenPermission() : null, settings.serverContext())
-                .exceptionally(error -> {
-                    logger.log(Level.WARNING, "Could not apply LuckPerms voice mute for " + playerName
-                            + " (the local mute is still active)", error);
-                    return null;
-                });
+        return track(result.get().exceptionally(error -> {
+            logger.log(Level.WARNING, "Could not update the LuckPerms mirror for " + playerName
+                    + ". The local voice mute is still enforced.", error);
+            return null;
+        }));
     }
 
-    /** @return true if the player had a local mute (LuckPerms deny nodes are removed either way) */
     public CompletableFuture<Boolean> unmute(UUID playerId) {
-        Mute removed = mutes.remove(playerId);
-        scheduleSave();
-        PluginConfig.Mute settings = config.get().mute();
-        if (removed != null && settings.notifyPlayer()) {
-            Player online = players.get(playerId);
-            if (online != null) {
-                online.sendMessage(messages.get().render("player.unmuted"));
+        return unmute(playerId, null);
+    }
+
+    private CompletableFuture<Boolean> unmute(UUID playerId, @Nullable Mute expected) {
+        var found = new AtomicReference<Mute>();
+        var result = new AtomicReference<CompletableFuture<Void>>();
+        mutes.compute(playerId, (id, current) -> {
+            if (expected != null && current != expected) {
+                result.set(CompletableFuture.completedFuture(null));
+                return current;
+            }
+            found.set(current);
+            List<LuckPermsHook.VoiceMute> known = current == null ? currentMirrors() : mirrors(current);
+            result.set(luckPerms.replaceVoiceMute(playerId, known, null, null));
+            return current;
+        });
+        Mute original = found.get();
+        return track(result.get().thenApply(ignored -> {
+            boolean removed = original != null && mutes.remove(playerId, original);
+            if (removed) {
+                scheduleSave();
+                if (config.get().mute().notifyPlayer()) {
+                    Player online = players.get(playerId);
+                    if (online != null) {
+                        online.sendMessage(messages.get().render("player.unmuted"));
+                    }
+                }
+            }
+            return removed;
+        }).whenComplete((removed, error) -> {
+            if (error != null) {
+                logger.log(Level.WARNING, "Could not remove the LuckPerms mirror for " + playerId
+                        + ". The local mute was kept so it can be cleaned up later.", error);
+            }
+        }));
+    }
+
+    public void reconcileMirrors() {
+        for (UUID player : mutes.keySet()) {
+            var result = new AtomicReference<CompletableFuture<Void>>();
+            mutes.computeIfPresent(player, (id, current) -> {
+                var known = new ArrayList<>(mirrors(current));
+                LuckPermsHook.VoiceMute next = current.expired(System.currentTimeMillis()) ? null : mirror(config.get().mute());
+                if (next != null && !known.contains(next)) {
+                    known.add(next);
+                }
+                result.set(luckPerms.replaceVoiceMute(id, known, next, current.remaining(System.currentTimeMillis())));
+                return withMirrors(current, List.copyOf(known));
+            });
+            if (result.get() != null) {
+                track(result.get().exceptionally(error -> {
+                    logger.log(Level.WARNING, "Could not update the LuckPerms mirror for " + player
+                            + ". The local voice mute is still enforced.", error);
+                    return null;
+                }));
             }
         }
-        if (!settings.luckPerms()) {
-            return CompletableFuture.completedFuture(removed != null);
+        if (!mutes.isEmpty()) {
+            scheduleSave();
         }
-        return luckPerms.clearVoiceMute(playerId, settings.speakPermission(), settings.listenPermission(), settings.serverContext())
-                .handle((ok, error) -> {
-                    if (error != null) {
-                        logger.log(Level.WARNING, "Could not remove LuckPerms voice mute nodes", error);
-                    }
-                    return removed != null;
-                });
+    }
+
+    public CompletableFuture<Void> flushMirrors() {
+        return CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new));
+    }
+
+    private <T> CompletableFuture<T> track(CompletableFuture<T> future) {
+        pending.add(future);
+        future.whenComplete((ignored, error) -> pending.remove(future));
+        return future;
+    }
+
+    private List<LuckPermsHook.VoiceMute> mirrors(Mute mute) {
+        if (mute.mirrors() != null) {
+            return mute.mirrors();
+        }
+        PluginConfig.Mute settings = config.get().mute();
+        return List.of(new LuckPermsHook.VoiceMute(settings.speakPermission(), settings.listenPermission(), settings.serverContext()));
+    }
+
+    private List<LuckPermsHook.VoiceMute> currentMirrors() {
+        PluginConfig.Mute settings = config.get().mute();
+        return settings.luckPerms() ? List.of(new LuckPermsHook.VoiceMute(settings.speakPermission(),
+                settings.listenPermission(), settings.serverContext())) : List.of();
+    }
+
+    private static LuckPermsHook.@Nullable VoiceMute mirror(PluginConfig.Mute settings) {
+        return settings.luckPerms() ? new LuckPermsHook.VoiceMute(settings.speakPermission(),
+                settings.disableListening() ? settings.listenPermission() : "", settings.serverContext()) : null;
+    }
+
+    private static Mute withMirrors(Mute mute, List<LuckPermsHook.VoiceMute> mirrors) {
+        return new Mute(mute.playerId(), mute.playerName(), mute.createdAt(), mute.expiresAt(), mute.reason(),
+                mute.actor(), mute.automatic(), mirrors);
     }
 
     private void sweepExpired() {
         long now = System.currentTimeMillis();
         for (Mute mute : mutes.values()) {
-            if (mute.expired(now) && mutes.remove(mute.playerId(), mute)) {
-                io.execute(() -> expired(mute));
+            if (mute.expired(now)) {
+                expireLater(mute);
             }
         }
     }
 
-    private void expired(Mute mute) {
-        scheduleSave();
-        if (config.get().mute().notifyPlayer()) {
-            Player online = players.get(mute.playerId());
-            if (online != null) {
-                online.sendMessage(messages.get().render("player.unmuted"));
-            }
+    private void expireLater(Mute mute) {
+        if (!expiring.add(mute.playerId())) {
+            return;
         }
-        expiryListener.accept(new StaffAction(StaffAction.Type.UNMUTE, mute.playerId(), mute.playerName(), "System",
-                null, "Mute expired", Instant.now()));
+        try {
+            io.execute(() -> unmute(mute.playerId(), mute).whenComplete((removed, error) -> {
+                expiring.remove(mute.playerId());
+                if (Boolean.TRUE.equals(removed)) {
+                    expiryListener.accept(new StaffAction(StaffAction.Type.UNMUTE, mute.playerId(), mute.playerName(),
+                            "System", null, "Mute expired", Instant.now()));
+                }
+            }));
+        } catch (RuntimeException e) {
+            expiring.remove(mute.playerId());
+        }
     }
 
     /** Coalesces bursts of changes into one write about a second later. */
@@ -224,11 +326,11 @@ public final class MuteService implements AutoCloseable {
     private void saveNow() {
         synchronized (saveLock) {
             saveScheduled.set(false);
-            if (!dirty.getAndSet(false)) {
+            if (!writable || !dirty.getAndSet(false)) {
                 return;
             }
             try {
-                JsonFiles.writeAtomically(file, active());
+                JsonFiles.writeAtomically(file, new ArrayList<>(mutes.values()));
             } catch (IOException e) {
                 dirty.set(true);
                 logger.log(Level.WARNING, "Could not save " + file, e);
@@ -236,7 +338,10 @@ public final class MuteService implements AutoCloseable {
         }
     }
 
-    /** Final save on shutdown, only if something changed since the last debounced write (a few KB at most). */
+    /**
+     * Final save on shutdown, only if something changed since the last debounced write. Writes a file on the calling
+     * thread, so call it off the server thread, after {@link #flushMirrors()} has completed.
+     */
     @Override
     public void close() {
         if (sweeper != null) {
