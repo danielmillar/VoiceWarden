@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/** {@code /reportvoice}, {@code /viewreport} and {@code /reportinbox}, matching the original plugin. */
+/** {@code /reportvoice}, {@code /viewreport} and {@code /reportinbox}. */
 final class ReportCommands {
 
     private static final int LINES_PER_PAGE = 6;

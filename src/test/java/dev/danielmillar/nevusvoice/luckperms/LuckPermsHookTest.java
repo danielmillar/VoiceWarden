@@ -16,14 +16,8 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LuckPermsHookTest {
-    @Test void readsHistoryFromLegacyMetadata() {
-        var hook = hook(Map.of("voicesentinel-offenses", "3", "voicesentinel-last-offense", "12345"));
-        assertEquals(new LuckPermsHook.Offenses(3, 12345), hook.cachedOffenses(UUID.randomUUID()).orElseThrow());
-    }
-
-    @Test void prefersRenamedMetadataOverLegacyHistory() {
-        var hook = hook(Map.of("voicesentinel-offenses", "3", "voicesentinel-last-offense", "12345",
-                "nevusvoice-offenses", "4", "nevusvoice-last-offense", "67890"));
+    @Test void readsNevusVoiceHistory() {
+        var hook = hook(Map.of("nevusvoice-offenses", "4", "nevusvoice-last-offense", "67890"));
         assertEquals(new LuckPermsHook.Offenses(4, 67890), hook.cachedOffenses(UUID.randomUUID()).orElseThrow());
     }
 
@@ -31,10 +25,18 @@ class LuckPermsHookTest {
         assertEquals(LuckPermsHook.Offenses.NONE, hook(Map.of()).cachedOffenses(UUID.randomUUID()).orElseThrow());
     }
 
+    @Test void ignoresOtherPluginHistory() {
+        var hook = hook(Map.of("otherplugin-offenses", "3", "otherplugin-last-offense", "12345"));
+        assertEquals(LuckPermsHook.Offenses.NONE, hook.cachedOffenses(UUID.randomUUID()).orElseThrow());
+    }
+
     @SuppressWarnings("unchecked")
     private static LuckPermsHook hook(Map<String, String> values) {
         CachedMetaData meta = Fakes.proxy(CachedMetaData.class, (p, m, args) -> {
             if (!m.getName().equals("getMetaValue")) throw new AssertionError(m);
+            if (!args[0].equals("nevusvoice-offenses") && !args[0].equals("nevusvoice-last-offense")) {
+                throw new AssertionError("Must only read NevusVoice metadata: " + args[0]);
+            }
             String value = values.get((String) args[0]);
             return value == null ? Optional.empty() : Optional.of(((Function<String, ?>) args[1]).apply(value));
         });

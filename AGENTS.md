@@ -82,8 +82,8 @@ Keep these terms distinct in code, comments, docs and messages.
 - Fix failing checks and report any remaining validation limits accurately.
 - Keep voice permission enforcement, audio queue ordering and asynchronous processing unchanged unless the task
   explicitly changes them. Do not block the Minecraft server or voice packet threads with transcription or I/O.
-- Preserve configuration, models, recordings, persistent mutes, reports and LuckPerms offense history when migrating
-  plugin data. Retain legacy VoiceSentinel references only where needed for migration compatibility.
+- Preserve NevusVoice's own configuration, models, recordings, persistent mutes, reports and LuckPerms offence history
+  across its updates.
 - Keep local server runtime files (`run/`), build output, private backups and secrets out of Git.
 - Keep README commands, permissions, plugin names and setup instructions aligned with the implementation.
 - Deployment is separate from a commit or PR. Run deployment tasks only when explicitly requested.

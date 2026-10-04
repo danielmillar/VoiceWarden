@@ -26,9 +26,6 @@ public final class LuckPermsHook {
 
     private static final String OFFENSES_KEY = "nevusvoice-offenses";
     private static final String LAST_OFFENSE_KEY = "nevusvoice-last-offense";
-    // Read old persisted history until the next write migrates it to the NevusVoice namespace.
-    private static final String LEGACY_OFFENSES_KEY = "voicesentinel-offenses";
-    private static final String LEGACY_LAST_OFFENSE_KEY = "voicesentinel-last-offense";
 
     private final LuckPerms luckPerms;
     private @Nullable EventSubscription<UserDataRecalculateEvent> recalcSubscription;
@@ -108,18 +105,15 @@ public final class LuckPermsHook {
 
     private static Offenses readOffenses(User user) {
         var meta = user.getCachedData().getMetaData();
-        int count = meta.getMetaValue(OFFENSES_KEY, Integer::parseInt)
-                .or(() -> meta.getMetaValue(LEGACY_OFFENSES_KEY, Integer::parseInt)).orElse(0);
-        long last = meta.getMetaValue(LAST_OFFENSE_KEY, Long::parseLong)
-                .or(() -> meta.getMetaValue(LEGACY_LAST_OFFENSE_KEY, Long::parseLong)).orElse(0L);
+        int count = meta.getMetaValue(OFFENSES_KEY, Integer::parseInt).orElse(0);
+        long last = meta.getMetaValue(LAST_OFFENSE_KEY, Long::parseLong).orElse(0L);
         return new Offenses(count, last);
     }
 
     public CompletableFuture<Void> storeOffenses(UUID player, Offenses offenses) {
         return luckPerms.getUserManager().modifyUser(player, user -> {
             user.data().clear(NodeType.META.predicate(m -> m.getMetaKey().equals(OFFENSES_KEY)
-                    || m.getMetaKey().equals(LAST_OFFENSE_KEY) || m.getMetaKey().equals(LEGACY_OFFENSES_KEY)
-                    || m.getMetaKey().equals(LEGACY_LAST_OFFENSE_KEY)));
+                    || m.getMetaKey().equals(LAST_OFFENSE_KEY)));
             if (offenses.count() > 0) {
                 user.data().add(MetaNode.builder(OFFENSES_KEY, Integer.toString(offenses.count())).build());
                 user.data().add(MetaNode.builder(LAST_OFFENSE_KEY, Long.toString(offenses.lastEpochMillis())).build());

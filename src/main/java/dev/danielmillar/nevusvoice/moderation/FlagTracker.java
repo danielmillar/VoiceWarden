@@ -4,7 +4,7 @@ import java.util.ArrayDeque;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Sliding-window count of mute-flags per player (original plugin: "flag_threshold"). Thread-safe. */
+/** Sliding-window count of mute-flags per player. Thread-safe. */
 final class FlagTracker {
 
     private record Hit(long at, int weight) {

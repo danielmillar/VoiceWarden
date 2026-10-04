@@ -18,7 +18,7 @@ public final class TurboModelActivation {
     private TurboModelActivation() {
     }
 
-    /** Leaves a byte-for-byte backup and preserves settings edited while the previous plugin was running. */
+    /** Leaves a byte-for-byte backup and preserves unrelated NevusVoice settings. */
     public static Optional<Path> apply(Path dataFolder) throws IOException {
         Path request = dataFolder.resolve(REQUEST_FILE);
         if (!Files.exists(request)) {

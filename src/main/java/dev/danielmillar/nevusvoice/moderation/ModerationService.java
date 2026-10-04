@@ -33,7 +33,7 @@ import java.util.logging.Logger;
  * Decides what happens to each transcript. Runs on speech-to-text worker threads; everything it triggers is either
  * O(1) (mute map, counters) or handed off asynchronously (LuckPerms, Discord, evidence files, console commands).
  *
- * <p>Model (compatible with the original plugin): FLAG/profanity hits alert staff only. MUTE-list hits add flags; when
+ * <p>FLAG/profanity hits alert staff only. MUTE-list hits add flags; when
  * the flags inside {@code flag-window} reach {@code flag-threshold} the player is auto-muted for the ladder duration of
  * their offense number, otherwise they may be warned.
  */

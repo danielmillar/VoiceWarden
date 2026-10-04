@@ -3,7 +3,6 @@ package dev.danielmillar.nevusvoice;
 import dev.danielmillar.nevusvoice.command.CommandRegistrar;
 import dev.danielmillar.nevusvoice.concurrent.PluginExecutors;
 import dev.danielmillar.nevusvoice.config.ConfigBundle;
-import dev.danielmillar.nevusvoice.config.LegacyDataMigration;
 import dev.danielmillar.nevusvoice.config.Messages;
 import dev.danielmillar.nevusvoice.config.PluginConfig;
 import dev.danielmillar.nevusvoice.config.TurboModelActivation;
@@ -88,15 +87,6 @@ public final class NevusVoicePlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         Path dataFolder = getDataFolder().toPath();
-        try {
-            if (LegacyDataMigration.migrate(dataFolder)) {
-                getLogger().info("Migrated existing NevusVoice data to " + dataFolder);
-            }
-        } catch (IOException e) {
-            getLogger().log(Level.SEVERE, "Could not migrate existing plugin data; NevusVoice is disabled", e);
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
         for (String name : DEFAULT_FILES) {
             if (!new File(getDataFolder(), name).exists()) {
                 saveResource(name, false);

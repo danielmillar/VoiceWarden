@@ -167,14 +167,14 @@ are downloaded from Hugging Face, verified by SHA-256, and resumed if interrupte
 
 ### Detection
 
-- Word lists use `[EN-PROFANITY]` (flag) and `[EN-MUTE]` (mute) sections, compatible with the original plugin.
+- Word lists use `[EN-PROFANITY]` (flag) and `[EN-MUTE]` (mute) sections.
 - `rules.yml` adds phrases, wildcards, regex, weights and an allowlist. The English defaults include over 380
   words and phrases and 18 advanced rules. Spelled-out letters ("k y s") and hyphenated compounds are matched.
 - Child exploitation requests and offers have weight 3. Sexual coercion, explicit sexual threats and some other
   severe rules have weight 2. Short ambiguous abbreviations are not standalone terms.
 - Utterances end when push-to-talk is released or after `audio.silence-timeout`. Long speech is split at its quietest
   point. Quiet speech is boosted with `speech-to-text.input-gain` (target −20 dBFS, maximum +40 dB). The capture
-  floor is `audio.min-level-dbfs: -65`; older configs with `-50` need updating to catch quiet whispers.
+  floor is `audio.min-level-dbfs: -65`.
   `audio.ignore-whispers` refers to the voice chat whisper key, not physical whispering.
 - Mute enforcement is instant in-process and mirrored as temporary LuckPerms `voicechat.speak` deny nodes. Offence
   history is stored in LuckPerms meta.
