@@ -154,7 +154,7 @@ mute:
 
 # ── Staff alerts ─────────────────────────────────────────────────────────────
 alerts:
-  # In-game alerts for players with voicesentinel.alerts (toggle per player with /nv alerts).
+  # In-game alerts for players with nevusvoice.alerts (toggle per player with /nv alerts).
   staff: true
   # Log flagged speech to the console.
   console: true

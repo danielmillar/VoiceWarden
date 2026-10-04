@@ -69,7 +69,7 @@ tasks.processResources {
     filesMatching("paper-plugin.yml") {
         expand("version" to pluginVersion)
     }
-    filesMatching("voicesentinel-build.properties") {
+    filesMatching("nevusvoice-build.properties") {
         expand("version" to pluginVersion, "sherpaOnnxVersion" to sherpaOnnxVersion)
     }
 }
@@ -77,10 +77,10 @@ tasks.processResources {
 tasks.test {
     useJUnitPlatform()
     // Native-backed integration tests are opt-in: -PsherpaIntegration=/path/to/models
-    providers.gradleProperty("sherpaIntegration").orNull?.let { systemProperty("voicesentinel.it.models", it) }
-    providers.gradleProperty("sherpaNatives").orNull?.let { systemProperty("voicesentinel.it.natives", it) }
-    providers.gradleProperty("sherpaRecordings").orNull?.let { systemProperty("voicesentinel.it.recordings", it) }
-    providers.gradleProperty("sherpaModel").orNull?.let { systemProperty("voicesentinel.it.model", it) }
+    providers.gradleProperty("sherpaIntegration").orNull?.let { systemProperty("nevusvoice.it.models", it) }
+    providers.gradleProperty("sherpaNatives").orNull?.let { systemProperty("nevusvoice.it.natives", it) }
+    providers.gradleProperty("sherpaRecordings").orNull?.let { systemProperty("nevusvoice.it.recordings", it) }
+    providers.gradleProperty("sherpaModel").orNull?.let { systemProperty("nevusvoice.it.model", it) }
 }
 
 tasks.jar {

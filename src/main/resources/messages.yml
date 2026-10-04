@@ -47,7 +47,7 @@ command:
   muted: "<prefix>Voice-muted <accent><player></accent> for <accent><duration></accent>."
   unmuted: "<prefix>Removed the voice mute from <accent><player></accent>."
   not-muted: "<prefix><accent><player></accent> is not voice-muted."
-  cannot-mute-bypass: "<prefix><accent><player></accent> has <accent>voicesentinel.bypass</accent> and cannot be voice-muted."
+  cannot-mute-bypass: "<prefix><accent><player></accent> has <accent>nevusvoice.bypass</accent> and cannot be voice-muted."
   mutes-header: "<prefix>Active voice mutes <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"
   mutes-entry: " <dark_gray>▪</dark_gray> <accent><player></accent> <dark_gray>»</dark_gray> <body><remaining> left <dark_gray>•</dark_gray> <muted><reason> (by <actor>)"
   mutes-empty: "<prefix>Nobody is voice-muted."
