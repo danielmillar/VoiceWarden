@@ -1,12 +1,12 @@
 # ──────────────────────────────────────────────────────────────────────────────
-#  NevusVoice: local, real-time voice chat moderation for Simple Voice Chat
+#  VoiceWarden: local, real-time voice chat moderation for Simple Voice Chat
 #
 #  All speech recognition runs on THIS machine with an embedded model:
 #  no external processor, no API keys, and no audio ever leaves the server
 #  (except evidence you choose to send to Discord).
 #
 #  Durations accept: 500ms, 30s, 5m, 1h30m, 2d, 1w
-#  Apply changes with /nevusvoice reload (no restart needed, even for model changes; audio.decode-threads is the exception).
+#  Apply changes with /voicewarden reload (no restart needed, even for model changes; audio.decode-threads is the exception).
 # ──────────────────────────────────────────────────────────────────────────────
 config-version: 1
 
@@ -18,7 +18,7 @@ server-name: ""
 
 # ── Speech-to-text ───────────────────────────────────────────────────────────
 speech-to-text:
-  # Model preset (downloaded automatically on first start into plugins/NevusVoice/models):
+  # Model preset (downloaded automatically on first start into plugins/VoiceWarden/models):
   #   parakeet-tdt-v2  English. Fast CPU transcription. ~670 MB download, ~1 GB RAM.
   #   parakeet-tdt-v3  25 European languages, auto-detected. ~670 MB download, ~1 GB RAM.
   #   whisper-small-en English. Lower CPU cost than Turbo; accuracy depends on the microphone. ~376 MB download.
@@ -33,7 +33,7 @@ speech-to-text:
   native-library-path: ""
 
   # Transcription workers share ONE copy of the model; concurrent inference still needs working memory.
-  # Start with 1 worker, especially for Whisper Turbo, then measure queue/drops in /nv stats on your server.
+  # Start with 1 worker, especially for Whisper Turbo, then measure queue/drops in /vw stats on your server.
   workers: 1
   # CPU threads the model's math may use (shared by all workers). Keep workers + cpu-threads below your core
   # count so the Minecraft server thread always has a core to itself.
@@ -42,7 +42,7 @@ speech-to-text:
   max-batch-size: 4
 
   queue:
-    # Utterances waiting for transcription. When full, the oldest are dropped (logged in /nv stats).
+    # Utterances waiting for transcription. When full, the oldest are dropped (logged in /vw stats).
     max-size: 200
     # Stops one player from flooding the queue.
     max-per-player: 6
@@ -71,7 +71,7 @@ speech-to-text:
     # When trimming is enabled, audio kept around detected speech.
     padding: 250ms
 
-  # Used when model: custom. Paths are relative to plugins/NevusVoice.
+  # Used when model: custom. Paths are relative to plugins/VoiceWarden.
   # For an English Whisper model, set model-type: whisper; joiner is unused.
   custom:
     model-type: nemo_transducer
@@ -154,7 +154,7 @@ mute:
 
 # ── Staff alerts ─────────────────────────────────────────────────────────────
 alerts:
-  # In-game alerts for players with nevusvoice.alerts (toggle per player with /nv alerts).
+  # In-game alerts for players with voicewarden.alerts (toggle per player with /vw alerts).
   staff: true
   # Log flagged speech to the console.
   console: true
@@ -205,7 +205,7 @@ recordings:
   max-total-size-mb: 2048
 
 # ── Discord ──────────────────────────────────────────────────────────────────
-# Three independent webhooks. Treat webhook URLs as secrets. Test with /nevusvoice discordtest all
+# Three independent webhooks. Treat webhook URLs as secrets. Test with /voicewarden discordtest all
 discord:
   timeout-seconds: 10
   retry-attempts: 3
@@ -215,7 +215,7 @@ discord:
   flags:
     enabled: false
     webhook-url: ""
-    username: NevusVoice
+    username: VoiceWarden
     avatar-url: ""
     # Hex colour like "#E74C3C". Empty = colour by action.
     color: ""
@@ -234,7 +234,7 @@ discord:
   mutes:
     enabled: false
     webhook-url: ""
-    username: NevusVoice
+    username: VoiceWarden
     avatar-url: ""
     color: ""
     ping-role-id: ""
@@ -250,7 +250,7 @@ discord:
   reports:
     enabled: false
     webhook-url: ""
-    username: NevusVoice
+    username: VoiceWarden
     avatar-url: ""
     color: ""
     ping-role-id: ""
@@ -269,7 +269,7 @@ privacy:
 
 # ── Logging & health ─────────────────────────────────────────────────────────
 logging:
-  # Write every transcript to plugins/NevusVoice/logs/transcripts-YYYY-MM-DD.log
+  # Write every transcript to plugins/VoiceWarden/logs/transcripts-YYYY-MM-DD.log
   transcripts: false
   debug: false
 

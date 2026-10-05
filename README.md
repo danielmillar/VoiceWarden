@@ -1,6 +1,6 @@
-# NevusVoice
+# VoiceWarden
 
-NevusVoice is a plugin for Minecraft servers that listens to voice chat and helps you deal with players who swear,
+VoiceWarden is a plugin for Minecraft servers that listens to voice chat and helps you deal with players who swear,
 harass others or break your rules.
 
 It turns what players say into text, checks that text against a list of rules you control, and then warns or mutes
@@ -27,7 +27,7 @@ key. The only audio that ever leaves your server is a recording you choose to se
 
 ## What you need
 
-- A **Paper** Minecraft server, version **26.1.2**, running **Java 25 or newer**.
+- A **Paper** Minecraft server, version **26.2**, running **Java 25 or newer**.
 - Two other plugins installed first:
   - [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) (version 2.6.x), which provides voice chat.
   - [LuckPerms](https://luckperms.net) (version 5.5 or newer), which handles permissions and remembers each
@@ -38,20 +38,20 @@ key. The only audio that ever leaves your server is a recording you choose to se
 
 ## Setting it up
 
-1. Download `NevusVoice-<version>.jar` and put it in your server's `plugins` folder, alongside Simple Voice Chat and
+1. Download `VoiceWarden-<version>.jar` and put it in your server's `plugins` folder, alongside Simple Voice Chat and
    LuckPerms.
-2. Start the server. The first time, NevusVoice downloads the speech recognition files it needs. This takes a few
+2. Start the server. The first time, VoiceWarden downloads the speech recognition files it needs. This takes a few
    minutes and your server stays playable meanwhile. Watch the server console for the message
    **`Speech engine ready`**.
 3. Let your staff see alerts by running this in the console, replacing `moderator` with your staff group's name:
 
    ```
-   /lp group moderator permission set nevusvoice.alerts true
+   /lp group moderator permission set voicewarden.alerts true
    ```
-4. Optional: set up Discord alerts by adding webhook links in `plugins/NevusVoice/config.yml`, then check they work with
-   `/nevusvoice discordtest all`.
+4. Optional: set up Discord alerts by adding webhook links in `plugins/VoiceWarden/config.yml`, then check they work with
+   `/voicewarden discordtest all`.
 
-**Trying it out safely.** In `config.yml`, set `moderation.dry-run: true`. NevusVoice will then report problems to
+**Trying it out safely.** In `config.yml`, set `moderation.dry-run: true`. VoiceWarden will then report problems to
 staff but never mute anyone. Switch it back when you're happy with how it behaves.
 
 **Server with no internet?** Set `speech-to-text.auto-download: false`. This disables all automatic downloads, both
@@ -60,52 +60,52 @@ gives the paths and download links for anything still missing.
 
 ## Using it
 
-The main command is `/nevusvoice`, or `/nv` for short.
+The main command is `/voicewarden`, or `/vw` for short.
 
 ### Commands for staff
 
 | Command | What it does | Permission |
 |---|---|---|
-| `/nv vcmute <player> <duration> [reason]` | Mutes a player's voice. Durations look like `30m`, `2h`, `1d` or `perm`. Works on offline players. | `nevusvoice.vcmute` |
-| `/nv unvcmute <player>` | Removes a voice mute. | `nevusvoice.vcmute` |
-| `/nv mutes` | Lists everyone currently muted. | `nevusvoice.vcmute` |
-| `/nv offenses <player> [reset]` | Shows a player's offence count, or resets it. | `nevusvoice.vcmute` |
-| `/nv history <player> [lines]` | Shows what a player recently said. | `nevusvoice.report.review` |
-| `/nv alerts` | Turns your own in-game alerts on or off. | `nevusvoice.alerts` |
-| `/viewreport <id or player> [minutes]` (`/vr`) | Opens a report, or a player's recent speech, as a book. | `nevusvoice.report.review` |
-| `/reportinbox [review <id>]` (`/rinbox`, `/vreports`) | Lists open reports and marks them as reviewed. | `nevusvoice.report.review` |
+| `/vw vcmute <player> <duration> [reason]` | Mutes a player's voice. Durations look like `30m`, `2h`, `1d` or `perm`. Works on offline players. | `voicewarden.vcmute` |
+| `/vw unvcmute <player>` | Removes a voice mute. | `voicewarden.vcmute` |
+| `/vw mutes` | Lists everyone currently muted. | `voicewarden.vcmute` |
+| `/vw offenses <player> [reset]` | Shows a player's offence count, or resets it. | `voicewarden.vcmute` |
+| `/vw history <player> [lines]` | Shows what a player recently said. | `voicewarden.report.review` |
+| `/vw alerts` | Turns your own in-game alerts on or off. | `voicewarden.alerts` |
+| `/viewreport <id or player> [minutes]` (`/vr`) | Opens a report, or a player's recent speech, as a book. | `voicewarden.report.review` |
+| `/reportinbox [review <id>]` (`/rinbox`, `/vreports`) | Lists open reports and marks them as reviewed. | `voicewarden.report.review` |
 
 ### Commands for admins
 
 | Command | What it does | Permission |
 |---|---|---|
-| `/nv reload` | Applies changes you made to the config files, without restarting. | `nevusvoice.reload` |
-| `/nv stats` | Shows how the plugin is doing: speed, queue, dropped audio and incidents. | `nevusvoice.stats` |
-| `/nv test <text>` | Checks some text against your rules, which is handy when editing word lists. | `nevusvoice.admin` |
-| `/nv discordtest [all, flag, mute or report]` | Sends a test message to your Discord webhooks. | `nevusvoice.admin` |
+| `/vw reload` | Applies changes you made to the config files, without restarting. | `voicewarden.reload` |
+| `/vw stats` | Shows how the plugin is doing: speed, queue, dropped audio and incidents. | `voicewarden.stats` |
+| `/vw test <text>` | Checks some text against your rules, which is handy when editing word lists. | `voicewarden.admin` |
+| `/vw discordtest [all, flag, mute or report]` | Sends a test message to your Discord webhooks. | `voicewarden.admin` |
 
 ### Command for players
 
 | Command | What it does | Permission |
 |---|---|---|
-| `/reportvoice <player> [minutes]` (`/rvoice`) | Reports a player's recent voice chat to staff, with a recording. | `nevusvoice.report` (everyone by default) |
+| `/reportvoice <player> [minutes]` (`/rvoice`) | Reports a player's recent voice chat to staff, with a recording. | `voicewarden.report` (everyone by default) |
 
 ### Permissions
 
 | Permission | Who has it by default | What it's for |
 |---|---|---|
-| `nevusvoice.admin` | Operators | Everything above except bypass. |
-| `nevusvoice.bypass` | Nobody | Players with this are never listened to or muted. |
-| `nevusvoice.alerts` | Operators | Receiving in-game alerts. |
-| `nevusvoice.reload` | Operators | Using `/nv reload`. |
-| `nevusvoice.stats` | Operators | Using `/nv stats`. |
-| `nevusvoice.vcmute` | Operators | Using `/nv vcmute`, `unvcmute`, `mutes` and `offenses`. |
-| `nevusvoice.report` | Everyone | Using `/reportvoice`. |
-| `nevusvoice.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/nv history`. |
+| `voicewarden.admin` | Operators | Everything above except bypass. |
+| `voicewarden.bypass` | Nobody | Players with this are never listened to or muted. |
+| `voicewarden.alerts` | Operators | Receiving in-game alerts. |
+| `voicewarden.reload` | Operators | Using `/vw reload`. |
+| `voicewarden.stats` | Operators | Using `/vw stats`. |
+| `voicewarden.vcmute` | Operators | Using `/vw vcmute`, `unvcmute`, `mutes` and `offenses`. |
+| `voicewarden.report` | Everyone | Using `/reportvoice`. |
+| `voicewarden.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/vw history`. |
 
 ## How a mute happens
 
-1. A player speaks. When they stop, NevusVoice turns that sentence into text.
+1. A player speaks. When they stop, VoiceWarden turns that sentence into text.
 2. The text is checked against your rules. Each rule either:
    - **flags** the player, which alerts staff but doesn't count towards a mute, or
    - **mutes**, which adds points towards an automatic mute. Serious rules add more points.
@@ -129,7 +129,7 @@ A few things to know:
 
 ## Customising
 
-All files are in `plugins/NevusVoice/`.
+All files are in `plugins/VoiceWarden/`.
 
 | File | What it's for |
 |---|---|
@@ -141,25 +141,25 @@ All files are in `plugins/NevusVoice/`.
 | `data/` | Active mutes and reports. If a mutes or reports file is corrupt, it is moved next to the original with a `.corrupt-<UUID>` suffix before fresh state is started. If it can't be preserved, writes are suspended. |
 | `models/` and `natives/` | The downloaded speech recognition files. |
 
-**Updating:** NevusVoice never overwrites your `wordlist.txt` or `rules.yml` when you install a new version, so you
-won't get new default rules automatically. Back them up before comparing them with the newest defaults. Use `/nv reload`
+**Updating:** VoiceWarden never overwrites your `wordlist.txt` or `rules.yml` when you install a new version, so you
+won't get new default rules automatically. Back them up before comparing them with the newest defaults. Use `/vw reload`
 after editing files. Restart the server after changing the plugin file itself. Changing `audio.decode-threads` needs a
-server restart to apply, and `/nv reload` tells you so.
+server restart to apply, and `/vw reload` tells you so.
 
 Setting `enabled: false` stops voice capture, drops queued utterances and discards results from transcription already
 running (a native call may still finish). Existing mutes stay enforced. `discord.max-queue-size` applies on
-`/nv reload`.
+`/vw reload`.
 
-On shutdown, NevusVoice finishes running transcription and saves its data in the background, so the Minecraft thread
+On shutdown, VoiceWarden finishes running transcription and saves its data in the background, so the Minecraft thread
 is not blocked. Native or disk work can delay the process exiting.
 
 ## Troubleshooting
 
 - **Nothing is happening.** Check the console for `Speech engine ready`. Until it appears, the first download is still
   running.
-- **Someone isn't being picked up.** Make sure they don't have `nevusvoice.bypass`.
-- **Staff see no alerts.** Give them `nevusvoice.alerts`, and ask them to run `/nv alerts` in case they turned them off.
-- **Audio is being dropped, or the server feels slow.** Run `/nv stats` and look at *Speed* and *dropped*. Choose a
+- **Someone isn't being picked up.** Make sure they don't have `voicewarden.bypass`.
+- **Staff see no alerts.** Give them `voicewarden.alerts`, and ask them to run `/vw alerts` in case they turned them off.
+- **Audio is being dropped, or the server feels slow.** Run `/vw stats` and look at *Speed* and *dropped*. Choose a
   lighter speech model, or see the technical section below.
 
 ---
@@ -199,7 +199,7 @@ are downloaded from Hugging Face, verified by SHA-256, and resumed if interrupte
   history is stored in LuckPerms meta.
 - Muted-player messages use `player.muted-actionbar`, `player.muted-permanent-actionbar` and
   `player.no-speak-permission-actionbar` in `messages.yml`; `mute.notify-player` toggles them. Simple Voice Chat
-  checks `voicechat.speak` before firing `MicrophonePacketEvent`, so NevusVoice replaces only its no-speak status
+  checks `voicechat.speak` before firing `MicrophonePacketEvent`, so VoiceWarden replaces only its no-speak status
   message through an adapter tested against SVC 2.6.24. If that interface changes, the plugin logs it and keeps the
   original message and mute enforcement.
 
@@ -217,7 +217,7 @@ SVC packet thread ── O(1) ──▶ per-player lock-free inbox ──▶ dec
 - The server thread only handles join/quit bookkeeping, command parsing and any console commands you configure.
 - Simple Voice Chat's packet thread does a map lookup and a lock-free enqueue, nothing more.
 - Per-player backlog, the transcription queue, the Discord queue and the audio memory budget are all bounded. Under
-  overload, audio is skipped and counted in `/nv stats`.
+  overload, audio is skipped and counted in `/vw stats`.
 - Extra workers share one model but need additional working memory. Start with one worker and measure.
 - Measured on an Apple M-series CPU with `cpu-threads: 2`, Parakeet transcribes a 3.6 s sentence in about 190 ms after
   the speaker stops, and Whisper Small a 2.86 s clip in about 500 ms. One Parakeet worker with 2 threads covers roughly
@@ -225,10 +225,10 @@ SVC packet thread ── O(1) ──▶ per-player lock-free inbox ──▶ dec
 
 ### Staging Turbo with a code update
 
-Cache Turbo under `plugins/NevusVoice/models/whisper-turbo/` and stage the new JAR in Paper's update folder. To switch
-to Turbo only when the new JAR starts, create `plugins/NevusVoice/activate-whisper-turbo` containing just
+Cache Turbo under `plugins/VoiceWarden/models/whisper-turbo/` and stage the new JAR in Paper's update folder. To switch
+to Turbo only when the new JAR starts, create `plugins/VoiceWarden/activate-whisper-turbo` containing just
 `whisper-turbo`. On the next startup the plugin selects Turbo, enables input gain and sets
-`audio.min-level-dbfs: -65`, keeps a byte-for-byte backup under `plugins/NevusVoice/backups/`, and renames the request
+`audio.min-level-dbfs: -65`, keeps a byte-for-byte backup under `plugins/VoiceWarden/backups/`, and renames the request
 to `activate-whisper-turbo.applied` so it runs once. Remove an unconsumed request to cancel it.
 
 ### Building
@@ -237,8 +237,8 @@ The repository tracks source and the Gradle wrapper. Build output, the local `ru
 and secrets are ignored.
 
 ```bash
-./gradlew build                 # → build/libs/NevusVoice-<version>.jar
-./gradlew runServer             # local Paper 26.1.2 test server
+./gradlew build                 # → build/libs/VoiceWarden-<version>.jar
+./gradlew runServer             # local Paper 26.2 test server
 ./gradlew test -PsherpaIntegration=/path/to/models   # optional end-to-end test with the real engine
 ```
 
@@ -246,10 +246,10 @@ To replay recorded speech through an installed model:
 
 ```bash
 ./gradlew test \
-  -PsherpaIntegration=run/plugins/NevusVoice/models \
-  -PsherpaNatives=run/plugins/NevusVoice/natives/sherpa-onnx-1.13.8/osx-aarch64 \
+  -PsherpaIntegration=run/plugins/VoiceWarden/models \
+  -PsherpaNatives=run/plugins/VoiceWarden/natives/sherpa-onnx-1.13.8/osx-aarch64 \
   -PsherpaModel=whisper-turbo \
-  -PsherpaRecordings=run/plugins/NevusVoice/recordings
+  -PsherpaRecordings=run/plugins/VoiceWarden/recordings
 ```
 
 Use your platform's native-library directory in place of `osx-aarch64`, and 16 kHz mono PCM WAVs. Use
@@ -258,9 +258,15 @@ Use your platform's native-library directory in place of `osx-aarch64`, and 16 k
 Audio fixtures and recordings are supplied locally and are not included in the repository. Audio files are ignored
 by Git, and CI rejects tracked files covered by `.gitignore`.
 
+## AI development disclaimer
+
+VoiceWarden contains AI-generated code and documentation, alongside human contributions. AI assistance does not
+guarantee correctness or security. Test the plugin on a development server and review its behaviour before relying
+on it for moderation. The project is provided without warranty under the [MIT licence](LICENSE).
+
 ## Licences and attribution
 
-- NevusVoice code: [MIT](LICENSE), © 2026 Daniel Millar.
+- VoiceWarden code: [MIT](LICENSE), © 2026 Daniel Millar.
 - [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx): Apache-2.0. ONNX Runtime: MIT.
 - NVIDIA Parakeet TDT 0.6B v2/v3 model weights: **CC-BY-4.0**. © NVIDIA, used unmodified through the
   [sherpa-onnx export](https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8).

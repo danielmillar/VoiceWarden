@@ -1,7 +1,7 @@
 # Repository instructions
 
-This repository contains NevusVoice, a Paper plugin for fully local voice chat moderation using Simple Voice Chat
-and LuckPerms. The Java package is `dev.danielmillar.nevusvoice`.
+This repository contains VoiceWarden, a Paper plugin for fully local voice chat moderation using Simple Voice Chat
+and LuckPerms. The Java package is `dev.danielmillar.voicewarden`.
 Read these instructions before changing code or publishing Git changes.
 
 ## GitHub rules
@@ -82,7 +82,7 @@ Keep these terms distinct in code, comments, docs and messages.
 - Fix failing checks and report any remaining validation limits accurately.
 - Keep voice permission enforcement, audio queue ordering and asynchronous processing unchanged unless the task
   explicitly changes them. Do not block the Minecraft server or voice packet threads with transcription or I/O.
-- Preserve NevusVoice's own configuration, models, recordings, persistent mutes, reports and LuckPerms offence history
+- Preserve VoiceWarden's own configuration, models, recordings, persistent mutes, reports and LuckPerms offence history
   across its updates.
 - Keep local server runtime files (`run/`), build output, private backups and secrets out of Git.
 - Keep README commands, permissions, plugin names and setup instructions aligned with the implementation.

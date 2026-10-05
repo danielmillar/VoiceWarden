@@ -5,10 +5,10 @@ plugins {
 }
 
 group = "dev.danielmillar"
-version = "1.0.0-SNAPSHOT"
+version = "1.0.0"
 
 base {
-    archivesName.set("NevusVoice")
+    archivesName.set("VoiceWarden")
 }
 
 repositories {
@@ -31,7 +31,7 @@ repositories {
 val sherpaOnnxVersion = "1.13.8"
 
 dependencies {
-    val paperApi = "io.papermc.paper:paper-api:26.1.2.build.74-stable"
+    val paperApi = "io.papermc.paper:paper-api:26.2.build.130-stable"
     compileOnly(paperApi)
     compileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.24")
     compileOnly("net.luckperms:api:5.5")
@@ -69,7 +69,7 @@ tasks.processResources {
     filesMatching("paper-plugin.yml") {
         expand("version" to pluginVersion)
     }
-    filesMatching("nevusvoice-build.properties") {
+    filesMatching("voicewarden-build.properties") {
         expand("version" to pluginVersion, "sherpaOnnxVersion" to sherpaOnnxVersion)
     }
 }
@@ -77,10 +77,10 @@ tasks.processResources {
 tasks.test {
     useJUnitPlatform()
     // Native-backed integration tests are opt-in: -PsherpaIntegration=/path/to/models
-    providers.gradleProperty("sherpaIntegration").orNull?.let { systemProperty("nevusvoice.it.models", it) }
-    providers.gradleProperty("sherpaNatives").orNull?.let { systemProperty("nevusvoice.it.natives", it) }
-    providers.gradleProperty("sherpaRecordings").orNull?.let { systemProperty("nevusvoice.it.recordings", it) }
-    providers.gradleProperty("sherpaModel").orNull?.let { systemProperty("nevusvoice.it.model", it) }
+    providers.gradleProperty("sherpaIntegration").orNull?.let { systemProperty("voicewarden.it.models", it) }
+    providers.gradleProperty("sherpaNatives").orNull?.let { systemProperty("voicewarden.it.natives", it) }
+    providers.gradleProperty("sherpaRecordings").orNull?.let { systemProperty("voicewarden.it.recordings", it) }
+    providers.gradleProperty("sherpaModel").orNull?.let { systemProperty("voicewarden.it.model", it) }
 }
 
 tasks.jar {
@@ -96,5 +96,5 @@ tasks.build {
 }
 
 tasks.runServer {
-    minecraftVersion("26.1.2")
+    minecraftVersion("26.2")
 }
