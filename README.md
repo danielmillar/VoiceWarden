@@ -253,8 +253,10 @@ To replay recorded speech through an installed model:
 ```
 
 Use your platform's native-library directory in place of `osx-aarch64`, and 16 kHz mono PCM WAVs. Use
-`-PsherpaModel=whisper-small-en` for Small, or omit it for Parakeet. Optional fixtures (`WhisperTest.wav`, `WhisperTest.48k.wav`, `clean-whisper.wav`, `test.wav`) are described
-in `SherpaOnnxEngineIT`.
+`-PsherpaModel=whisper-small-en` for Small, or omit it for Parakeet.
+
+Audio fixtures and recordings are supplied locally and are not included in the repository. Audio files are ignored
+by Git, and CI rejects tracked files covered by `.gitignore`.
 
 ## Licences and attribution
 
