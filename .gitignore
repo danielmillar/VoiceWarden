@@ -22,6 +22,34 @@ crash-reports/
 *.hprof
 hs_err_pid*
 replay_pid*
+*.[wW][aA][vV]
+*.[wW][aA][vV][eE]
+*.[mM][pP]3
+*.[mM][pP]2
+*.[oO][gG][gG]
+*.[oO][gG][aA]
+*.[fF][lL][aA][cC]
+*.[mM]4[aA]
+*.[mM]4[bB]
+*.[aA][aA][cC]
+*.[oO][pP][uU][sS]
+*.[aA][iI][fF][fF]
+*.[aA][iI][fF]
+*.[aA][iI][fF][cC]
+*.[wW][mM][aA]
+*.[pP][cC][mM]
+*.[rR][aA][wW]
+*.[aA][uU]
+*.[sS][nN][dD]
+*.[aA][mM][rR]
+*.[cC][aA][fF]
+*.[mM][kK][aA]
+*.[aA][cC]3
+*.[dD][tT][sS]
+*.[aA][pP][eE]
+*.[wW][vV]
+*.[dD][sS][fF]
+*.[dD][fF][fF]
 
 # Private deployment backups, credentials and recorded benchmark output
 backups/
