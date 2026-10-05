@@ -1,6 +1,0 @@
-package dev.danielmillar.nevusvoice.notify.discord;
-
-/** Webhook routes to exercise with realistic sample data. */
-public enum WebhookTestTarget {
-    ALL, FLAG, MUTE, REPORT
-}

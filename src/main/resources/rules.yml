@@ -1,4 +1,4 @@
-# NevusVoice matches the ORIGINAL speech transcript and keeps the matched text for staff review.
+# VoiceWarden matches the ORIGINAL speech transcript and keeps the matched text for staff review.
 # Words/phrases ignore case, accents and punctuation; internal apostrophes disappear (you're = youre).
 # Wildcards apply to whole words: word* (prefix), *word (suffix), *word* (substring).
 # FLAG alerts staff; MUTE also contributes weight towards the configured auto-mute threshold.

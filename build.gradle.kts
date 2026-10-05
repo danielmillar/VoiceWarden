@@ -8,7 +8,7 @@ group = "dev.danielmillar"
 version = "1.0.0-SNAPSHOT"
 
 base {
-    archivesName.set("NevusVoice")
+    archivesName.set("VoiceWarden")
 }
 
 repositories {
@@ -69,7 +69,7 @@ tasks.processResources {
     filesMatching("paper-plugin.yml") {
         expand("version" to pluginVersion)
     }
-    filesMatching("nevusvoice-build.properties") {
+    filesMatching("voicewarden-build.properties") {
         expand("version" to pluginVersion, "sherpaOnnxVersion" to sherpaOnnxVersion)
     }
 }
@@ -77,10 +77,10 @@ tasks.processResources {
 tasks.test {
     useJUnitPlatform()
     // Native-backed integration tests are opt-in: -PsherpaIntegration=/path/to/models
-    providers.gradleProperty("sherpaIntegration").orNull?.let { systemProperty("nevusvoice.it.models", it) }
-    providers.gradleProperty("sherpaNatives").orNull?.let { systemProperty("nevusvoice.it.natives", it) }
-    providers.gradleProperty("sherpaRecordings").orNull?.let { systemProperty("nevusvoice.it.recordings", it) }
-    providers.gradleProperty("sherpaModel").orNull?.let { systemProperty("nevusvoice.it.model", it) }
+    providers.gradleProperty("sherpaIntegration").orNull?.let { systemProperty("voicewarden.it.models", it) }
+    providers.gradleProperty("sherpaNatives").orNull?.let { systemProperty("voicewarden.it.natives", it) }
+    providers.gradleProperty("sherpaRecordings").orNull?.let { systemProperty("voicewarden.it.recordings", it) }
+    providers.gradleProperty("sherpaModel").orNull?.let { systemProperty("voicewarden.it.model", it) }
 }
 
 tasks.jar {

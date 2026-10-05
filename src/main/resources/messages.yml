@@ -1,4 +1,4 @@
-# NevusVoice messages: MiniMessage format (https://docs.advntr.dev/minimessage/format.html)
+# VoiceWarden messages: MiniMessage format (https://docs.advntr.dev/minimessage/format.html)
 # Every message can use the theme colours as tags (<accent>text</accent>) and <prefix>. Player-provided text
 # (names, transcripts) is always inserted as plain text, so it can never inject formatting or click events.
 
@@ -13,7 +13,7 @@ theme:
 
 # Reusable MiniMessage snippets available as tags, e.g. <prefix>. Their styles carry into the text after them.
 prefixes:
-  prefix: "<gradient:#FFD36E:#F59E0B><b>ɴᴇᴠᴜꜱ</b></gradient> <dark_gray>»</dark_gray> <body>"
+  prefix: "<gradient:#FFD36E:#F59E0B><b>VoiceWarden</b></gradient> <dark_gray>»</dark_gray> <body>"
 
 privacy-join: "<prefix>Voice chat on this server is transcribed and automatically moderated. <muted>Flagged speech may be recorded as evidence for staff."
 
@@ -48,7 +48,7 @@ command:
   unmuted: "<prefix>Removed the voice mute from <accent><player></accent>."
   action-failed: "<prefix><error>That action failed<dark_gray>:</dark_gray> <reason></error>"
   not-muted: "<prefix><accent><player></accent> is not voice-muted."
-  cannot-mute-bypass: "<prefix><accent><player></accent> has <accent>nevusvoice.bypass</accent> and cannot be voice-muted."
+  cannot-mute-bypass: "<prefix><accent><player></accent> has <accent>voicewarden.bypass</accent> and cannot be voice-muted."
   mutes-header: "<prefix>Active voice mutes <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"
   mutes-entry: " <dark_gray>▪</dark_gray> <accent><player></accent> <dark_gray>»</dark_gray> <body><remaining> left <dark_gray>•</dark_gray> <muted><reason> (by <actor>)"
   mutes-empty: "<prefix>Nobody is voice-muted."

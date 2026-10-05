@@ -1,1 +1,1 @@
-rootProject.name = "NevusVoice"
+rootProject.name = "VoiceWarden"

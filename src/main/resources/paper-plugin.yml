@@ -1,6 +1,6 @@
-name: NevusVoice
+name: VoiceWarden
 version: '${version}'
-main: dev.danielmillar.nevusvoice.NevusVoicePlugin
+main: dev.danielmillar.voicewarden.VoiceWardenPlugin
 api-version: '26.1'
 description: 'Real-time, fully local voice chat moderation for Simple Voice Chat.'
 author: danielmillar
@@ -16,33 +16,33 @@ dependencies:
       required: true
       join-classpath: true
 permissions:
-  nevusvoice.admin:
-    description: Full access to NevusVoice commands (does not include bypass).
+  voicewarden.admin:
+    description: Full access to VoiceWarden commands (does not include bypass).
     default: op
     children:
-      nevusvoice.alerts: true
-      nevusvoice.reload: true
-      nevusvoice.stats: true
-      nevusvoice.vcmute: true
-      nevusvoice.report.review: true
-  nevusvoice.bypass:
+      voicewarden.alerts: true
+      voicewarden.reload: true
+      voicewarden.stats: true
+      voicewarden.vcmute: true
+      voicewarden.report.review: true
+  voicewarden.bypass:
     description: Voice is never transcribed or moderated, and the player cannot be voice-muted.
     default: false
-  nevusvoice.alerts:
+  voicewarden.alerts:
     description: Receive in-game alerts when voice is flagged.
     default: op
-  nevusvoice.reload:
-    description: Use /nevusvoice reload.
+  voicewarden.reload:
+    description: Use /voicewarden reload.
     default: op
-  nevusvoice.stats:
-    description: Use /nevusvoice stats.
+  voicewarden.stats:
+    description: Use /voicewarden stats.
     default: op
-  nevusvoice.vcmute:
-    description: Use /nevusvoice vcmute, unvcmute, mutes and offenses.
+  voicewarden.vcmute:
+    description: Use /voicewarden vcmute, unvcmute, mutes and offenses.
     default: op
-  nevusvoice.report:
+  voicewarden.report:
     description: Use /reportvoice to report a player's voice chat.
     default: true
-  nevusvoice.report.review:
-    description: Receive voice report alerts and use /viewreport, /reportinbox and /nevusvoice history.
+  voicewarden.report.review:
+    description: Receive voice report alerts and use /viewreport, /reportinbox and /voicewarden history.
     default: op

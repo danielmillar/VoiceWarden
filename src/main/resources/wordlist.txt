@@ -1,4 +1,4 @@
-# NevusVoice English transcript moderation. One word or phrase per line.
+# VoiceWarden English transcript moderation. One word or phrase per line.
 # [LANG-PROFANITY] = staff alert; [LANG-MUTE] = contributes to auto-muting.
 # Case/accents/punctuation are ignored. word* = prefix; *word = suffix; *word* = substring.
 # This is a curated detection list, not an endorsement of these terms.
