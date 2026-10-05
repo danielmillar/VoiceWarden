@@ -27,7 +27,7 @@ key. The only audio that ever leaves your server is a recording you choose to se
 
 ## What you need
 
-- A **Paper** Minecraft server, version **26.1.2**, running **Java 25 or newer**.
+- A **Paper** Minecraft server, version **26.2**, running **Java 25 or newer**.
 - Two other plugins installed first:
   - [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) (version 2.6.x), which provides voice chat.
   - [LuckPerms](https://luckperms.net) (version 5.5 or newer), which handles permissions and remembers each
@@ -238,7 +238,7 @@ and secrets are ignored.
 
 ```bash
 ./gradlew build                 # → build/libs/VoiceWarden-<version>.jar
-./gradlew runServer             # local Paper 26.1.2 test server
+./gradlew runServer             # local Paper 26.2 test server
 ./gradlew test -PsherpaIntegration=/path/to/models   # optional end-to-end test with the real engine
 ```
 

@@ -1,7 +1,7 @@
 name: VoiceWarden
 version: '${version}'
 main: dev.danielmillar.voicewarden.VoiceWardenPlugin
-api-version: '26.1'
+api-version: '26.2'
 description: 'Real-time, fully local voice chat moderation for Simple Voice Chat.'
 author: danielmillar
 website: https://github.com/danielmillar

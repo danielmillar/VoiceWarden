@@ -31,7 +31,7 @@ repositories {
 val sherpaOnnxVersion = "1.13.8"
 
 dependencies {
-    val paperApi = "io.papermc.paper:paper-api:26.1.2.build.74-stable"
+    val paperApi = "io.papermc.paper:paper-api:26.2.build.130-stable"
     compileOnly(paperApi)
     compileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.24")
     compileOnly("net.luckperms:api:5.5")
@@ -96,5 +96,5 @@ tasks.build {
 }
 
 tasks.runServer {
-    minecraftVersion("26.1.2")
+    minecraftVersion("26.2")
 }

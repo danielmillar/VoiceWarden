@@ -3,6 +3,7 @@ package dev.danielmillar.voicewarden.config;
 import dev.danielmillar.voicewarden.testutil.Fakes;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -81,7 +82,10 @@ class MessagesTest {
         for (Component child : component.children()) assertPlayerColor(child, value);
     }
     private static void assertNoOpCommand(Component component) {
-        if (component.clickEvent() != null) assertFalse(component.clickEvent().value().contains("/op me"));
+        var click = component.clickEvent();
+        if (click != null && click.payload() instanceof ClickEvent.Payload.Text text) {
+            assertFalse(text.value().contains("/op me"));
+        }
         for (Component child : component.children()) assertNoOpCommand(child);
     }
 }
