@@ -27,7 +27,7 @@ key. The only audio that ever leaves your server is a recording you choose to se
 
 ## What you need
 
-- A **Paper** Minecraft server, version **26.2**, running **Java 25 or newer**.
+- A **Paper** Minecraft server, version **26.1 or newer**, running **Java 25 or newer**.
 - Two other plugins installed first:
   - [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) (version 2.6.x), which provides voice chat.
   - [LuckPerms](https://luckperms.net) (version 5.5 or newer), which handles permissions and remembers each
@@ -238,9 +238,14 @@ and secrets are ignored.
 
 ```bash
 ./gradlew build                 # → build/libs/VoiceWarden-<version>.jar
-./gradlew runServer             # local Paper 26.2 test server
+./gradlew runServer             # local test server, on the Paper version in gradle.properties
 ./gradlew test -PsherpaIntegration=/path/to/models   # optional end-to-end test with the real engine
 ```
+
+`paperApi` in `gradle.properties` is the oldest supported Paper version, and the plugin compiles against it. To build
+against another version, pass it with `-PpaperApi`, for example `./gradlew build -PpaperApi=26.3.+`. CI tests the
+newest Paper build of each version in the matrix in `.github/workflows/build.yml`. To support a new version, add it to
+the matrix. To drop the oldest, change `paperApi` and the first matrix entry.
 
 To replay recorded speech through an installed model:
 
