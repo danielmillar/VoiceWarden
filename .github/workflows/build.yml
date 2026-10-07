@@ -4,15 +4,45 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Weekly, so new Paper builds are tested even when nothing changes here.
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  paper:
+    name: Paper ${{ matrix.minecraft }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Supported Minecraft versions, each tested against its newest Paper build. The first must match
+        # paperApi in gradle.properties; add new versions as Paper releases them.
+        minecraft: ['26.1', '26.2', '26.3']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+      - run: ./gradlew test -PpaperApi=${{ matrix.minecraft }}.+
+
+  # The required check. It builds the release jar against the oldest supported Paper and fails if any
+  # version above failed, since a skipped required check would otherwise count as passing.
   build:
     name: Build and test
+    needs: paper
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - if: needs.paper.result != 'success'
+        run: |
+          echo "A supported Paper version failed: ${{ needs.paper.result }}"
+          exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: |
           ignored=$(git ls-files --cached --ignored --exclude-from=.gitignore)

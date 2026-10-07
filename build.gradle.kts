@@ -30,8 +30,13 @@ repositories {
 
 val sherpaOnnxVersion = "1.13.8"
 
+// The Paper API to compile against: the oldest supported release from gradle.properties unless overridden.
+val paperApiVersion = providers.gradleProperty("paperApi").get()
+val minecraftVersion = paperApiVersion.substringBefore(".build").removeSuffix(".+")
+val pluginApiVersion = minecraftVersion.split('.').take(2).joinToString(".")
+
 dependencies {
-    val paperApi = "io.papermc.paper:paper-api:26.2.build.130-stable"
+    val paperApi = "io.papermc.paper:paper-api:$paperApiVersion"
     compileOnly(paperApi)
     compileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.24")
     compileOnly("net.luckperms:api:5.5")
@@ -64,10 +69,11 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.processResources {
     val pluginVersion = project.version.toString()
     inputs.property("version", pluginVersion)
+    inputs.property("apiVersion", pluginApiVersion)
     inputs.property("sherpaOnnxVersion", sherpaOnnxVersion)
     filteringCharset = "UTF-8"
     filesMatching("paper-plugin.yml") {
-        expand("version" to pluginVersion)
+        expand("version" to pluginVersion, "apiVersion" to pluginApiVersion)
     }
     filesMatching("voicewarden-build.properties") {
         expand("version" to pluginVersion, "sherpaOnnxVersion" to sherpaOnnxVersion)
@@ -96,5 +102,5 @@ tasks.build {
 }
 
 tasks.runServer {
-    minecraftVersion("26.2")
+    minecraftVersion(minecraftVersion)
 }
