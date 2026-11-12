@@ -1,42 +1,44 @@
 # VoiceWarden
 
-VoiceWarden is a plugin for Minecraft servers that listens to voice chat and helps you deal with players who swear,
-harass others or break your rules.
+[![Build and test](https://github.com/danielmillar/VoiceWarden/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/danielmillar/VoiceWarden/actions/workflows/build.yml) [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](https://github.com/danielmillar/VoiceWarden/blob/main/LICENSE) ![Paper 26.1+](https://img.shields.io/badge/Paper-26.1%2B-informational) ![Java 25](https://img.shields.io/badge/Java-25%2B-orange)
 
-It turns what players say into text, checks that text against a list of rules you control, and then warns or mutes
-the player automatically. Your staff get an alert and can listen to a recording.
+VoiceWarden is a Paper plugin that listens to voice chat and helps you deal with players who swear, harass others or
+break your rules. It turns speech into text, checks the text against rules you control, and warns or mutes the player
+automatically. Your staff get an alert and can listen to a recording.
 
 Everything runs **on your own server**. No audio is sent to any outside service, and you don't need an account or API
 key. The only audio that ever leaves your server is a recording you choose to send to your own Discord.
 
-## What it does
+## How it works
 
-- **Understands speech.** It converts voice chat into text using a speech recognition model that runs on your server.
-  Like any speech recognition, it can make mistakes, so test it with your own microphones before relying on it.
-- **Spots bad language.** It checks for swear words, slurs, threats, harassment, advertising and more. You can add or
-  remove words and rules to suit your community.
-- **Mutes automatically.** You choose how many mute-rule hits within a time window trigger a mute
-  (`moderation.flag-threshold` and `moderation.flag-window`). The default threshold is 1, so the first hit mutes. With
-  a higher threshold, players can be warned until they reach it (`moderation.warn-below-threshold`). Repeat offenders
-  get longer mutes each time. A muted player can also be stopped from hearing others if you want.
-- **Helps your staff.** Staff see an in-game alert showing what was said, what was said just before, and where the
-  player is, with a button to mute them. Alerts can also go to Discord with the recording attached.
-- **Lets players report each other.** Players can report someone with `/reportvoice`. Staff can review reports and
-  listen to the recording.
-- **Stays out of the way.** It runs in the background and should not slow your server down.
+```
+player speaks → local speech-to-text → your rules → warn or mute → staff alert (in game and Discord)
+```
 
-## What you need
+## Features
 
-- A **Paper** Minecraft server, version **26.1 or newer**, running **Java 25 or newer**.
-- Two other plugins installed first:
-  - [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) (version 2.6.x), which provides voice chat.
-  - [LuckPerms](https://luckperms.net) (version 5.5 or newer), which handles permissions and remembers each
-    player's offences.
-- A computer running Linux, Windows or macOS.
+- **Local speech recognition.** A speech model runs on your server. Like any speech recognition, it can make
+  mistakes, so test it with your own microphones before relying on it.
+- **Rules you control.** Swear words, slurs, threats, harassment, advertising and more. Add or remove words and rules
+  to suit your community.
+- **Automatic mutes.** Set how many mute-rule hits within a time window trigger a mute. Repeat offenders get longer
+  mutes. Below the threshold, players can be warned instead.
+- **Staff tools.** In-game alerts show what was said, what was said just before, and where the player is, with a button
+  to mute them. Alerts can also go to Discord with the recording attached.
+- **Player reports.** Players report each other with `/reportvoice`. Staff review reports and listen to the recording.
+- **Light on the server.** Audio is processed in the background and should not slow your server down.
+
+## Requirements
+
+- A **Paper** server, version **26.1 or newer**, running **Java 25 or newer**.
+- [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) (version 2.6.x), which provides voice chat.
+- [LuckPerms](https://luckperms.net) (version 5.5 or newer), which handles permissions and remembers each player's
+  offences.
+- Linux, Windows or macOS.
 - About **3 GB of spare memory (RAM)** for the best-quality speech model, plus free disk space for the model
   (between about 400 MB and 1 GB, depending on which you choose).
 
-## Setting it up
+## Setup
 
 1. Download `VoiceWarden-<version>.jar` and put it in your server's `plugins` folder, alongside Simple Voice Chat and
    LuckPerms.
@@ -58,7 +60,7 @@ staff but never mute anyone. Switch it back when you're happy with how it behave
 the speech model and the native libraries. Once you have put the required files for your platform in place, the console
 gives the paths and download links for anything still missing.
 
-## Using it
+## Commands
 
 The main command is `/voicewarden`, or `/vw` for short.
 
@@ -90,7 +92,7 @@ The main command is `/voicewarden`, or `/vw` for short.
 |---|---|---|
 | `/reportvoice <player> [minutes]` (`/rvoice`) | Reports a player's recent voice chat to staff, with a recording. | `voicewarden.report` (everyone by default) |
 
-### Permissions
+## Permissions
 
 | Permission | Who has it by default | What it's for |
 |---|---|---|
@@ -103,56 +105,6 @@ The main command is `/voicewarden`, or `/vw` for short.
 | `voicewarden.report` | Everyone | Using `/reportvoice`. |
 | `voicewarden.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/vw history`. |
 
-## How a mute happens
-
-1. A player speaks. When they stop, VoiceWarden turns that sentence into text.
-2. The text is checked against your rules. Each rule either:
-   - **flags** the player, which alerts staff but doesn't count towards a mute, or
-   - **mutes**, which adds points towards an automatic mute. Serious rules add more points.
-3. If a player collects enough points in a short time, they are muted. The length comes from the **mute ladder**:
-   a first offence gets a short mute and repeat offences get longer ones. If they are below the limit, they get a
-   warning instead when `moderation.warn-below-threshold` is on.
-4. Staff are alerted either way, and the mute is remembered even if the player leaves or the server restarts.
-   New mutes store the identity of their LuckPerms mirror, so they can still be cleaned up after a config change.
-   Mutes saved by an older version have no stored identity, so cleanup assumes your current config. If you changed the
-   mute permission or context before upgrading, remove the old LuckPerms entry by hand.
-   An unmute completes only after that cleanup succeeds. An expired mute is no longer enforced, but its record is kept
-   until cleanup succeeds; a failed cleanup is retried on the expiry sweep and at startup, or by unmuting.
-
-A few things to know:
-
-- Neutral words are not blocked, and everyday words that merely contain a bad word, such as "cocktail", are allowed.
-- Rules look at the words, not the meaning. They can't tell a quote or a joke from a real insult, so staff should
-  check the context in alerts.
-- Muted players see a message above their hotbar telling them how long the mute lasts. You can change this text in
-  `messages.yml`.
-
-## Customising
-
-All files are in `plugins/VoiceWarden/`.
-
-| File | What it's for |
-|---|---|
-| `config.yml` | Every setting, with explanations inside the file. |
-| `messages.yml` | All the messages players and staff see. |
-| `wordlist.txt` | Your list of swear words and words that cause a mute. Wildcards such as `word*` are allowed. |
-| `rules.yml` | More advanced rules, such as phrases and an "always allowed" list. |
-| `recordings/` | Saved recordings used as evidence. Old ones are deleted automatically based on age and size. |
-| `data/` | Active mutes and reports. If a mutes or reports file is corrupt, it is moved next to the original with a `.corrupt-<UUID>` suffix before fresh state is started. If it can't be preserved, writes are suspended. |
-| `models/` and `natives/` | The downloaded speech recognition files. |
-
-**Updating:** VoiceWarden never overwrites your `wordlist.txt` or `rules.yml` when you install a new version, so you
-won't get new default rules automatically. Back them up before comparing them with the newest defaults. Use `/vw reload`
-after editing files. Restart the server after changing the plugin file itself. Changing `audio.decode-threads` needs a
-server restart to apply, and `/vw reload` tells you so.
-
-Setting `enabled: false` stops voice capture, drops queued utterances and discards results from transcription already
-running (a native call may still finish). Existing mutes stay enforced. `discord.max-queue-size` applies on
-`/vw reload`.
-
-On shutdown, VoiceWarden finishes running transcription and saves its data in the background, so the Minecraft thread
-is not blocked. Native or disk work can delay the process exiting.
-
 ## Troubleshooting
 
 - **Nothing is happening.** Check the console for `Speech engine ready`. Until it appears, the first download is still
@@ -160,122 +112,18 @@ is not blocked. Native or disk work can delay the process exiting.
 - **Someone isn't being picked up.** Make sure they don't have `voicewarden.bypass`.
 - **Staff see no alerts.** Give them `voicewarden.alerts`, and ask them to run `/vw alerts` in case they turned them off.
 - **Audio is being dropped, or the server feels slow.** Run `/vw stats` and look at *Speed* and *dropped*. Choose a
-  lighter speech model, or see the technical section below.
+  lighter speech model (see [Configuration](docs/configuration.md#speech-models)).
 
----
+## Documentation
 
-## Technical details
+- [Configuration](docs/configuration.md): how mutes work, config files, updating, and choosing a speech model.
+- [Architecture](docs/architecture.md): detection, threading, performance, and licences and attribution.
+- [Contributing](CONTRIBUTING.md): building, testing and opening a pull request.
 
-This section is for server administrators and developers.
+## Licence
 
-### Speech models
+VoiceWarden's code is under the [MIT licence](LICENSE). The speech models and libraries it downloads have their own
+licences, listed in [Licences and attribution](docs/architecture.md#licences-and-attribution).
 
-Speech recognition runs through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with Silero VAD to ignore
-non-speech. Set `speech-to-text.model` to choose:
-
-| Model | Notes | Download |
-|---|---|---|
-| NVIDIA Parakeet TDT 0.6B (default) | Fast on CPU | about 670 MB |
-| `whisper-small-en` | Lower CPU cost than Turbo; accuracy depends on the microphone | 376 MB |
-| `whisper-turbo` | Highest accuracy, needs the most CPU and RAM | 1.04 GB |
-
-Whisper is configured for English. Model memory is outside the Java heap, so measure server RSS under load. The first
-start also downloads the native libraries for your platform (about 9-13 MB, checked against a pinned SHA-256). Models
-are downloaded from Hugging Face, verified by SHA-256, and resumed if interrupted. Supported platforms are Linux
-(glibc), Windows and macOS on x64 or arm64.
-
-### Detection
-
-- Word lists use `[EN-PROFANITY]` (flag) and `[EN-MUTE]` (mute) sections.
-- `rules.yml` adds phrases, wildcards, regex, weights and an allowlist. The English defaults include over 380
-  words and phrases and 18 advanced rules. Spelled-out letters ("k y s") and hyphenated compounds are matched.
-- Child exploitation requests and offers have weight 3. Sexual coercion, explicit sexual threats and some other
-  severe rules have weight 2. Short ambiguous abbreviations are not standalone terms.
-- Utterances end when push-to-talk is released or after `audio.silence-timeout`. Long speech is split at its quietest
-  point. Quiet speech is boosted with `speech-to-text.input-gain` (target −20 dBFS, maximum +40 dB). The capture
-  floor is `audio.min-level-dbfs: -65`.
-  `audio.ignore-whispers` refers to the voice chat whisper key, not physical whispering.
-- Mute enforcement is instant in-process and mirrored as temporary LuckPerms `voicechat.speak` deny nodes. Offence
-  history is stored in LuckPerms meta.
-- Muted-player messages use `player.muted-actionbar`, `player.muted-permanent-actionbar` and
-  `player.no-speak-permission-actionbar` in `messages.yml`; `mute.notify-player` toggles them. Simple Voice Chat
-  checks `voicechat.speak` before firing `MicrophonePacketEvent`, so VoiceWarden replaces only its no-speak status
-  message through an adapter tested against SVC 2.6.24. If that interface changes, the plugin logs it and keeps the
-  original message and mute enforcement.
-
-### Performance and threading
-
-```
-SVC packet thread ── O(1) ──▶ per-player lock-free inbox ──▶ decode pool: Opus → 48 kHz → 16 kHz (FIR), segmentation
-   └ mute check (map lookup) → cancel packet                         │ bounded, per-player-fair queue (drop-oldest)
-                                                                     ▼
-                     STT workers: gain → Silero VAD gate → batched recognition on ONE shared model
-                                                                     ▼
-                     rules → flags/ladder → mute map (+ async LuckPerms) → alerts / Discord / evidence (IO threads)
-```
-
-- The server thread only handles join/quit bookkeeping, command parsing and any console commands you configure.
-- Simple Voice Chat's packet thread does a map lookup and a lock-free enqueue, nothing more.
-- Per-player backlog, the transcription queue, the Discord queue and the audio memory budget are all bounded. Under
-  overload, audio is skipped and counted in `/vw stats`.
-- Extra workers share one model but need additional working memory. Start with one worker and measure.
-- Measured on an Apple M-series CPU with `cpu-threads: 2`, Parakeet transcribes a 3.6 s sentence in about 190 ms after
-  the speaker stops, and Whisper Small a 2.86 s clip in about 500 ms. One Parakeet worker with 2 threads covers roughly
-  6-8 people talking at the same moment. These are single-machine measurements, not an accuracy guarantee.
-
-### Staging Turbo with a code update
-
-Cache Turbo under `plugins/VoiceWarden/models/whisper-turbo/` and stage the new JAR in Paper's update folder. To switch
-to Turbo only when the new JAR starts, create `plugins/VoiceWarden/activate-whisper-turbo` containing just
-`whisper-turbo`. On the next startup the plugin selects Turbo, enables input gain and sets
-`audio.min-level-dbfs: -65`, keeps a byte-for-byte backup under `plugins/VoiceWarden/backups/`, and renames the request
-to `activate-whisper-turbo.applied` so it runs once. Remove an unconsumed request to cancel it.
-
-### Building
-
-The repository tracks source and the Gradle wrapper. Build output, the local `run/` server directory, private backups
-and secrets are ignored.
-
-```bash
-./gradlew build                 # → build/libs/VoiceWarden-<version>.jar
-./gradlew runServer             # local test server, on the Paper version in gradle.properties
-./gradlew test -PsherpaIntegration=/path/to/models   # optional end-to-end test with the real engine
-```
-
-`paperApi` in `gradle.properties` is the oldest supported Paper version, and the plugin compiles against it. To build
-against another version, pass it with `-PpaperApi`, for example `./gradlew build -PpaperApi=26.3.+`. CI tests the
-newest Paper build of each version in the matrix in `.github/workflows/build.yml`. To support a new version, add it to
-the matrix. To drop the oldest, change `paperApi` and the first matrix entry.
-
-To replay recorded speech through an installed model:
-
-```bash
-./gradlew test \
-  -PsherpaIntegration=run/plugins/VoiceWarden/models \
-  -PsherpaNatives=run/plugins/VoiceWarden/natives/sherpa-onnx-1.13.8/osx-aarch64 \
-  -PsherpaModel=whisper-turbo \
-  -PsherpaRecordings=run/plugins/VoiceWarden/recordings
-```
-
-Use your platform's native-library directory in place of `osx-aarch64`, and 16 kHz mono PCM WAVs. Use
-`-PsherpaModel=whisper-small-en` for Small, or omit it for Parakeet.
-
-Audio fixtures and recordings are supplied locally and are not included in the repository. Audio files are ignored
-by Git, and CI rejects tracked files covered by `.gitignore`.
-
-## AI development disclaimer
-
-VoiceWarden contains AI-generated code and documentation, alongside human contributions. AI assistance does not
-guarantee correctness or security. Test the plugin on a development server and review its behaviour before relying
-on it for moderation. The project is provided without warranty under the [MIT licence](LICENSE).
-
-## Licences and attribution
-
-- VoiceWarden code: [MIT](LICENSE), © 2026 Daniel Millar.
-- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx): Apache-2.0. ONNX Runtime: MIT.
-- NVIDIA Parakeet TDT 0.6B v2/v3 model weights: **CC-BY-4.0**. © NVIDIA, used unmodified through the
-  [sherpa-onnx export](https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8).
-- OpenAI Whisper model weights: **MIT**, used through the
-  [sherpa-onnx Whisper Small English export](https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small.en) and
-  [Whisper Turbo export](https://huggingface.co/csukuangfj/sherpa-onnx-whisper-turbo).
-- Silero VAD: MIT.
+VoiceWarden contains AI-generated code and documentation, alongside human contributions, and AI assistance does not
+guarantee correctness or security. Test it on a development server before relying on it for moderation.
