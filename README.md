@@ -40,8 +40,9 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 
 ## Setup
 
-1. Download `VoiceWarden-<version>.jar` and put it in your server's `plugins` folder, alongside Simple Voice Chat and
-   LuckPerms.
+1. Download `VoiceWarden-<version>.jar` from the [Releases page](https://github.com/danielmillar/VoiceWarden/releases)
+   (the `.sha256` file next to it can be used to check the download) and put it in your server's `plugins` folder,
+   alongside Simple Voice Chat and LuckPerms.
 2. Start the server. The first time, VoiceWarden downloads the speech recognition files it needs. This takes a few
    minutes and your server stays playable meanwhile. Watch the server console for the message
    **`Speech engine ready`**.

@@ -36,6 +36,19 @@ Use your platform's native-library directory in place of `osx-aarch64`, and 16 k
 Audio fixtures and recordings are supplied locally and are not included in the repository. Audio files are ignored
 by Git, and CI rejects tracked files covered by `.gitignore`.
 
+## Releasing
+
+Set `version` in `build.gradle.kts` through a normal pull request. Once it has merged, tag that commit on `main` with
+`v<version>` and push the tag:
+
+```
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The Release workflow checks that the tag matches the Gradle version, runs `./gradlew build`, and publishes a GitHub
+release with the JAR, a SHA-256 checksum file and notes generated from the merged pull requests. You can edit the notes
+afterwards.
+
 ## Pull requests
 
 - Branch off `main` and open the pull request against `main`.
