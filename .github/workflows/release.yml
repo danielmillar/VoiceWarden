@@ -1,0 +1,39 @@
+name: Release
+
+# Push a tag matching the Gradle version, e.g. `git tag v1.0.0 && git push origin v1.0.0`.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+      - name: Check the tag matches the Gradle version
+        id: version
+        run: |
+          version=$(./gradlew -q properties --property version | sed -n 's/^version: //p')
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match version $version in build.gradle.kts"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: ./gradlew build
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JAR: build/libs/VoiceWarden-${{ steps.version.outputs.version }}.jar
+        run: |
+          sha256sum "$JAR" | sed 's#build/libs/##' > "$JAR.sha256"
+          gh release create "$GITHUB_REF_NAME" "$JAR" "$JAR.sha256" \
+            --verify-tag --generate-notes --title "VoiceWarden $GITHUB_REF_NAME"
