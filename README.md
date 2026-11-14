@@ -32,7 +32,7 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 
 ## Requirements
 
-- A **Paper** server, version **26.1 or newer**, running **Java 25 or newer**.
+- A **Paper** or **Folia** server, version **26.1 or newer**, running **Java 25 or newer**.
 - [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) (version 2.6.x), which provides voice chat.
 - Optional: [LuckPerms](https://luckperms.net) (version 5.5 or newer). VoiceWarden enforces mutes itself, so it works
   without it. With LuckPerms, mutes also apply on other servers sharing your LuckPerms storage, and commands can find
