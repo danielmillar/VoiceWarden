@@ -187,7 +187,7 @@ alerts:
   console: true
 
 # ── Custom commands ──────────────────────────────────────────────────────────
-# Console commands run on the main thread when something happens. Placeholders:
+# Console commands run on the main thread (the global region on Folia) when something happens. Placeholders:
 #   {player} {uuid} {words} {transcript} {duration} {offense} {categories}
 custom-commands:
   # After an automatic mute.
