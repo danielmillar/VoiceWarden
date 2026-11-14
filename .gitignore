@@ -66,3 +66,5 @@ benchmarks/private-results/
 # macOS
 .DS_Store
 Thumbs.db
+
+.paper-mcp/
