@@ -25,6 +25,7 @@ public record PluginConfig(
         EvidenceSettings recordings,
         DiscordSettings discord,
         boolean privacyJoinMessage,
+        Retention retention,
         Consent consent,
         Logging logging,
         Duration healthCheckInterval
@@ -156,6 +157,14 @@ public record PluginConfig(
      * @param audioMemoryBytes shared budget for buffered speech audio used by voice reports (0 = keep no audio)
      */
     public record TranscriptBuffer(boolean enabled, Duration retention, int maxLinesPerPlayer, long audioMemoryBytes) {
+    }
+
+    /**
+     * How long stored records about players are kept, in days. 0 keeps them forever.
+     *
+     * @param consentDays an answer is deleted once its player has not been seen for this long
+     */
+    public record Retention(int transcriptLogDays, int muteHistoryDays, int reportDays, int consentDays, int exportDays) {
     }
 
     public record VoiceReport(

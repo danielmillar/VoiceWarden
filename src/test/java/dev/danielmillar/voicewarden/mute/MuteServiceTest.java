@@ -288,6 +288,52 @@ class MuteServiceTest {
         assertTrue(service.isMuted(alice));
     }
 
+    @Test void eraseLiftsTheMuteRemovesItsNodesAndDeletesItsHistoryOnly() {
+        config = Fakes.with(config, "mute", Fakes.with(config.mute(), "luckPerms", true));
+        MuteService service = service();
+        service.mute(alice, "Alice", Duration.ofHours(1), "reason", "staff", false).join();
+        service.mute(bob, "Bob", Duration.ofHours(1), "reason", "staff", false).join();
+        int before = luckPermsCalls.get();
+        assertEquals(new MuteService.Erased(true, 1), service.erase(alice).join());
+        assertEquals(before + 1, luckPermsCalls.get());
+        assertFalse(service.isMuted(alice));
+        database.close();
+        database = Fakes.database(folder);
+        MuteService reloaded = service();
+        reloaded.start(timer);
+        try {
+            assertFalse(reloaded.isMuted(alice));
+            assertTrue(reloaded.isMuted(bob));
+            assertEquals(0, reloaded.history(alice, 1, 10).join().events().size());
+            assertEquals(1, reloaded.history(bob, 1, 10).join().events().size());
+            assertEquals(new MuteService.Erased(false, 0), reloaded.erase(alice).join());
+        } finally { reloaded.close(); }
+    }
+
+    @Test void eraseKeepsTheMuteWhenItsNodesCannotBeRemoved() {
+        MuteService service = new MuteService(() -> config, () -> messages,
+                (player, previous, next, duration) -> next == null
+                        ? CompletableFuture.failedFuture(new IllegalStateException("LuckPerms is down"))
+                        : CompletableFuture.completedFuture(null),
+                new OnlinePlayers(), Runnable::run, Logger.getLogger("MuteServiceTest"), database);
+        service.mute(alice, "Alice", Duration.ofHours(1), "reason", "staff", false).join();
+        assertThrows(java.util.concurrent.CompletionException.class, () -> service.erase(alice).join());
+        assertTrue(service.isMuted(alice));
+        assertEquals(1, service.history(alice, 1, 10).join().events().size());
+    }
+
+    @Test void oldHistoryIsDeletedExceptForPlayersStillMuted() {
+        MuteService service = service();
+        service.mute(alice, "Alice", Duration.ofHours(1), "reason", "staff", false).join();
+        assertTrue(service.unmute(alice, "staff").join());
+        service.mute(bob, "Bob", null, "reason", "staff", false).join();
+        long later = System.currentTimeMillis() + Duration.ofDays(1).toMillis();
+        assertEquals(0, service.pruneHistory(System.currentTimeMillis() - Duration.ofDays(1).toMillis()).join());
+        assertEquals(2, service.pruneHistory(later).join());
+        assertEquals(0, service.history(alice, 1, 10).join().events().size());
+        assertEquals(1, service.history(bob, 1, 10).join().events().size());
+    }
+
     private MuteService service() { return service(Runnable::run); }
     private MuteService service(java.util.concurrent.Executor io) {
         return new MuteService(() -> config, () -> messages, hook, new OnlinePlayers(), io, Logger.getLogger("MuteServiceTest"), database);

@@ -47,6 +47,16 @@ class ConfigLoaderTest {
         assertEquals(3, loaded.warnings().size());
     }
 
+    @Test void retentionHasDefaultsAndInvalidDaysFallBackWithAWarning() throws Exception {
+        var file = folder.resolve("config.yml");
+        java.nio.file.Files.writeString(file, "consent: {mode: notice}\n");
+        assertEquals(new PluginConfig.Retention(30, 365, 90, 365, 7), ConfigLoader.load(folder, file).config().retention());
+        java.nio.file.Files.writeString(file, "privacy: {retention: {transcript-logs-days: 0, reports-days: -1, exports-days: soon}}\n");
+        var loaded = ConfigLoader.load(folder, file);
+        assertEquals(new PluginConfig.Retention(0, 365, 90, 365, 7), loaded.config().retention());
+        assertEquals(2, loaded.warnings().size());
+    }
+
     @Test void existingMuteConfigKeepsBlockingEverythingAndItsListeningChoice() throws Exception {
         var file = folder.resolve("config.yml");
         java.nio.file.Files.writeString(file, "mute:\n  disable-listening: true\n");

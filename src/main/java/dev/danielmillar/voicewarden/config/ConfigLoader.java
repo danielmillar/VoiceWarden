@@ -80,6 +80,12 @@ public final class ConfigLoader {
                 recordings(c),
                 discord(c),
                 c.getBoolean("privacy.join-message"),
+                new PluginConfig.Retention(
+                        intIn(c, "privacy.retention.transcript-logs-days", 0, 36_500),
+                        intIn(c, "privacy.retention.mute-history-days", 0, 36_500),
+                        intIn(c, "privacy.retention.reports-days", 0, 36_500),
+                        intIn(c, "privacy.retention.consent-days", 0, 36_500),
+                        intIn(c, "privacy.retention.exports-days", 0, 36_500)),
                 new PluginConfig.Consent(
                         choice(c, "consent.mode", PluginConfig.ConsentMode.class, PluginConfig.ConsentMode.NOTICE),
                         intIn(c, "consent.rules-version", 1, Integer.MAX_VALUE),
