@@ -174,4 +174,35 @@ class ModerationServiceTest {
         assertTrue(asked.isEmpty());
         assertTrue(mutes.isMuted(player));
     }
+
+    @Test void forgiveClearsTheFlagWindowAndOffenceCount() throws Exception {
+        var cfg = config();
+        cfg = Fakes.with(cfg, "moderation", Fakes.with(Fakes.with(cfg.moderation(), "flagThreshold", 2), "dryRun", false));
+        cfg = Fakes.with(cfg, "alerts", new PluginConfig.Alerts(false, false));
+        cfg = Fakes.with(cfg, "recordings", new EvidenceSettings(EvidenceSettings.Mode.NONE, folder, false, 0, 0));
+        final var settings = cfg;
+        var messages = Messages.load(folder.resolve("messages.yml"));
+        var players = new OnlinePlayers();
+        var database = Fakes.database(folder);
+        var mutes = new MuteService(() -> settings, () -> messages, hook(), players, Runnable::run, log, database);
+        var rules = RuleEngine.compile(List.of(new RuleDefinition("test", "test", RuleAction.MUTE, 1, true,
+                List.of("badword"), List.of(), List.of(), List.of())), Set.of());
+        var offenses = new OffenseTracker(database, log);
+        try (var http = HttpClient.newHttpClient()) {
+            var discord = new DiscordWebhookService(DiscordSettings::disabled, http, log);
+            var moderation = new ModerationService(() -> settings, () -> messages, () -> rules,
+                    new TranscriptBuffer(new TranscriptBuffer.Limits(Duration.ofHours(1), 10, 0)), offenses, mutes,
+                    new StaffAlertService(() -> settings, () -> messages, players, log), discord,
+                    new EvidenceStore(settings::recordings, Runnable::run, log), new CustomCommandRunner(null, log),
+                    new TranscriptLog(folder.resolve("logs"), Runnable::run, log), players, new Metrics(), log);
+            var segment = new AudioSegment(player, "Alex", TestFixtures.AUDIO, 16000, Instant.now(), System.nanoTime(), null, false);
+            offenses.recordNext(player, 0);
+            moderation.onTranscript(new Transcript(segment, "badword", 0));
+            moderation.forgive(player).join();
+            moderation.onTranscript(new Transcript(segment, "badword", 0));
+            assertFalse(mutes.isMuted(player));
+            assertEquals(0, offenses.lookup(player, 0).join().count());
+        }
+        database.close();
+    }
 }

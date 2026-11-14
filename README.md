@@ -73,9 +73,11 @@ The main command is `/voicewarden`, or `/vw` for short.
 |---|---|---|
 | `/vw vcmute <player> <duration> [reason]` | Mutes a player's voice. Durations look like `30m`, `2h`, `1d` or `perm`. Works on offline players. | `voicewarden.vcmute` |
 | `/vw unvcmute <player>` | Removes a voice mute. | `voicewarden.vcmute` |
+| `/vw pardon <player> [reason]` | Undoes a wrong call in one step: removes the mute, clears the offence count and flags, and records the pardon. | `voicewarden.vcmute` |
 | `/vw mutes` | Lists everyone currently muted. | `voicewarden.vcmute` |
 | `/vw offenses <player> [reset]` | Shows a player's offence count, or resets it. | `voicewarden.vcmute` |
-| `/vw history <player> [lines]` | Shows what a player recently said. | `voicewarden.report.review` |
+| `/vw history <player> [page]` | Shows a player's voice record: offences, current mute, and past mutes, unmutes, expiries and pardons, newest first. | `voicewarden.vcmute` |
+| `/vw transcript <player> [lines]` | Shows what a player recently said. | `voicewarden.report.review` |
 | `/vw alerts` | Turns your own in-game alerts on or off. | `voicewarden.alerts` |
 | `/viewreport <id or player> [minutes]` (`/vr`) | Opens a report, or a player's recent speech, as a book. | `voicewarden.report.review` |
 | `/reportinbox [review <id>]` (`/rinbox`, `/vreports`) | Lists open reports and marks them as reviewed. | `voicewarden.report.review` |
@@ -104,9 +106,9 @@ The main command is `/voicewarden`, or `/vw` for short.
 | `voicewarden.alerts` | Operators | Receiving in-game alerts. |
 | `voicewarden.reload` | Operators | Using `/vw reload`. |
 | `voicewarden.stats` | Operators | Using `/vw stats`. |
-| `voicewarden.vcmute` | Operators | Using `/vw vcmute`, `unvcmute`, `mutes` and `offenses`. |
+| `voicewarden.vcmute` | Operators | Using `/vw vcmute`, `unvcmute`, `pardon`, `mutes`, `offenses` and `history`. |
 | `voicewarden.report` | Everyone | Using `/reportvoice`. |
-| `voicewarden.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/vw history`. |
+| `voicewarden.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/vw transcript`. |
 
 ## Troubleshooting
 

@@ -153,7 +153,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
                 executors.io(), getLogger(), database);
         alerts = new StaffAlertService(this::config, this::messages, players, getLogger());
         discord = new DiscordWebhookService(() -> config.discord(), http, getLogger());
-        staffModeration = new StaffModerationService(mutes, this::isBypassed, action -> {
+        staffModeration = new StaffModerationService(mutes, this::isBypassed, id -> moderation.forgive(id), action -> {
             alerts.staffAction(action);
             discord.submitStaffAction(action);
         });

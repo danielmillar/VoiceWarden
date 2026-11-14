@@ -61,12 +61,16 @@ server restart to apply, and `/vw reload` tells you so.
 - Existing voice mutes and reports are not carried over: VoiceWarden starts with no mutes and an empty report inbox.
   The old JSON files in `data/` are ignored and can be deleted.
 - If you mirrored mutes to LuckPerms, the old deny entries stay in LuckPerms and still silence those players.
-  While the mirror is on with the same permission and context settings, `/vw unmute <player>` removes them, even
+  While the mirror is on with the same permission and context settings, `/vw unvcmute <player>` removes them, even
   though it replies that the player is not muted. Otherwise remove them in LuckPerms.
 - Offence counts are no longer kept in LuckPerms meta (`voicewarden-offenses`, `voicewarden-last-offense`), and old
   counts are not imported. The mute ladder starts from zero after upgrading, and counts are now per server rather than
   shared across a network.
 - Evidence recordings and transcript logs are unchanged.
+- `/vw history <player>` now shows a player's voice record (offences, current mute and past mutes) and needs
+  `voicewarden.vcmute`. What a player recently said moved to `/vw transcript <player>`, still with
+  `voicewarden.report.review`.
+- Mute history starts at the upgrade, so mutes lifted before it do not appear in `/vw history`.
 
 ## Disabling and shutdown
 

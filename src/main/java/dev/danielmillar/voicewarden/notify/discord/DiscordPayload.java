@@ -140,8 +140,18 @@ final class DiscordPayload {
 
     private static Embed staff(StaffAction action, DiscordSettings settings, WebhookSettings webhook) {
         boolean mute = action.type() == StaffAction.Type.MUTE;
-        Embed embed = base(settings, webhook, mute ? "Voice mute: {player}" : "Voice unmute: {player}",
-                mute ? 0xE74C3C : 0x2ECC71, action.targetName(), mute ? "Muted" : "Unmuted",
+        String title = switch (action.type()) {
+            case MUTE -> "Voice mute: {player}";
+            case UNMUTE -> "Voice unmute: {player}";
+            case PARDON -> "Voice pardon: {player}";
+        };
+        String status = switch (action.type()) {
+            case MUTE -> "Muted";
+            case UNMUTE -> "Unmuted";
+            case PARDON -> "Pardoned";
+        };
+        int color = switch (action.type()) { case MUTE -> 0xE74C3C; case UNMUTE -> 0x2ECC71; case PARDON -> 0x3498DB; };
+        Embed embed = base(settings, webhook, title, color, action.targetName(), status,
                 action.duration(), action.targetId().toString().substring(0, 8), action.timestamp());
         embed.field("Player", player(action.targetName(), action.targetId()));
         embed.field("By", DiscordText.plain(action.actor()));
