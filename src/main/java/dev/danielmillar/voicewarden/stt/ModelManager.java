@@ -17,19 +17,22 @@ public final class ModelManager {
     record ModelFile(String name, long size, @Nullable String sha256) {
     }
 
-    /** Models published by the sherpa-onnx project on Hugging Face, pinned by size and SHA-256. */
+    /**
+     * Models published by the sherpa-onnx project on Hugging Face, pinned by commit, size and SHA-256.
+     * Always pin a commit: upstream re-uploads files in place, so a branch name serves bytes that no longer match.
+     */
     public enum Preset {
         PARAKEET_TDT_V2("parakeet-tdt-v2", "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
-                "NVIDIA Parakeet TDT 0.6B v2 (English, int8)", List.of(
-                new ModelFile("encoder.int8.onnx", 652_184_296L, "a32b12d17bbbc309d0686fbbcc2987b5e9b8333a7da83fa6b089f0a2acd651ab"),
-                new ModelFile("decoder.int8.onnx", 7_257_753L, "b6bb64963457237b900e496ee9994b59294526439fbcc1fecf705b31a15c6b4e"),
-                new ModelFile("joiner.int8.onnx", 1_739_080L, "7946164367946e7f9f29a122407c3252b680dbae9a51343eb2488d057c3c43d2"),
+                "NVIDIA Parakeet TDT 0.6B v2 (English, int8)", "84b478d541cdbf0c296a7ab5f1e20a6f8f998114", List.of(
+                new ModelFile("encoder.int8.onnx", 652_282_309L, "92a10bd9c23936ea0566c29f963bc57c2a5df4261b6a8921c39abea66557ca8b"),
+                new ModelFile("decoder.int8.onnx", 7_257_753L, "4d097bae3bac5c96018d5293ba39f1b657296102b142affda40378f38b020f41"),
+                new ModelFile("joiner.int8.onnx", 1_739_080L, "77a29f3e5ac7d37074e0af465391b80f314015d5b97f0f90c6c7767f1d56f428"),
                 new ModelFile("tokens.txt", 9_384L, "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d"))),
         PARAKEET_TDT_V3("parakeet-tdt-v3", "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
-                "NVIDIA Parakeet TDT 0.6B v3 (25 European languages, int8)", List.of(
-                new ModelFile("encoder.int8.onnx", 652_184_281L, "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"),
-                new ModelFile("decoder.int8.onnx", 11_845_275L, "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e"),
-                new ModelFile("joiner.int8.onnx", 6_355_277L, "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3"),
+                "NVIDIA Parakeet TDT 0.6B v3 (25 European languages, int8)", "ed5d745623472f97cfc2e6c2916ee248798fc5a8", List.of(
+                new ModelFile("encoder.int8.onnx", 652_282_294L, "1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479"),
+                new ModelFile("decoder.int8.onnx", 11_845_274L, "0222a86147299d4dee90edf95b6d13827edb42ad8b7c9cf0b2582f030937c0b5"),
+                new ModelFile("joiner.int8.onnx", 6_355_277L, "cbd02f3696e9944970111fb439d9c3fd365a80374565f13f2b9c7007d253fc98"),
                 new ModelFile("tokens.txt", 93_939L, "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"))),
         WHISPER_SMALL_EN("whisper-small-en", "csukuangfj/sherpa-onnx-whisper-small.en",
                 "Whisper Small (English, int8)", "d9533f69affd85061aee349af7fea5cb2996dbbe", List.of(
@@ -47,10 +50,6 @@ public final class ModelManager {
         final String description;
         final String revision;
         final List<ModelFile> files;
-
-        Preset(String id, String repository, String description, List<ModelFile> files) {
-            this(id, repository, description, "main", files);
-        }
 
         Preset(String id, String repository, String description, String revision, List<ModelFile> files) {
             this.id = id;
@@ -105,6 +104,10 @@ public final class ModelManager {
         for (ModelFile file : preset.files) {
             ensure(downloader, dir.resolve(file.name()), file, preset.url(file), settings.autoDownload(), preset.id + "/" + file.name());
         }
+        return layout(preset, dir, vad);
+    }
+
+    static ResolvedModel layout(Preset preset, Path dir, @Nullable Path vad) {
         if (preset == Preset.WHISPER_SMALL_EN || preset == Preset.WHISPER_TURBO) {
             String prefix = preset == Preset.WHISPER_SMALL_EN ? "small.en" : "turbo";
             return new ResolvedModel(preset.description, "whisper",
@@ -118,15 +121,23 @@ public final class ModelManager {
 
     private static void ensure(Downloader downloader, Path path, ModelFile file, URI url, boolean autoDownload, String label)
             throws IOException, InterruptedException {
-        if (Files.isRegularFile(path) && Files.size(path) == file.size()) {
+        if (matches(path, file)) {
             return;
         }
         if (!autoDownload) {
-            throw new IOException(label + " is missing or incomplete at " + path.toAbsolutePath()
+            throw new IOException(label + " is missing, incomplete or outdated at " + path.toAbsolutePath()
                     + ". Enable speech-to-text.auto-download or download it manually from " + url);
         }
         Files.deleteIfExists(path);
         downloader.download(url, path, file.size(), file.sha256(), label);
+    }
+
+    /** Same size alone is not enough: upstream re-exports can keep a file's size while changing its contents. */
+    static boolean matches(Path path, ModelFile file) throws IOException {
+        if (!Files.isRegularFile(path) || Files.size(path) != file.size()) {
+            return false;
+        }
+        return file.sha256() == null || file.sha256().equalsIgnoreCase(Downloader.sha256(path));
     }
 
     private static Path existing(Path dataFolder, String configured, String what) throws IOException {

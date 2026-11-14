@@ -49,7 +49,7 @@ public final class Downloader {
             try {
                 attempt(uri, target, expectedSize, sha256, label);
                 return;
-            } catch (ChecksumException e) {
+            } catch (IntegrityException e) {
                 throw e;
             } catch (IOException e) {
                 last = e;
@@ -85,18 +85,18 @@ public final class Downloader {
         if (!append) {
             existing = 0;
         }
+        long announced = response.headers().firstValueAsLong("Content-Length").orElse(-1);
+        if (expectedSize > 0 && announced >= 0 && existing + announced != expectedSize) {
+            response.body().close();
+            Files.deleteIfExists(part);
+            throw sizeMismatch(label, uri, existing + announced, expectedSize);
+        }
         MessageDigest digest = sha256 == null ? null : sha256Digest();
         if (digest != null && append) {
-            try (InputStream in = Files.newInputStream(part)) {
-                byte[] buf = new byte[1 << 16];
-                int n;
-                while ((n = in.read(buf)) >= 0) {
-                    digest.update(buf, 0, n);
-                }
-            }
+            update(digest, part);
         }
         long total = expectedSize > 0 ? expectedSize
-                : response.headers().firstValueAsLong("Content-Length").orElse(-1) + (append ? existing : 0);
+                : announced < 0 ? -1 : announced + existing;
         if (existing == 0) {
             logger.info("Downloading " + label + (total > 0 ? " (" + mib(total) + ")" : "") + "...");
         } else {
@@ -119,6 +119,7 @@ public final class Downloader {
             }
         });
         long done = existing;
+        boolean oversized = false;
         try (InputStream in = body;
              OutputStream out = Files.newOutputStream(part, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
                      append ? StandardOpenOption.APPEND : StandardOpenOption.TRUNCATE_EXISTING)) {
@@ -128,6 +129,10 @@ public final class Downloader {
             while ((n = in.read(buf)) >= 0) {
                 if (Thread.interrupted()) {
                     throw new InterruptedException("download cancelled");
+                }
+                if (expectedSize > 0 && done + n > expectedSize) {
+                    oversized = true;
+                    break;
                 }
                 out.write(buf, 0, n);
                 if (digest != null) {
@@ -146,14 +151,19 @@ public final class Downloader {
         } finally {
             watchdog.interrupt();
         }
-        if (expectedSize > 0 && done != expectedSize) {
-            throw new IOException("incomplete download: got " + done + " of " + expectedSize + " bytes");
+        if (oversized) {
+            Files.deleteIfExists(part);
+            throw sizeMismatch(label, uri, -1, expectedSize);
+        }
+        if (expectedSize > 0 && done < expectedSize) {
+            throw new IOException("connection ended early: got " + done + " of " + expectedSize
+                    + " bytes; the partial file is kept and the download resumes");
         }
         if (digest != null) {
             String actual = HexFormat.of().formatHex(digest.digest());
             if (!actual.equalsIgnoreCase(sha256)) {
                 Files.deleteIfExists(part);
-                throw new ChecksumException("SHA-256 mismatch for " + label + ": expected " + sha256 + " but got " + actual
+                throw new IntegrityException("SHA-256 mismatch for " + label + ": expected " + sha256 + " but got " + actual
                         + ". The file was deleted; it will be downloaded again on the next start.");
             }
         }
@@ -163,6 +173,23 @@ public final class Downloader {
             Files.move(part, target, StandardCopyOption.REPLACE_EXISTING);
         }
         logger.info("Downloaded " + label + " (" + mib(done) + ")");
+    }
+
+    /** Hex SHA-256 of a whole file. Blocking: reads the file end to end. */
+    static String sha256(Path file) throws IOException {
+        MessageDigest digest = sha256Digest();
+        update(digest, file);
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static void update(MessageDigest digest, Path file) throws IOException {
+        try (InputStream in = Files.newInputStream(file)) {
+            byte[] buf = new byte[1 << 16];
+            int n;
+            while ((n = in.read(buf)) >= 0) {
+                digest.update(buf, 0, n);
+            }
+        }
     }
 
     private static MessageDigest sha256Digest() {
@@ -177,8 +204,16 @@ public final class Downloader {
         return String.format(Locale.ROOT, "%.1f MB", bytes / 1_048_576.0);
     }
 
-    static final class ChecksumException extends IOException {
-        ChecksumException(String message) {
+    private static IntegrityException sizeMismatch(String label, URI uri, long served, long expected) {
+        return new IntegrityException("Size mismatch for " + label + ": " + uri + " serves "
+                + (served >= 0 ? served + " bytes" : "more bytes") + " but VoiceWarden expects exactly " + expected
+                + ". The file upstream is not the pinned one, so it was not used and will not be retried."
+                + " Update VoiceWarden, or report this if you are on the latest version.");
+    }
+
+    /** The server delivered a file that is not the pinned one; retrying the same URL cannot help. */
+    static final class IntegrityException extends IOException {
+        IntegrityException(String message) {
             super(message);
         }
     }
