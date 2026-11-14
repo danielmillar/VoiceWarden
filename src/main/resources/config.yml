@@ -251,6 +251,7 @@ discord:
     color: ""
     # Role id to ping, e.g. "123456789012345678". Empty = no ping.
     ping-role-id: ""
+    # Post the recording as its own message right under the alert, so it plays in Discord.
     include-audio: true
     include-transcript: true
     include-context: true
@@ -269,6 +270,7 @@ discord:
     avatar-url: ""
     color: ""
     ping-role-id: ""
+    # Post the recording as its own message right under the alert, so it plays in Discord.
     include-audio: true
     include-transcript: true
     include-context: true
@@ -285,6 +287,7 @@ discord:
     avatar-url: ""
     color: ""
     ping-role-id: ""
+    # Post the recording as its own message right under the alert, so it plays in Discord.
     include-audio: true
     include-transcript: true
     include-context: true

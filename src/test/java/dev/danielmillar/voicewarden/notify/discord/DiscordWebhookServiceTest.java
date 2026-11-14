@@ -99,10 +99,17 @@ class DiscordWebhookServiceTest {
         service.start();
     }
 
-    @Test void multipartContainsPayloadAndByteExactWav() throws Exception {
+    @Test void recordingFollowsTheCardAsAPlainMessageWithByteExactWav() throws Exception {
         config.set(settings(webhook(url, true, "12345", true), WebhookSettings.disabled(), WebhookSettings.disabled(), 10, 0));
         start();
         assertTrue(service.submitIncident(TestFixtures.incident()));
+        Captured card = take();
+        assertEquals("application/json", card.contentType());
+        assertEquals(DiscordPayload.COMPONENTS_V2, card.json().get("flags").getAsInt());
+        assertFalse(card.json().has("attachments"));
+        assertNull(new View(card).file());
+        assertEquals("12345", card.json().getAsJsonObject("allowed_mentions").getAsJsonArray("roles").get(0).getAsString());
+        assertLimits(card.json());
         Captured request = take();
         assertTrue(request.contentType().startsWith("multipart/form-data; boundary="));
         assertEquals("VoiceWarden (https://github.com/danielmillar, 1.0)", request.userAgent());
@@ -110,8 +117,11 @@ class DiscordWebhookServiceTest {
         assertTrue(request.text().contains("name=\"files[0]\"; filename=\"voice-abcdef01.wav\""));
         JsonObject json = request.json();
         assertEquals("voice-abcdef01.wav", json.getAsJsonArray("attachments").get(0).getAsJsonObject().get("filename").getAsString());
-        assertEquals("attachment://voice-abcdef01.wav", new View(json).file());
-        assertLimits(json);
+        // A plain message: Discord shows its audio attachment with a player, which a Components V2 card cannot.
+        assertFalse(json.has("flags"));
+        assertFalse(json.has("components"));
+        assertEquals("-# Recording · abcdef01", json.get("content").getAsString());
+        assertFalse(json.getAsJsonObject("allowed_mentions").has("roles"));
         String binary = new String(request.bytes(), StandardCharsets.ISO_8859_1);
         int start = binary.indexOf("Content-Type: audio/wav\r\n\r\n") + "Content-Type: audio/wav\r\n\r\n".length();
         byte[] expected = WavEncoder.encode(TestFixtures.AUDIO, 16000);
@@ -176,6 +186,26 @@ class DiscordWebhookServiceTest {
         deliveries(2, 0);
         assertEquals(1, logs.stream().filter(record -> record.getMessage().contains("role id")).count());
         assertFalse(logThreads.contains(Thread.currentThread().threadId()));
+    }
+
+    @Test void failedRecordingIsLoggedButTheCardStillCounts() throws Exception {
+        config.set(settings(webhook(url, true, "", false), WebhookSettings.disabled(), WebhookSettings.disabled(), 10, 0));
+        reply = (exchange, attempt) -> respond(exchange, attempt == 1 ? 204 : 413, attempt == 1 ? "" : "{\"message\":\"Request entity too large\"}");
+        start();
+        service.submitIncident(TestFixtures.incident());
+        take(); take();
+        deliveries(1, 0);
+        assertEquals(1, logs.stream().filter(record -> record.getMessage().contains("recording")).count());
+    }
+
+    @Test void failedCardSendsNoRecording() throws Exception {
+        config.set(settings(webhook(url, true, "", false), WebhookSettings.disabled(), WebhookSettings.disabled(), 10, 0));
+        reply = (exchange, attempt) -> respond(exchange, 400, "{\"message\":\"Invalid Form Body\"}");
+        start();
+        service.submitIncident(TestFixtures.incident());
+        assertEquals("application/json", take().contentType());
+        deliveries(0, 1);
+        assertNull(requests.poll()); // the failure is counted after the consumer is done with this event
     }
 
     @Test void emptyAudioUsesJsonEvenWhenEnabled() throws Exception {
@@ -263,7 +293,11 @@ class DiscordWebhookServiceTest {
                 "Alex", Duration.ofMinutes(1), lines, TestFixtures.AUDIO, 16000);
         service.submitReport(report);
         Captured request = take();
-        assertTrue(request.contentType().startsWith("multipart/"));
+        assertEquals("application/json", request.contentType());
+        Captured recording = take();
+        assertTrue(recording.contentType().startsWith("multipart/"));
+        assertEquals("voice-abcdef01.wav", recording.json().getAsJsonArray("attachments").get(0).getAsJsonObject()
+                .get("filename").getAsString());
         View view = new View(request);
         String transcript = view.part("Transcript");
         assertFalse(transcript.contains("line0 "));
@@ -271,7 +305,7 @@ class DiscordWebhookServiceTest {
         assertTrue(view.row("Speech").startsWith("30 lines"));
         assertEquals("Console", view.row("Reporter"));
         assertEquals(0x3498DB, view.color());
-        assertEquals("attachment://voice-abcdef01.wav", view.file());
+        assertNull(view.file());
         assertLimits(request.json());
     }
 
@@ -478,8 +512,9 @@ class DiscordWebhookServiceTest {
         start();
         var results = service.sendTest(WebhookTestTarget.ALL).get(3, TimeUnit.SECONDS);
         assertEquals(List.of(sent("flags"), off("mutes"), new WebhookTestResult("reports", WebhookTestResult.Outcome.FAILED, 404, "Unknown Webhook")), results);
-        Captured flag = take(); take();
-        assertTrue(flag.contentType().startsWith("multipart/"));
+        Captured flag = take(); Captured clip = take(); take();
+        assertEquals("application/json", flag.contentType());
+        assertTrue(clip.contentType().startsWith("multipart/"));
         assertTrue(new View(flag).part("Transcript").contains("**badword**"));
         assertEquals(List.of(off("mutes")), service.sendTest(WebhookTestTarget.MUTE).get(3, TimeUnit.SECONDS));
     }
