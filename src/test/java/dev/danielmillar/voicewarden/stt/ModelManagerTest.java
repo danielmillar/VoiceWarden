@@ -86,6 +86,34 @@ class ModelManagerTest {
         }
     }
 
+    @org.junit.jupiter.api.Test
+    void inspectReportsSizesOfEveryFileWithoutChangingThem() throws Exception {
+        var preset = ModelManager.Preset.WHISPER_SMALL_EN;
+        var settings = Fakes.with(settings(preset), "doubleCheck", true);
+        Path dir = Files.createDirectories(folder.resolve("models/" + preset.id));
+        var good = preset.files.get(0);
+        sparse(dir.resolve(good.name()), good.size());
+        sparse(dir.resolve(preset.files.get(1).name()), 7);
+
+        var states = ModelManager.inspect(settings, folder);
+
+        int moonshine = ModelManager.Preset.MOONSHINE_BASE_EN.files.size();
+        assertEquals(preset.files.size() + moonshine, states.size(), "double-check files are listed too");
+        assertTrue(states.get(0).matchesPin());
+        assertEquals(7, states.get(1).actualSize());
+        assertFalse(states.get(1).matchesPin());
+        assertFalse(states.get(2).present());
+        assertEquals(7, Files.size(dir.resolve(preset.files.get(1).name())), "inspect never deletes or downloads");
+        assertFalse(Files.exists(folder.resolve("models/" + ModelManager.Preset.MOONSHINE_BASE_EN.id)));
+    }
+
+    private static void sparse(Path path, long size) throws Exception {
+        try (var channel = FileChannel.open(path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+            channel.position(size - 1);
+            channel.write(ByteBuffer.wrap(new byte[]{0}));
+        }
+    }
+
     private PluginConfig.SpeechToText settings(ModelManager.Preset preset) throws Exception {
         var settings = Fakes.config(folder).speechToText();
         settings = Fakes.with(settings, "model", preset.id);

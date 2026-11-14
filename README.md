@@ -92,6 +92,7 @@ The main command is `/voicewarden`, or `/vw` for short.
 |---|---|---|
 | `/vw reload` | Applies changes you made to the config files, without restarting. | `voicewarden.reload` |
 | `/vw stats` | Shows how the plugin is doing: speed, queue, dropped audio and incidents. | `voicewarden.stats` |
+| `/vw check` | Checks the whole setup (voice chat, speech engine, model files, database, LuckPerms, Discord, config and recordings) and says what is OK, what to look at, and the fix for each problem. | `voicewarden.admin` |
 | `/vw test <text>` | Checks some text against your rules, which is handy when editing word lists. | `voicewarden.admin` |
 | `/vw discordtest [all, flag, mute or report]` | Sends a test message to your Discord webhooks. | `voicewarden.admin` |
 
@@ -130,6 +131,7 @@ With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, Voi
 
 ## Troubleshooting
 
+- **Something isn't working.** Run `/vw check`. Each WARN or FAIL line names the setting or step that fixes it.
 - **Nothing is happening.** Check the console for `Speech engine ready`. Until it appears, the first download is still
   running.
 - **Someone isn't being picked up.** Make sure they don't have `voicewarden.bypass`.

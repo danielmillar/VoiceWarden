@@ -140,6 +140,69 @@ public final class ModelManager {
                 dir.resolve("joiner.int8.onnx"), dir.resolve("tokens.txt"), vad);
     }
 
+    /**
+     * One file the engine needs, as found on disk. {@code actualSize} is -1 when missing; {@code expectedSize} is -1
+     * for a custom model, which has no pin.
+     */
+    public record FileState(String label, Path path, long expectedSize, long actualSize) {
+        public boolean present() {
+            return actualSize >= 0;
+        }
+
+        public boolean matchesPin() {
+            return present() && (expectedSize < 0 || actualSize == expectedSize);
+        }
+    }
+
+    /**
+     * Read-only listing of every file {@link #resolve} and {@link #resolveDoubleCheck} would use, with sizes only:
+     * hashing a 600 MB model is left to the load, which always verifies. Never downloads or deletes.
+     */
+    public static List<FileState> inspect(PluginConfig.SpeechToText settings, Path dataFolder) {
+        Path models = dataFolder.resolve("models");
+        List<FileState> files = new java.util.ArrayList<>();
+        if (settings.vad().enabled()) {
+            files.add(state(SILERO_VAD.name(), models.resolve(SILERO_VAD.name()), SILERO_VAD.size()));
+        }
+        if (settings.model().equals("custom")) {
+            PluginConfig.CustomModel c = settings.custom();
+            files.add(state("custom encoder", configured(dataFolder, c.encoder()), -1));
+            files.add(state("custom decoder", configured(dataFolder, c.decoder()), -1));
+            if (!c.modelType().equals("whisper")) {
+                files.add(state("custom joiner", configured(dataFolder, c.joiner()), -1));
+            }
+            files.add(state("custom tokens", configured(dataFolder, c.tokens()), -1));
+        } else {
+            Preset.byId(settings.model()).filter(p -> p != Preset.MOONSHINE_BASE_EN)
+                    .ifPresent(p -> addPreset(files, p, models));
+        }
+        if (settings.doubleCheck()) {
+            addPreset(files, Preset.MOONSHINE_BASE_EN, models);
+        }
+        return List.copyOf(files);
+    }
+
+    private static void addPreset(List<FileState> files, Preset preset, Path models) {
+        for (ModelFile file : preset.files) {
+            files.add(state(preset.id + "/" + file.name(), models.resolve(preset.id).resolve(file.name()), file.size()));
+        }
+    }
+
+    private static FileState state(String label, Path path, long expected) {
+        long actual;
+        try {
+            actual = Files.isRegularFile(path) ? Files.size(path) : -1;
+        } catch (IOException e) {
+            actual = -1;
+        }
+        return new FileState(label, path, expected, actual);
+    }
+
+    private static Path configured(Path dataFolder, String configured) {
+        Path p = Path.of(configured);
+        return (p.isAbsolute() ? p : dataFolder.resolve(p)).toAbsolutePath().normalize();
+    }
+
     private static void ensure(Downloader downloader, Path path, ModelFile file, URI url, boolean autoDownload, String label)
             throws IOException, InterruptedException {
         if (matches(path, file)) {
@@ -162,8 +225,7 @@ public final class ModelManager {
     }
 
     private static Path existing(Path dataFolder, String configured, String what) throws IOException {
-        Path p = Path.of(configured);
-        Path resolved = (p.isAbsolute() ? p : dataFolder.resolve(p)).toAbsolutePath().normalize();
+        Path resolved = configured(dataFolder, configured);
         if (!Files.isRegularFile(resolved)) {
             throw new IOException("speech-to-text.custom." + what + " not found: " + resolved);
         }

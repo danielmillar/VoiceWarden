@@ -17,7 +17,7 @@ import java.util.logging.Logger;
 public final class HealthMonitor implements AutoCloseable {
 
     private static final long WARN_INTERVAL_MILLIS = TimeUnit.MINUTES.toMillis(5);
-    private static final long SLOW_P95_MILLIS = 10_000;
+    static final long SLOW_P95_MILLIS = 10_000;
 
     private final Supplier<PluginConfig> config;
     private final Metrics metrics;

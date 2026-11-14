@@ -26,7 +26,7 @@ import java.util.logging.Logger;
  */
 public final class Database implements AutoCloseable {
 
-    static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 3;
     private static final int SQLITE_CORRUPT = 11;
     private static final int SQLITE_NOTADB = 26;
 

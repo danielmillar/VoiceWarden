@@ -58,6 +58,20 @@ class TranscriptionServiceTest {
         }
     }
 
+    @Test void failedLoadKeepsItsReasonForTheSetupCheck() throws Exception {
+        var config = Fakes.config(folder);
+        var settings = Fakes.with(Fakes.with(config.speechToText(), "autoDownload", false),
+                "nativeLibraryPath", folder.resolve("no-natives").toString());
+        var service = new TranscriptionService(folder, null, new Fakes.Executor(true), () -> config,
+                new Metrics(), Logger.getAnonymousLogger(), transcript -> { }, ready -> {});
+        service.start(settings).join();
+        assertEquals(TranscriptionService.State.FAILED, service.state());
+        assertNotNull(service.lastFailure());
+        assertNull(service.loaded());
+        assertEquals(0, service.aliveWorkers());
+        assertFalse(service.doubleCheckLoaded());
+    }
+
     @Test void doubleCheckWithoutALoadedModelFailsInsteadOfWaiting() throws Exception {
         var config = Fakes.config(folder);
         var service = new TranscriptionService(folder, null, new Fakes.Executor(false), () -> config,

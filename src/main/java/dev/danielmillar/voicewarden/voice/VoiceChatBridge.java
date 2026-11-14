@@ -45,6 +45,7 @@ public final class VoiceChatBridge implements VoicechatPlugin {
     private final Supplier<PluginConfig.Mute> settings;
     private final Consumer<Player> deniedSpeech;
     private volatile boolean active = true;
+    private volatile boolean initialized;
 
     public VoiceChatBridge(AudioIngestService ingest, MuteService mutes, ConsentService consent,
                            Supplier<PluginConfig.Mute> settings, Consumer<Player> deniedSpeech) {
@@ -63,6 +64,12 @@ public final class VoiceChatBridge implements VoicechatPlugin {
     @Override
     public void initialize(VoicechatApi api) {
         ingest.setApi(api);
+        initialized = true;
+    }
+
+    /** Simple Voice Chat has picked VoiceWarden up and handed it its API. */
+    public boolean initialized() {
+        return initialized;
     }
 
     @Override
