@@ -69,6 +69,8 @@ public final class VoiceWardenPlugin extends JavaPlugin {
     private volatile Messages messages;
     private volatile RuleEngine rules;
     private volatile List<String> configWarnings = List.of();
+    /** Why the last /vw reload could not read the files; null after a good one. The previous config stays in use. */
+    private volatile @Nullable String reloadError;
 
     private PluginExecutors executors;
     private Metrics metrics;
@@ -272,9 +274,11 @@ public final class VoiceWardenPlugin extends JavaPlugin {
             ConfigBundle bundle;
             try {
                 bundle = ConfigBundle.load(getDataFolder().toPath());
-            } catch (IOException e) {
+            } catch (IOException | RuntimeException e) {
+                reloadError = String.valueOf(e.getMessage()).lines().findFirst().orElse("").strip();
                 throw new IllegalStateException(e.getMessage(), e);
             }
+            reloadError = null;
             if (!started) {
                 throw new IllegalStateException("VoiceWarden is stopping");
             }
@@ -292,7 +296,9 @@ public final class VoiceWardenPlugin extends JavaPlugin {
             String engineNote = "";
             boolean engineDown = transcription.state() == TranscriptionService.State.FAILED
                     || transcription.state() == TranscriptionService.State.STOPPED;
-            if (config.enabled() && (engineDown || !config.speechToText().equals(previous.speechToText()))) {
+            // A reload that failed to load new engine settings left them in config; retry rather than compare equal.
+            boolean retry = transcription.lastFailure() != null;
+            if (config.enabled() && (engineDown || retry || !config.speechToText().equals(previous.speechToText()))) {
                 transcription.start(config.speechToText());
                 engineNote = engineDown ? ", starting speech engine" : ", reloading speech engine in the background";
             }
@@ -322,7 +328,8 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         var lp = new SetupCheck.LuckPerms(getServer().getPluginManager().getPlugin("LuckPerms") != null,
                 luckPerms != null, c.mute().luckPerms());
         var discordFacts = new SetupCheck.Discord(c.discord(), discord.sentCount(), discord.failedCount(), discord.droppedCount());
-        var configFacts = new SetupCheck.Config(c.moderation().dryRun(), rules.ruleCount(), configWarnings);
+        var configFacts = new SetupCheck.Config(c.enabled(), c.moderation().dryRun(), rules.ruleCount(),
+                configWarnings, reloadError);
         CompletableFuture<SetupCheck.Store> store = SetupCheck.readDatabase(database, Duration.ofSeconds(5));
         Path dataFolder = getDataFolder().toPath();
         return CompletableFuture.supplyAsync(() -> {

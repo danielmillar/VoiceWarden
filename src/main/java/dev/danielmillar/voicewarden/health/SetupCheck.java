@@ -50,7 +50,7 @@ public final class SetupCheck {
     }
 
     /**
-     * @param dropped utterances and packets skipped since start because transcription fell behind
+     * @param dropped utterances and packets skipped since start (backlog, or discarded while disabled); information only
      * @param platform the native-library platform id, or why this machine has none
      */
     public record Engine(boolean enabled, State state, String detail, String model, @Nullable String lastFailure,
@@ -73,7 +73,8 @@ public final class SetupCheck {
     public record Discord(DiscordSettings settings, long sent, long failed, long dropped) {
     }
 
-    public record Config(boolean dryRun, int rules, List<String> warnings) {
+    /** @param reloadError why the last /vw reload could not read the files, or null */
+    public record Config(boolean enabled, boolean dryRun, int rules, List<String> warnings, @Nullable String reloadError) {
     }
 
     /** @param error why the folder is not writable, or null */
@@ -156,22 +157,20 @@ public final class SetupCheck {
                     + " worker(s) crashed", "see \"worker crashed\" in the console, then restart the server"));
         }
         String speed = String.format(Locale.ROOT, "%.1f", e.speed());
-        if (e.dropped() > 0) {
-            out.add(new Finding(Status.WARN, area, e.dropped() + " utterance(s) or packet(s) skipped since start because"
-                    + " transcription fell behind (speed " + speed + "× real time)",
+        if (e.queueMax() > 0 && e.queue() * 2 >= e.queueMax()) {
+            out.add(new Finding(Status.WARN, area, e.queue() + " of " + e.queueMax() + " queue places are waiting now"
+                    + " (speed " + speed + "× real time); a full queue skips speech",
                     "raise speech-to-text.workers or cpu-threads if the CPU has room"));
-        }
-        if (e.errors() > 0) {
-            out.add(new Finding(Status.WARN, area, e.errors() + " transcription error(s) since start",
-                    "see \"Transcription failed\" in the console"));
         }
         if (e.p95Millis() > HealthMonitor.SLOW_P95_MILLIS) {
             out.add(new Finding(Status.WARN, area, "slow: 95% of utterances take up to " + e.p95Millis()
                     + " ms", "raise speech-to-text.cpu-threads or pick a smaller model"));
         }
         if (out.size() == before) {
+            String history = e.dropped() == 0 && e.errors() == 0 ? ""
+                    : "; since start " + e.dropped() + " skipped, " + e.errors() + " error(s)";
             out.add(Finding.ok(area, e.aliveWorkers() + " worker(s), queue " + e.queue() + "/" + e.queueMax()
-                    + (e.p95Millis() < 0 ? "" : ", p95 " + e.p95Millis() + " ms, speed " + speed + "×")));
+                    + (e.p95Millis() < 0 ? "" : ", p95 " + e.p95Millis() + " ms, speed " + speed + "×") + history));
         }
     }
 
@@ -258,19 +257,14 @@ public final class SetupCheck {
         webhook("flags", s.flags(), ready, out);
         webhook("mutes", s.mutes(), ready, out);
         webhook("reports", s.reports(), ready, out);
-        if (d.failed() > 0) {
-            out.add(new Finding(Status.WARN, area, d.failed() + " message(s) failed to send since start",
-                    "run /vw discordtest to see the error"));
-        }
-        if (d.dropped() > 0) {
-            out.add(new Finding(Status.WARN, area, d.dropped() + " message(s) dropped because the queue was full",
-                    "raise discord.max-queue-size or check for rate limits"));
-        }
         if (out.size() > before) {
             return;
         }
+        String history = d.failed() == 0 && d.dropped() == 0 ? ""
+                : ", " + d.failed() + " failed and " + d.dropped() + " dropped since start (/vw discordtest shows why)";
         out.add(Finding.ok(area, ready.isEmpty() ? "no webhooks enabled"
-                : String.join(", ", ready) + " webhook(s) valid, " + d.sent() + " sent; /vw discordtest sends a test"));
+                : String.join(", ", ready) + " webhook(s) valid, " + d.sent() + " sent" + history
+                + (history.isEmpty() ? "; /vw discordtest sends a test" : "")));
     }
 
     private static void webhook(String name, WebhookSettings w, List<String> ready, List<Finding> out) {
@@ -300,6 +294,11 @@ public final class SetupCheck {
 
     static void config(Config c, List<Finding> out) {
         String area = "Config";
+        int before = out.size();
+        if (c.reloadError() != null) {
+            out.add(new Finding(Status.FAIL, area, "the last /vw reload failed (" + c.reloadError()
+                    + "), so the previous settings are still in use", "fix the file, then /vw reload"));
+        }
         if (c.dryRun()) {
             out.add(new Finding(Status.WARN, area, "moderation.dry-run is on: actions are decided but never applied",
                     "set moderation.dry-run: false when you trust the rules"));
@@ -311,8 +310,9 @@ public final class SetupCheck {
             out.add(new Finding(Status.WARN, area, (c.warnings().size() - MAX_CONFIG_WARNINGS) + " more warning(s)",
                     "see the console after /vw reload"));
         }
-        if (!c.dryRun() && c.warnings().isEmpty()) {
-            out.add(Finding.ok(area, "loaded without warnings, " + c.rules() + " rule(s)"));
+        if (out.size() == before) {
+            out.add(Finding.ok(area, "loaded without warnings, " + c.rules() + " rule(s); "
+                    + (c.enabled() ? "enabled" : "disabled") + ", dry-run off"));
         }
     }
 

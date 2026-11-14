@@ -42,7 +42,7 @@ class SetupCheckTest {
                 new SetupCheck.Store(Database.SCHEMA_VERSION, Database.SCHEMA_VERSION, 3, null),
                 new SetupCheck.LuckPerms(true, true, true),
                 new SetupCheck.Discord(Fakes.with(config.discord(), "flags", webhook), 4, 0, 0),
-                new SetupCheck.Config(false, 12, List.of()),
+                new SetupCheck.Config(true, false, 12, List.of(), null),
                 new SetupCheck.Recordings(config.recordings(), null, 1024, 50L << 30));
     }
 
@@ -62,7 +62,7 @@ class SetupCheckTest {
                 new SetupCheck.Store(0, 2, 0, "locked"),
                 new SetupCheck.LuckPerms(false, false, true),
                 Fakes.with(healthy.discord(), "failed", 2L),
-                new SetupCheck.Config(true, 0, List.of("bad")),
+                new SetupCheck.Config(true, true, 0, List.of("bad"), "broken yaml"),
                 Fakes.with(healthy.recordings(), "error", "denied"));
         assertTrue(SetupCheck.evaluate(broken).stream()
                 .filter(f -> f.status() != Status.OK).allMatch(f -> !f.fix().isBlank()));
@@ -109,10 +109,16 @@ class SetupCheckTest {
     }
 
     @Test
-    void droppedAudioErrorsAndSlowTranscriptionWarn() {
-        assertTrue(engine("dropped", 5L).contains(Status.WARN));
-        assertTrue(engine("errors", 1L).contains(Status.WARN));
+    void backlogNowAndSlowTranscriptionWarn() {
+        assertTrue(engine("queue", 100).contains(Status.WARN));
+        assertFalse(engine("queue", 10).contains(Status.WARN));
         assertTrue(engine("p95Millis", HealthMonitor.SLOW_P95_MILLIS + 1).contains(Status.WARN));
+    }
+
+    @Test
+    void pastDropsAndErrorsAreInformationNotWarnings() {
+        var history = Fakes.with(Fakes.with(healthy.engine(), "dropped", 5L), "errors", 2L);
+        assertFalse(check("engine", history).contains(Status.WARN));
     }
 
     @Test
@@ -199,20 +205,25 @@ class SetupCheckTest {
     }
 
     @Test
-    void failedOrDroppedDeliveriesWarn() {
-        assertEquals(List.of(Status.WARN), check("discord", Fakes.with(healthy.discord(), "failed", 1L)));
-        assertEquals(List.of(Status.WARN), check("discord", Fakes.with(healthy.discord(), "dropped", 1L)));
+    void pastDeliveryFailuresAreInformationNotWarnings() {
+        assertEquals(List.of(Status.OK), check("discord", Fakes.with(healthy.discord(), "failed", 1L)));
+        assertEquals(List.of(Status.OK), check("discord", Fakes.with(healthy.discord(), "dropped", 1L)));
     }
 
     // ── config ──────────────────────────────────────────────────────────────
 
     @Test
     void dryRunAndLoadWarningsWarn() {
-        assertEquals(List.of(Status.WARN), check("config", new SetupCheck.Config(true, 1, List.of())));
+        assertEquals(List.of(Status.WARN), check("config", new SetupCheck.Config(true, true, 1, List.of(), null)));
         var many = List.of("1", "2", "3", "4", "5", "6", "7");
-        List<Status> lines = check("config", new SetupCheck.Config(false, 1, many));
+        List<Status> lines = check("config", new SetupCheck.Config(true, false, 1, many, null));
         assertEquals(SetupCheck.MAX_CONFIG_WARNINGS + 1, lines.size());
         assertTrue(lines.stream().allMatch(s -> s == Status.WARN));
+    }
+
+    @Test
+    void failedReloadFails() {
+        assertEquals(List.of(Status.FAIL), check("config", new SetupCheck.Config(true, false, 1, List.of(), "bad yaml")));
     }
 
     // ── recordings ──────────────────────────────────────────────────────────
