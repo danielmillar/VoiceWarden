@@ -87,6 +87,19 @@ class TranscriptBufferTest {
         assertEquals("text", buffer.recentLines(alice, 1).getFirst().text());
     }
 
+    @Test void forgetDropsOnlyThatPlayersLinesAndAudio() {
+        TranscriptBuffer buffer = buffer(10, 1_000);
+        buffer.add(alice, "Alice", now, "one", new short[10]);
+        buffer.add(alice, "Alice", now.plusSeconds(1), "two", new short[10]);
+        buffer.add(bob, "Bob", now, "hi", new short[10]);
+        assertEquals(2, buffer.forget(alice));
+        assertTrue(buffer.recentLines(alice, 10).isEmpty());
+        assertFalse(buffer.knownPlayers().containsKey(alice));
+        assertEquals(List.of("hi"), buffer.recentLines(bob, 10).stream().map(TranscriptLine::text).toList());
+        assertEquals(20, buffer.audioBytes());
+        assertEquals(0, buffer.forget(alice));
+    }
+
     private TranscriptBuffer buffer(int maxLines, long budget) {
         return new TranscriptBuffer(new TranscriptBuffer.Limits(Duration.ofMinutes(1), maxLines, budget));
     }

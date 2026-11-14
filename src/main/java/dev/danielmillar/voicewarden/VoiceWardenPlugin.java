@@ -28,6 +28,7 @@ import dev.danielmillar.voicewarden.notify.StaffAlertService;
 import dev.danielmillar.voicewarden.notify.discord.DiscordWebhookService;
 import dev.danielmillar.voicewarden.player.OnlinePlayers;
 import dev.danielmillar.voicewarden.player.PlayerListener;
+import dev.danielmillar.voicewarden.privacy.PlayerData;
 import dev.danielmillar.voicewarden.report.ReportService;
 import dev.danielmillar.voicewarden.report.ReportStore;
 import dev.danielmillar.voicewarden.storage.Database;
@@ -51,6 +52,7 @@ import java.sql.SQLException;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -67,6 +69,8 @@ import java.util.logging.Level;
  */
 public final class VoiceWardenPlugin extends JavaPlugin {
 
+    /** With the buffer off, alerts still need the last few lines; older context says little about a flag. */
+    private static final Duration DISABLED_BUFFER_RETENTION = Duration.ofMinutes(5);
     private static final List<String> DEFAULT_FILES = List.of("config.yml", "messages.yml", "rules.yml", "wordlist.txt");
 
     private volatile PluginConfig config;
@@ -101,6 +105,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
     private ReportService reports;
     private ReportStore reportStore;
     private HealthMonitor health;
+    private PlayerData playerData;
     private volatile boolean started;
 
     @Override
@@ -192,9 +197,18 @@ public final class VoiceWardenPlugin extends JavaPlugin {
             }
         }, players::get, player -> player.hasPermission(AudioIngestService.BYPASS_PERMISSION), consent::allowsProcessing,
                 getLogger());
+        // A transcript finishing after its player withdrew consent is dropped, so a withdrawal clears the buffer for good.
         transcription = new TranscriptionService(dataFolder, new Downloader(http, getLogger()), executors.io(), this::config,
-                metrics, getLogger(), moderation::onTranscript, ready -> ingest.setAccepting(ready && config.enabled()));
+                metrics, getLogger(), transcript -> {
+            if (consent.allowsProcessing(transcript.segment().playerId())) {
+                moderation.onTranscript(transcript);
+            }
+        }, ready -> ingest.setAccepting(ready && config.enabled()));
         health = new HealthMonitor(this::config, metrics, transcription, getLogger());
+        consent.onDenied(transcriptBuffer::forget);
+        playerData = new PlayerData(this::config, database, mutes, offenses, moderation::forgive, consent, reportStore,
+                reports::forget, evidence, transcriptBuffer, transcriptLog, dataFolder.resolve("exports"),
+                id -> players.get(id) != null, executors.io(), getLogger());
 
         mutes.onExpiry(action -> discord.submitStaffAction(action));
         speechNotice = new VoiceSpeechNotice(this, this::config, this::messages, mutes, consent, System::currentTimeMillis,
@@ -208,12 +222,14 @@ public final class VoiceWardenPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new PlayerListener(players, this::config, this::messages,
                 player -> {
+                    consent.seen(player.getUniqueId());
                     speechNotice.show(player);
                     consentPrompt.onJoin(player);
                 }, player -> {
                     speechNotice.onRespawn(player);
                     consentPrompt.onRespawn(player);
                 }, id -> {
+            consent.seen(id);
             speechNotice.onDisconnect(id);
             ingest.onDisconnect(id);
         }), this);
@@ -239,7 +255,13 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         health.start(executors.timer());
         discord.start();
         executors.timer().scheduleWithFixedDelay(() -> executors.io().execute(moderation::housekeeping), 1, 1, TimeUnit.MINUTES);
-        executors.timer().scheduleWithFixedDelay(() -> evidence.cleanup().exceptionally(e -> null), 5, 60, TimeUnit.MINUTES);
+        executors.timer().scheduleWithFixedDelay(() -> {
+            evidence.cleanup().exceptionally(e -> null);
+            executors.io().execute(() -> playerData.prune(Instant.now()).exceptionally(e -> {
+                getLogger().log(Level.WARNING, "Could not delete old records under privacy.retention", e);
+                return null;
+            }));
+        }, 5, 60, TimeUnit.MINUTES);
         started = true;
 
         if (config.enabled()) {
@@ -400,7 +422,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         int contextLines = Math.max(1, config.moderation().contextLines());
         return b.enabled()
                 ? new TranscriptBuffer.Limits(b.retention(), Math.max(b.maxLinesPerPlayer(), contextLines), b.audioMemoryBytes())
-                : new TranscriptBuffer.Limits(Duration.ofHours(1), contextLines, 0);
+                : new TranscriptBuffer.Limits(DISABLED_BUFFER_RETENTION, contextLines, 0);
     }
 
     // ── accessors for commands ───────────────────────────────────────────────
@@ -472,6 +494,10 @@ public final class VoiceWardenPlugin extends JavaPlugin {
 
     public PluginExecutors executors() {
         return executors;
+    }
+
+    public PlayerData playerData() {
+        return playerData;
     }
 
     public StaffModerationService staffModeration() {

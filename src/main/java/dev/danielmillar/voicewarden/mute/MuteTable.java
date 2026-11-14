@@ -112,6 +112,23 @@ final class MuteTable {
         }
     }
 
+    /** Deletes the player's whole history. Returns how many events. */
+    static int deleteHistory(Connection c, UUID player) throws SQLException {
+        try (PreparedStatement s = c.prepareStatement("DELETE FROM mute_events WHERE player_id = ?")) {
+            s.setString(1, player.toString());
+            return s.executeUpdate();
+        }
+    }
+
+    /** Deletes events older than {@code cutoff}, keeping the history of players who still have a stored mute. */
+    static int pruneHistory(Connection c, long cutoff) throws SQLException {
+        try (PreparedStatement s = c.prepareStatement(
+                "DELETE FROM mute_events WHERE at < ? AND player_id NOT IN (SELECT player_id FROM mutes)")) {
+            s.setLong(1, cutoff);
+            return s.executeUpdate();
+        }
+    }
+
     /** Newest first. Insertion order breaks ties, since several events can share a millisecond. */
     static MuteEvent.Page history(Connection c, UUID player, int page, int perPage) throws SQLException {
         int total;

@@ -6,8 +6,9 @@ VoiceWarden is a Paper plugin that listens to voice chat and helps you deal with
 break your rules. It turns speech into text, checks the text against rules you control, and warns or mutes the player
 automatically. Your staff get an alert and can listen to a recording.
 
-Everything runs **on your own server**. No audio is sent to any outside service, and you don't need an account or API
-key. The only audio that ever leaves your server is a recording you choose to send to your own Discord.
+Everything runs **on your own server**. Speech recognition uses no outside service, and you don't need an account or
+API key. Nothing leaves your server unless you turn on Discord alerts: once a webhook is set up, alerts are sent to it
+automatically, with the transcript and, if you choose, the recording. See [Privacy](docs/privacy.md).
 
 ## How it works
 
@@ -95,6 +96,8 @@ The main command is `/voicewarden`, or `/vw` for short.
 | `/vw check` | Checks the whole setup (voice chat, speech engine, model files, database, LuckPerms, Discord, config and recordings) and says what is OK, what to look at, and the fix for each problem. | `voicewarden.admin` |
 | `/vw test <text>` | Checks some text against your rules, which is handy when editing word lists. | `voicewarden.admin` |
 | `/vw discordtest [all, flag, mute or report]` | Sends a test message to your Discord webhooks. | `voicewarden.admin` |
+| `/vw export <player or UUID>` | Writes everything VoiceWarden stores about a player to one file, for a player who asks for their data. See [Privacy](docs/privacy.md). | `voicewarden.admin` |
+| `/vw forget <player or UUID> [confirm]` | Erases everything VoiceWarden stores about a player and lifts their voice mute. Without `confirm`, it only explains. | `voicewarden.admin` |
 
 ### Commands for players
 
@@ -142,6 +145,7 @@ With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, Voi
 ## Documentation
 
 - [Configuration](docs/configuration.md): how mutes work, config files, updating, and choosing a speech model.
+- [Privacy](docs/privacy.md): what is stored, for how long, and how to export or erase a player's data.
 - [Architecture](docs/architecture.md): detection, threading, performance, and licences and attribution.
 - [Contributing](CONTRIBUTING.md): building, testing and opening a pull request.
 

@@ -137,8 +137,10 @@ public final class StaffAlertService {
                         Messages.text("text", l.text())), REVIEW_PERMISSION);
             }
         }
-        logger.info("[REPORT] " + report.reporterName() + " reported " + report.targetName() + " (" + report.lines().size()
-                + " lines) #" + report.shortId());
+        if (config.get().alerts().console()) {
+            logger.info("[REPORT] " + report.reporterName() + " reported " + report.targetName() + " ("
+                    + report.lines().size() + " lines) #" + report.shortId());
+        }
     }
 
     private void broadcast(Component message, String permission) {

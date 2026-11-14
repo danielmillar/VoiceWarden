@@ -63,6 +63,11 @@ public final class ReportService {
         this.logger = logger;
     }
 
+    /** Forgets when the player last reported, so no cooldown outlives an erasure. */
+    public void forget(UUID player) {
+        lastReport.remove(player);
+    }
+
     public CompletableFuture<Result> submit(@Nullable UUID reporterId, String reporterName, UUID targetId,
                                             String targetName, @Nullable Duration requestedWindow) {
         return CompletableFuture.supplyAsync(() -> {

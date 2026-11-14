@@ -2,8 +2,8 @@
 #  VoiceWarden: local, real-time voice chat moderation for Simple Voice Chat
 #
 #  All speech recognition runs on THIS machine with an embedded model:
-#  no external processor, no API keys, and no audio ever leaves the server
-#  (except evidence you choose to send to Discord).
+#  no external processor and no API keys. Nothing leaves the server except what
+#  you send to your own Discord webhooks (see discord: below and docs/privacy.md).
 #
 #  Durations accept: 500ms, 30s, 5m, 1h30m, 2d, 1w
 #  Apply changes with /voicewarden reload (no restart needed, even for model changes; audio.decode-threads is the exception).
@@ -201,6 +201,9 @@ custom-commands:
   #   - "say [Voice] {player} was muted for {duration}: {words}"
 
 # ── Transcript buffer (powers context, /viewreport and /reportvoice) ─────────
+# Recent speech held in memory only. When disabled, VoiceWarden keeps just each player's last
+# moderation.context-lines lines for 5 minutes, so alerts still show context, without audio. /reportvoice
+# and /vw transcript then only see those lines.
 transcript-buffer:
   enabled: true
   retention: 12h
@@ -294,6 +297,21 @@ discord:
 privacy:
   # Tell players on join that voice chat is transcribed and moderated (text in messages.yml).
   join-message: true
+  # How long stored records about players are kept, in days. 0 keeps them forever. Old records are deleted
+  # hourly. Recordings use recordings.retention-days. An offence count is deleted once
+  # moderation.mute-ladder.reset-after-days has reset it. See docs/privacy.md.
+  retention:
+    # Daily transcript files in logs/ (only written when logging.transcripts is true).
+    transcript-logs-days: 30
+    # Mute history shown by /vw history. A player's history is kept while they are muted.
+    mute-history-days: 365
+    # Voice reports, reviewed or not. At most 1000 are kept either way.
+    reports-days: 90
+    # A player's consent answer is deleted once they have not joined for this long. In confirm mode they are
+    # asked again if they return.
+    consent-days: 365
+    # Files written by /vw export in exports/.
+    exports-days: 7
 
 # ── Consent ──────────────────────────────────────────────────────────────────
 consent:

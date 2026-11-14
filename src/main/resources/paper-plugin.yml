@@ -22,7 +22,7 @@ dependencies:
       join-classpath: true
 permissions:
   voicewarden.admin:
-    description: Full access to VoiceWarden commands (does not include bypass).
+    description: Full access to VoiceWarden commands, including /voicewarden forget and export (does not include bypass).
     default: op
     children:
       voicewarden.alerts: true

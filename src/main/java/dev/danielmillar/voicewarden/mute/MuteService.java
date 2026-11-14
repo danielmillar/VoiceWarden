@@ -200,6 +200,45 @@ public final class MuteService implements AutoCloseable {
         return database.query(c -> MuteTable.history(c, playerId, page, perPage));
     }
 
+    /** What {@link #erase} removed. */
+    public record Erased(boolean wasMuted, int historyEvents) {
+    }
+
+    /**
+     * Erases everything stored about the player's mutes: lifts any mute without telling anyone, removes the LuckPerms
+     * deny nodes, and deletes the mute and its whole history. Fails, leaving the mute in place, if the nodes cannot be
+     * removed.
+     */
+    public CompletableFuture<Erased> erase(UUID playerId) {
+        var cleared = new AtomicReference<CompletableFuture<Void>>();
+        mutes.compute(playerId, (id, current) -> {
+            cleared.set(mirror.replaceVoiceMute(id, current == null ? currentMirrors() : mirrors(current), null, null));
+            return current;
+        });
+        return track(cleared.get()).thenCompose(ignored -> {
+            var wasMuted = new AtomicBoolean();
+            var deleted = new AtomicReference<CompletableFuture<Integer>>();
+            mutes.compute(playerId, (id, current) -> {
+                wasMuted.set(current != null && !current.expired(System.currentTimeMillis()));
+                deleted.set(database.query(c -> {
+                    int[] events = {0};
+                    Database.inTransaction(c, tx -> {
+                        MuteTable.delete(tx, id);
+                        events[0] = MuteTable.deleteHistory(tx, id);
+                    });
+                    return events[0];
+                }));
+                return null;
+            });
+            return deleted.get().thenApply(events -> new Erased(wasMuted.get(), events));
+        });
+    }
+
+    /** Deletes history older than {@code cutoff} (epoch millis), except for players who are still muted. */
+    public CompletableFuture<Integer> pruneHistory(long cutoff) {
+        return database.query(c -> MuteTable.pruneHistory(c, cutoff));
+    }
+
     private CompletableFuture<Boolean> unmute(UUID playerId, @Nullable Mute expected, MuteEvent.Type type,
                                               String actor, String reason) {
         var found = new AtomicReference<Mute>();
