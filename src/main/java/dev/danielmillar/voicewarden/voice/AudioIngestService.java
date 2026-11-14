@@ -46,6 +46,7 @@ public final class AudioIngestService implements AutoCloseable {
     private final Consumer<AudioSegment> sink;
     private final Function<UUID, @Nullable Player> onlinePlayer;
     private final Predicate<Player> bypass;
+    private final Predicate<UUID> consented;
     private final Logger logger;
     private final AtomicLong lastErrorLog = new AtomicLong();
 
@@ -56,13 +57,14 @@ public final class AudioIngestService implements AutoCloseable {
 
     public AudioIngestService(Supplier<PluginConfig> config, Metrics metrics, ExecutorService decodeExecutor,
                               Consumer<AudioSegment> sink, Function<UUID, @Nullable Player> onlinePlayer,
-                              Predicate<Player> bypass, Logger logger) {
+                              Predicate<Player> bypass, Predicate<UUID> consented, Logger logger) {
         this.config = config;
         this.metrics = metrics;
         this.decodeExecutor = decodeExecutor;
         this.sink = sink;
         this.onlinePlayer = onlinePlayer;
         this.bypass = bypass;
+        this.consented = consented;
         this.logger = logger;
     }
 
@@ -91,12 +93,15 @@ public final class AudioIngestService implements AutoCloseable {
         if (!accepting) {
             return;
         }
+        UUID id = speaker.getUuid();
+        if (!consented.test(id)) {
+            return;
+        }
         PluginConfig.Audio settings = config.get().audio();
         if (whispering && settings.ignoreWhispers()) {
             return;
         }
         metrics.packets.increment();
-        UUID id = speaker.getUuid();
         SpeakerSession session = sessions.get(id);
         if (session == null) {
             session = sessions.computeIfAbsent(id, key -> newSession(key, speaker));

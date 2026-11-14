@@ -26,7 +26,7 @@ import java.util.logging.Logger;
  */
 public final class Database implements AutoCloseable {
 
-    static final int SCHEMA_VERSION = 2;
+    static final int SCHEMA_VERSION = 3;
     private static final int SQLITE_CORRUPT = 11;
     private static final int SQLITE_NOTADB = 26;
 
@@ -138,6 +138,9 @@ public final class Database implements AutoCloseable {
         if (version < 2) {
             inTransaction(connection, Database::migrateToVersion2);
         }
+        if (version < 3) {
+            inTransaction(connection, Database::migrateToVersion3);
+        }
     }
 
     private static void createVersion1(Connection c) throws SQLException {
@@ -213,6 +216,20 @@ public final class Database implements AutoCloseable {
                     SELECT player_id, player_name, 'mute', created_at, actor, reason, expires_at, automatic
                     FROM mutes ORDER BY created_at""");
             s.execute("PRAGMA user_version = 2");
+        }
+    }
+
+    /** Adds each player's latest answer to the voice moderation consent prompt. */
+    private static void migrateToVersion3(Connection c) throws SQLException {
+        try (Statement s = c.createStatement()) {
+            s.execute("""
+                    CREATE TABLE consents (
+                        player_id     TEXT PRIMARY KEY,
+                        accepted      INTEGER NOT NULL,
+                        rules_version INTEGER NOT NULL,
+                        decided_at    INTEGER NOT NULL
+                    )""");
+            s.execute("PRAGMA user_version = 3");
         }
     }
 

@@ -294,6 +294,7 @@ final class VoiceWardenCommand {
                             Messages.text("remaining", Durations.formatShort(m.remaining(System.currentTimeMillis()))),
                             Messages.text("reason", m.reason()), Messages.text("actor", m.actor()))),
                     () -> sender.sendMessage(msg().render("command.record-not-muted")));
+            sender.sendMessage(consentLine(target.id()));
         }
         if (page.events().isEmpty()) {
             sender.sendMessage(msg().render(page.page() == 1 ? "command.record-empty" : "command.record-page-empty"));
@@ -323,6 +324,19 @@ final class VoiceWardenCommand {
                     Messages.text("pages", Integer.toString(Math.max(1, page.pages()))),
                     Messages.component("newer", newer), Messages.component("older", older)));
         }
+    }
+
+    private net.kyori.adventure.text.Component consentLine(java.util.UUID player) {
+        var consent = plugin.consent();
+        var answer = consent.answer(player);
+        var time = Messages.text("time", answer.map(a -> Formats.dateTime(java.time.Instant.ofEpochMilli(a.decidedAt()))).orElse("-"));
+        var version = Messages.text("version", answer.map(a -> Integer.toString(a.rulesVersion())).orElse("-"));
+        return switch (consent.status(player)) {
+            case NOT_REQUIRED -> msg().render("command.record-consent-notice");
+            case ACCEPTED -> msg().render("command.record-consent-accepted", time, version);
+            case DENIED -> msg().render("command.record-consent-denied", time, version);
+            case PENDING -> msg().render("command.record-consent-pending");
+        };
     }
 
     private int transcript(CommandContext<CommandSourceStack> ctx, int count) {

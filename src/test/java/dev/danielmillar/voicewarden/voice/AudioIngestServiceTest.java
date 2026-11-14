@@ -48,6 +48,7 @@ class AudioIngestServiceTest {
     private AudioIngestService ingest;
     private ServerPlayer speaker;
     private int amplitude = 10_000;
+    private boolean consented = true;
     private double defaultMinLevelDbfs;
 
     @BeforeEach void setup() throws Exception {
@@ -62,7 +63,7 @@ class AudioIngestServiceTest {
     private void setupIngest(java.util.concurrent.ExecutorService executor) {
         ingest = new AudioIngestService(() -> config, metrics, executor, segments::add,
                 key -> (Player) speaker.getPlayer(), p -> p.hasPermission(AudioIngestService.BYPASS_PERMISSION),
-                Logger.getLogger("AudioIngestServiceTest"));
+                key -> consented, Logger.getLogger("AudioIngestServiceTest"));
         ingest.setApi(Fakes.proxy(VoicechatApi.class, (p, m, a) -> {
             if (!m.getName().equals("createDecoder")) throw new AssertionError(m);
             created.incrementAndGet();
@@ -128,6 +129,15 @@ class AudioIngestServiceTest {
         assertEquals(id, segment.playerId());
         assertEquals(64, segment.location().y());
         assertEquals(1, metrics.utterances.sum());
+    }
+
+    @Test void voiceOfAPlayerWithoutConsentIsNeverDecodedOrSegmented() {
+        consented = false;
+        send(5, (byte) 1);
+        end();
+        assertEquals(0, created.get());
+        assertTrue(segments.isEmpty());
+        assertEquals(0, metrics.packets.sum());
     }
 
     @Test void shortUtteranceIsDroppedAndCounted() {

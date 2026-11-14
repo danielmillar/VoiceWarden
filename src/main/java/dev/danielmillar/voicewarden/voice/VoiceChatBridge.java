@@ -1,6 +1,7 @@
 package dev.danielmillar.voicewarden.voice;
 
 import dev.danielmillar.voicewarden.config.PluginConfig;
+import dev.danielmillar.voicewarden.consent.ConsentService;
 import dev.danielmillar.voicewarden.mute.MuteScope;
 import dev.danielmillar.voicewarden.mute.MuteService;
 import de.maxhenkel.voicechat.api.Group;
@@ -40,14 +41,16 @@ public final class VoiceChatBridge implements VoicechatPlugin {
 
     private final AudioIngestService ingest;
     private final MuteService mutes;
+    private final ConsentService consent;
     private final Supplier<PluginConfig.Mute> settings;
     private final Consumer<Player> deniedSpeech;
     private volatile boolean active = true;
 
-    public VoiceChatBridge(AudioIngestService ingest, MuteService mutes, Supplier<PluginConfig.Mute> settings,
-                           Consumer<Player> deniedSpeech) {
+    public VoiceChatBridge(AudioIngestService ingest, MuteService mutes, ConsentService consent,
+                           Supplier<PluginConfig.Mute> settings, Consumer<Player> deniedSpeech) {
         this.ingest = ingest;
         this.mutes = mutes;
+        this.consent = consent;
         this.settings = settings;
         this.deniedSpeech = deniedSpeech;
     }
@@ -87,6 +90,13 @@ public final class VoiceChatBridge implements VoicechatPlugin {
         MicrophonePacket packet = event.getPacket();
         if (mutes.isMuted(speaker.getUuid())
                 && silenced(settings.get().scope(), sender.getGroup(), packet.isWhispering())) {
+            event.cancel();
+            if (packet.getOpusEncodedData().length > 0 && speaker.getPlayer() instanceof Player player) {
+                deniedSpeech.accept(player);
+            }
+            return;
+        }
+        if (consent.blocksSpeech(speaker.getUuid())) {
             event.cancel();
             if (packet.getOpusEncodedData().length > 0 && speaker.getPlayer() instanceof Player player) {
                 deniedSpeech.accept(player);

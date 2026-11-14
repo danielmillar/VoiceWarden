@@ -80,6 +80,11 @@ public final class ConfigLoader {
                 recordings(c),
                 discord(c),
                 c.getBoolean("privacy.join-message"),
+                new PluginConfig.Consent(
+                        choice(c, "consent.mode", PluginConfig.ConsentMode.class, PluginConfig.ConsentMode.NOTICE),
+                        intIn(c, "consent.rules-version", 1, Integer.MAX_VALUE),
+                        choice(c, "consent.on-deny", PluginConfig.OnDeny.class, PluginConfig.OnDeny.STAY),
+                        c.getBoolean("consent.speak-without-consent")),
                 new PluginConfig.Logging(c.getBoolean("logging.transcripts"), c.getBoolean("logging.debug")),
                 duration(c, "health-check-interval", Duration.ofSeconds(5), Duration.ofHours(1))
         );
