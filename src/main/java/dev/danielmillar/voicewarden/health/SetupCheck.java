@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -41,13 +42,37 @@ public final class SetupCheck {
         }
     }
 
-    public record Facts(Voice voice, Engine engine, Models models, Store database, LuckPerms luckPerms, Discord discord,
-                        Config config, Recordings recordings) {
+    public record Facts(Voice voice, VoicePermissions voicePermissions, Engine engine, Models models, Store database,
+                        LuckPerms luckPerms, Discord discord, Config config, Recordings recordings) {
     }
 
     /** @param version Simple Voice Chat's version, or "" when unknown */
     public record Voice(String version, boolean registered, boolean noticeHook) {
     }
+
+    /** Whether players who are not op hold Simple Voice Chat's own nodes; see {@link #voicePermissions}. */
+    public record VoicePermissions(List<VoiceNode> nodes, GrantSource source) {
+    }
+
+    /**
+     * @param registered whether a plugin registered the node with the server
+     * @param defaultTrue whether its registered default gives it to every player
+     * @param granted whether {@link VoicePermissions#source()} shows it given to every player anyway
+     */
+    public record VoiceNode(String name, boolean registered, boolean defaultTrue, boolean granted) {
+    }
+
+    /** Where {@link VoiceNode#granted()} comes from. */
+    public enum GrantSource {
+        /** LuckPerms' default group, which every new player is in. */
+        LUCKPERMS,
+        /** Every player online who is not op; without LuckPerms it is the only view of other plugins' grants. */
+        ONLINE_PLAYERS,
+        /** No LuckPerms and no player online who is not op, so nothing shows a grant. */
+        NONE
+    }
+
+    public static final List<String> VOICE_NODES = List.of("voicechat.speak", "voicechat.listen", "voicechat.groups");
 
     /**
      * @param dropped utterances and packets skipped since start (backlog, or discarded while disabled); information only
@@ -90,6 +115,9 @@ public final class SetupCheck {
     public static List<Finding> evaluate(Facts facts) {
         List<Finding> out = new ArrayList<>();
         voice(facts.voice(), out);
+        if (facts.voice().registered()) {
+            voicePermissions(facts.voicePermissions(), out);
+        }
         engine(facts.engine(), out);
         models(facts.models(), out);
         database(facts.database(), out);
@@ -115,6 +143,66 @@ public final class SetupCheck {
                     + " so muted players see the voice chat one; mutes still work",
                     "Use Simple Voice Chat 2.6.x; see the console at startup for the reason."));
         }
+    }
+
+    /**
+     * Simple Voice Chat 2.6.x lists its nodes in plugin.yml without a default, which makes them op-only, so players who
+     * are not op can neither speak nor listen until the operator grants them, and they see VoiceWarden's notice.
+     */
+    static void voicePermissions(VoicePermissions p, List<Finding> out) {
+        String area = "Voice permissions";
+        List<VoiceNode> known = p.nodes().stream().filter(VoiceNode::registered).toList();
+        if (known.isEmpty()) {
+            return;
+        }
+        List<VoiceNode> missing = known.stream().filter(n -> !n.defaultTrue() && !n.granted()).toList();
+        if (missing.isEmpty()) {
+            String how = known.stream().allMatch(VoiceNode::defaultTrue) ? "every player has them by default"
+                    : p.source() == GrantSource.LUCKPERMS ? "the LuckPerms default group grants them"
+                    : "every player online who is not op has them";
+            out.add(Finding.ok(area, names(known) + ": " + how));
+            return;
+        }
+        String nodes = names(missing);
+        String lack = "so players who are not op cannot " + effects(missing);
+        out.add(switch (p.source()) {
+            case LUCKPERMS -> new Finding(Status.WARN, area, nodes + " " + opOnly(missing)
+                    + " and the LuckPerms default group does not grant " + them(missing) + ", " + lack,
+                    "Run " + missing.stream().map(n -> "lp group default permission set " + n.name() + " true")
+                            .collect(Collectors.joining(", then ")) + ".");
+            case ONLINE_PLAYERS -> new Finding(Status.WARN, area, nodes + " " + opOnly(missing)
+                    + " and some players online who are not op lack " + them(missing) + ", " + lack,
+                    "Grant " + nodes + " to every player with your permissions plugin.");
+            case NONE -> new Finding(Status.WARN, area, nodes + " " + opOnly(missing) + ", " + lack
+                    + " unless a permissions plugin grants " + them(missing),
+                    "Grant " + nodes + " to every player with your permissions plugin, then check again with a"
+                            + " player online who is not op.");
+        });
+    }
+
+    private static String names(List<VoiceNode> nodes) {
+        List<String> names = nodes.stream().map(VoiceNode::name).toList();
+        return names.size() == 1 ? names.getFirst()
+                : String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
+    }
+
+    private static String opOnly(List<VoiceNode> nodes) {
+        return (nodes.size() == 1 ? "is" : "are") + " op-only by Simple Voice Chat's default";
+    }
+
+    private static String them(List<VoiceNode> nodes) {
+        return nodes.size() == 1 ? "it" : "them";
+    }
+
+    private static String effects(List<VoiceNode> nodes) {
+        List<String> effects = nodes.stream().map(n -> switch (n.name()) {
+            case "voicechat.speak" -> "speak";
+            case "voicechat.listen" -> "hear voice chat";
+            case "voicechat.groups" -> "join groups";
+            default -> "use " + n.name();
+        }).toList();
+        return effects.size() == 1 ? effects.getFirst()
+                : String.join(", ", effects.subList(0, effects.size() - 1)) + " or " + effects.getLast();
     }
 
     static void engine(Engine e, List<Finding> out) {

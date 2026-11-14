@@ -7,6 +7,7 @@ import net.luckperms.api.context.DefaultContextKeys;
 import net.luckperms.api.event.EventSubscription;
 import net.luckperms.api.event.user.UserDataRecalculateEvent;
 import net.luckperms.api.model.data.TemporaryNodeMergeStrategy;
+import net.luckperms.api.model.group.Group;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.Node;
 import net.luckperms.api.node.types.PermissionNode;
@@ -85,6 +86,14 @@ public final class LuckPermsHook implements VoiceMuteMirror {
         return user(player).thenApply(user -> user.getCachedData()
                 .getPermissionData(luckPerms.getContextManager().getStaticQueryOptions())
                 .checkPermission(permission).asBoolean());
+    }
+
+    /** Whether LuckPerms' default group, which every new player is in, holds {@code permission} as true here. */
+    public boolean defaultGroupGrants(String permission) {
+        Group group = luckPerms.getGroupManager().getGroup("default");
+        return group != null && group.getCachedData()
+                .getPermissionData(luckPerms.getContextManager().getStaticQueryOptions())
+                .checkPermission(permission).asBoolean();
     }
 
     private CompletableFuture<User> user(UUID player) {
