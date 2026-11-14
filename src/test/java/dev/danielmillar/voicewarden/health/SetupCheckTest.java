@@ -36,6 +36,7 @@ class SetupCheckTest {
         var file = new ModelManager.FileState("model.onnx", folder.resolve("model.onnx"), 10, 10);
         healthy = new SetupCheck.Facts(
                 new SetupCheck.Voice("2.6.25", true, true),
+                permissions(SetupCheck.GrantSource.LUCKPERMS, false, true),
                 new SetupCheck.Engine(true, State.READY, "Whisper", "whisper-turbo", null, false, false, 2, 2, 0, 64,
                         0, 0, 800, 6.0, true, "1.13.8", "linux-x64", true),
                 new SetupCheck.Models(List.of(file), true, Instant.now()),
@@ -57,6 +58,7 @@ class SetupCheckTest {
     void everyProblemCarriesAFix() {
         var broken = new SetupCheck.Facts(
                 new SetupCheck.Voice("", false, false),
+                permissions(SetupCheck.GrantSource.NONE, false, false),
                 Fakes.with(healthy.engine(), "state", State.FAILED),
                 new SetupCheck.Models(List.of(), false, null),
                 new SetupCheck.Store(0, 2, 0, "locked"),
@@ -78,6 +80,43 @@ class SetupCheckTest {
     @Test
     void missingPermissionNoticeHookWarns() {
         assertEquals(List.of(Status.OK, Status.WARN), check("voice", new SetupCheck.Voice("2.6.25", true, false)));
+    }
+
+    // ── voice chat permissions ──────────────────────────────────────────────
+
+    @Test
+    void opOnlyVoiceNodesWarnUntilEveryPlayerHasThem() {
+        assertEquals(List.of(Status.OK), check("voicePermissions", permissions(SetupCheck.GrantSource.NONE, true, false)));
+        for (var source : SetupCheck.GrantSource.values()) {
+            var warn = findings("voicePermissions", permissions(source, false, false));
+            assertEquals(List.of(Status.WARN), warn.stream().map(Finding::status).toList(), source.name());
+            assertFalse(warn.getFirst().fix().isBlank());
+        }
+        assertEquals(List.of(Status.OK), check("voicePermissions", permissions(SetupCheck.GrantSource.LUCKPERMS, false, true)));
+        assertEquals(List.of(Status.OK), check("voicePermissions", permissions(SetupCheck.GrantSource.ONLINE_PLAYERS, false, true)));
+    }
+
+    @Test
+    void luckPermsFixGrantsOnlyTheMissingNodes() {
+        var speakGranted = new SetupCheck.VoicePermissions(List.of(
+                new SetupCheck.VoiceNode("voicechat.speak", true, false, true),
+                new SetupCheck.VoiceNode("voicechat.listen", true, false, false),
+                new SetupCheck.VoiceNode("voicechat.groups", true, true, false)), SetupCheck.GrantSource.LUCKPERMS);
+        List<Finding> findings = findings("voicePermissions", speakGranted);
+        assertEquals(List.of(Status.WARN), findings.stream().map(Finding::status).toList());
+        assertTrue(findings.getFirst().fix().contains("lp group default permission set voicechat.listen true"));
+        assertFalse(findings.getFirst().fix().contains("voicechat.speak"));
+        assertFalse(findings.getFirst().fix().contains("voicechat.groups"));
+    }
+
+    @Test
+    void unregisteredNodesOrUnloadedVoiceChatSayNothing() {
+        var unregistered = new SetupCheck.VoicePermissions(SetupCheck.VOICE_NODES.stream()
+                .map(n -> new SetupCheck.VoiceNode(n, false, false, false)).toList(), SetupCheck.GrantSource.NONE);
+        assertEquals(List.of(), check("voicePermissions", unregistered));
+        var notLoaded = Fakes.with(Fakes.with(healthy, "voice", new SetupCheck.Voice("", false, true)),
+                "voicePermissions", permissions(SetupCheck.GrantSource.NONE, false, false));
+        assertTrue(SetupCheck.evaluate(notLoaded).stream().noneMatch(f -> f.area().equals("Voice permissions")));
     }
 
     // ── speech engine ───────────────────────────────────────────────────────
@@ -268,6 +307,7 @@ class SetupCheckTest {
 
     private static final java.util.Map<String, List<String>> AREAS = java.util.Map.of(
             "voice", List.of("Voice chat"),
+            "voicePermissions", List.of("Voice permissions"),
             "engine", List.of("Speech engine", "Double check", "Transcription", "Native libraries"),
             "models", List.of("Model files"),
             "database", List.of("Database"),
@@ -284,6 +324,11 @@ class SetupCheckTest {
     private List<Finding> findings(String field, Object value) {
         return SetupCheck.evaluate(Fakes.with(healthy, field, value)).stream()
                 .filter(f -> AREAS.get(field).contains(f.area())).toList();
+    }
+
+    private static SetupCheck.VoicePermissions permissions(SetupCheck.GrantSource source, boolean defaultTrue, boolean granted) {
+        return new SetupCheck.VoicePermissions(SetupCheck.VOICE_NODES.stream()
+                .map(n -> new SetupCheck.VoiceNode(n, true, defaultTrue, granted)).toList(), source);
     }
 
     private List<Status> engine(String field, Object value) {

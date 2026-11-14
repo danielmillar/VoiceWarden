@@ -42,6 +42,8 @@ import dev.danielmillar.voicewarden.voice.VoiceSpeechNotice;
 import de.maxhenkel.voicechat.api.BukkitVoicechatService;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.entity.Player;
+import org.bukkit.permissions.Permission;
+import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jspecify.annotations.Nullable;
 
@@ -358,6 +360,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         var voicechat = getServer().getPluginManager().getPlugin("voicechat");
         var voice = new SetupCheck.Voice(voicechat == null ? "" : voicechat.getPluginMeta().getVersion(),
                 bridge != null && bridge.initialized(), permissionMessageHook != null);
+        var voicePermissions = voicePermissions();
         var lp = new SetupCheck.LuckPerms(getServer().getPluginManager().getPlugin("LuckPerms") != null,
                 luckPerms != null, c.mute().luckPerms());
         var discordFacts = new SetupCheck.Discord(c.discord(), discord.sentCount(), discord.failedCount(), discord.droppedCount());
@@ -388,8 +391,27 @@ public final class VoiceWardenPlugin extends JavaPlugin {
                     loaded != null && loaded.settings().equals(stt) ? loaded.at() : null);
             var recordings = SetupCheck.inspectRecordings(c.recordings());
             return new DiskFacts(engine, models, recordings);
-        }, executors.io()).thenCombine(store, (disk, db) -> SetupCheck.evaluate(new SetupCheck.Facts(voice,
+        }, executors.io()).thenCombine(store, (disk, db) -> SetupCheck.evaluate(new SetupCheck.Facts(voice, voicePermissions,
                 disk.engine(), disk.models(), db, lp, discordFacts, configFacts, disk.recordings())));
+    }
+
+    /** Reads registered permissions and online players, so it runs on the thread that ran the command. */
+    private SetupCheck.VoicePermissions voicePermissions() {
+        LuckPermsHook lp = luckPerms;
+        List<? extends Player> nonOps = getServer().getOnlinePlayers().stream().filter(p -> !p.isOp()).toList();
+        var source = lp != null ? SetupCheck.GrantSource.LUCKPERMS
+                : nonOps.isEmpty() ? SetupCheck.GrantSource.NONE : SetupCheck.GrantSource.ONLINE_PLAYERS;
+        List<SetupCheck.VoiceNode> nodes = SetupCheck.VOICE_NODES.stream().map(name -> {
+            Permission registered = getServer().getPluginManager().getPermission(name);
+            boolean granted = switch (source) {
+                case LUCKPERMS -> lp.defaultGroupGrants(name);
+                case ONLINE_PLAYERS -> nonOps.stream().allMatch(p -> p.hasPermission(name));
+                case NONE -> false;
+            };
+            return new SetupCheck.VoiceNode(name, registered != null,
+                    registered != null && registered.getDefault() == PermissionDefault.TRUE, granted);
+        }).toList();
+        return new SetupCheck.VoicePermissions(nodes, source);
     }
 
     private record DiskFacts(SetupCheck.Engine engine, SetupCheck.Models models, SetupCheck.Recordings recordings) {

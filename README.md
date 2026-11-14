@@ -51,13 +51,21 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 2. Start the server. The first time, VoiceWarden downloads the speech recognition files it needs. This takes a few
    minutes and your server stays playable meanwhile. Watch the server console for the message
    **`Speech engine ready`**.
-3. Let your staff see alerts by giving them the `voicewarden.alerts` permission. With LuckPerms, run this in the
+3. Make sure players can use voice chat. Simple Voice Chat 2.6 gives `voicechat.speak` and `voicechat.listen` only to
+   ops by default, so everyone else hears nothing and is told they have no permission to speak. With LuckPerms, run
+   this in the console:
+
+   ```
+   /lp group default permission set voicechat.speak true
+   /lp group default permission set voicechat.listen true
+   ```
+4. Let your staff see alerts by giving them the `voicewarden.alerts` permission. With LuckPerms, run this in the
    console, replacing `moderator` with your staff group's name:
 
    ```
    /lp group moderator permission set voicewarden.alerts true
    ```
-4. Optional: set up Discord alerts by adding webhook links in `plugins/VoiceWarden/config.yml`, then check they work with
+5. Optional: set up Discord alerts by adding webhook links in `plugins/VoiceWarden/config.yml`, then check they work with
    `/voicewarden discordtest all`.
 
 **Trying it out safely.** In `config.yml`, set `moderation.dry-run: true`. VoiceWarden will then report problems to
@@ -92,7 +100,7 @@ The main command is `/voicewarden`, or `/vw` for short.
 |---|---|---|
 | `/vw reload` | Applies changes you made to the config files, without restarting. | `voicewarden.reload` |
 | `/vw stats` | Shows how the plugin is doing: speed, queue, dropped audio and incidents. | `voicewarden.stats` |
-| `/vw check` | Checks the whole setup (voice chat, speech engine, model files, database, LuckPerms, Discord, config and recordings) and says what is OK, what to look at, and the fix for each problem. | `voicewarden.admin` |
+| `/vw check` | Checks the whole setup (voice chat and its permissions, speech engine, model files, database, LuckPerms, Discord, config and recordings) and says what is OK, what to look at, and the fix for each problem. | `voicewarden.admin` |
 | `/vw test <text>` | Checks some text against your rules, which is handy when editing word lists. | `voicewarden.admin` |
 | `/vw discordtest [all, flag, mute or report]` | Sends a test message to your Discord webhooks. | `voicewarden.admin` |
 
@@ -134,6 +142,7 @@ With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, Voi
 - **Something isn't working.** Run `/vw check`. Each ⚠ or ✘ line names the setting or step that fixes it.
 - **Nothing is happening.** Check the console for `Speech engine ready`. Until it appears, the first download is still
   running.
+- **Players who are not op can't talk or hear.** Grant them `voicechat.speak` and `voicechat.listen` (setup step 3).
 - **Someone isn't being picked up.** Make sure they don't have `voicewarden.bypass`.
 - **Staff see no alerts.** Give them `voicewarden.alerts`, and ask them to run `/vw alerts` in case they turned them off.
 - **Audio is being dropped, or the server feels slow.** Run `/vw stats` and look at *Speed* and *dropped*. Choose a
