@@ -37,8 +37,9 @@ keeps that record forever. Old records are deleted once an hour.
 
 ## Telling players
 
-`privacy.join-message` shows the `privacy-join` text from `messages.yml` on join. If you change what you record or
-where it goes, such as turning on Discord or `recordings.mode: all`, update that text to match. With
+`privacy.join-message` shows the `privacy-join` text from `messages.yml` on join, and `consent.dialog` holds the
+consent menu's text. Both say staff may keep recordings and that alerts may go to Discord. If you change what you
+record or where it goes, such as `recordings.mode: all`, update them to match. With
 `consent.mode: confirm`, players accept or deny before any of their speech is processed. See
 [Consent](configuration.md#consent).
 
