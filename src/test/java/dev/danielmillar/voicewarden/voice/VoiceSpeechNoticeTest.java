@@ -9,7 +9,6 @@ import dev.danielmillar.voicewarden.player.OnlinePlayers;
 import dev.danielmillar.voicewarden.testutil.Fakes;
 import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import net.luckperms.api.LuckPerms;
@@ -36,7 +35,6 @@ class VoiceSpeechNoticeTest {
     private final List<Repeating> repeating = new ArrayList<>();
     private final List<Component> actionBars = new ArrayList<>();
     private final List<Component> chat = new ArrayList<>();
-    private final List<BossBar> bossBars = new ArrayList<>();
     private boolean canSpeak;
     private long now;
     private PluginConfig config;
@@ -98,8 +96,6 @@ class VoiceSpeechNoticeTest {
             }
             case "sendActionBar" -> { actionBars.add((Component) args[0]); yield null; }
             case "sendMessage" -> { chat.add((Component) args[0]); yield null; }
-            case "showBossBar" -> { bossBars.add((BossBar) args[0]); yield null; }
-            case "hideBossBar" -> { assertTrue(bossBars.remove((BossBar) args[0])); yield null; }
             default -> throw new AssertionError(m);
         });
         notice = new VoiceSpeechNotice(plugin, () -> config, () -> messages, mutes, () -> now, logger);
@@ -171,30 +167,23 @@ class VoiceSpeechNoticeTest {
         assertEquals(1, repeating.size());
     }
 
-    @Test void bossBarIsShownForTheMuteAndHiddenWhenTheDisplayChanges() {
-        mute("display", MuteDisplay.BOSS_BAR);
+    @Test void statusEndsWhenTheDisplayChangesToChat() {
         mutes.mute(id, "Alice", Duration.ofMinutes(5), "reason", "staff", false).join();
         notice.show(player);
         tick();
-        tick();
-        assertEquals(1, bossBars.size());
-        assertTrue(PlainTextComponentSerializer.plainText().serialize(bossBars.getFirst().name()).contains("left"));
-        assertTrue(actionBars.isEmpty());
         mute("display", MuteDisplay.CHAT);
         tick();
-        assertTrue(bossBars.isEmpty());
         assertTrue(repeating.getFirst().cancelled);
+        assertEquals("", text(actionBars));
     }
 
-    @Test void shutdownHidesTheBossBarAndStopsEveryNotice() {
-        mute("display", MuteDisplay.BOSS_BAR);
+    @Test void shutdownStopsEveryNotice() {
         mutes.mute(id, "Alice", null, "reason", "staff", false).join();
         notice.show(player);
         tick();
         notice.onDeniedSpeech(player);
         notice.close();
         drain();
-        assertTrue(bossBars.isEmpty());
         assertTrue(chat.isEmpty());
         assertTrue(repeating.getFirst().cancelled);
         assertFalse(notice.onDeniedSpeech(player));

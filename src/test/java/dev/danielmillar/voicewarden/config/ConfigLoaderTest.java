@@ -41,16 +41,21 @@ class ConfigLoaderTest {
                 mute:
                   blocks: {proximity: false, groups: open-only}
                   allowed-groups: [" staff-appeal ", ""]
-                  feedback: {display: boss-bar, reminder-interval: 0}
+                  feedback: {display: chat, reminder-interval: 0}
                 """);
         mute = ConfigLoader.load(folder, file).config().mute();
         assertEquals(new MuteScope(false, true, MuteScope.Groups.OPEN_ONLY, java.util.List.of("staff-appeal")), mute.scope());
-        assertEquals(PluginConfig.MuteDisplay.BOSS_BAR, mute.display());
+        assertEquals(PluginConfig.MuteDisplay.CHAT, mute.display());
         assertEquals(Duration.ZERO, mute.reminderInterval());
         java.nio.file.Files.writeString(file, "mute:\n  feedback:\n    display: off\n");
         var loaded = ConfigLoader.load(folder, file);
         assertEquals(PluginConfig.MuteDisplay.OFF, loaded.config().mute().display());
         assertEquals(java.util.List.of(), loaded.warnings());
+        java.nio.file.Files.writeString(file, "mute:\n  feedback:\n    display: boss-bar\n");
+        loaded = ConfigLoader.load(folder, file);
+        assertEquals(PluginConfig.MuteDisplay.ACTION_BAR, loaded.config().mute().display());
+        assertEquals(1, loaded.warnings().size());
+        assertTrue(loaded.warnings().getFirst().contains("mute.feedback.display"));
     }
 
     @Test void existingConfigUsesGainDefaultsAndExplicitOptOutIsRespected() throws Exception {

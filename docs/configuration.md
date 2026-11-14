@@ -35,7 +35,7 @@ A few things to know:
 - Neutral words are not blocked, and everyday words that merely contain a bad word, such as "cocktail", are allowed.
 - Rules look at the words, not the meaning. They can't tell a quote or a joke from a real insult, so staff should
   check the context in alerts.
-- Muted players see how long their mute lasts above their hotbar (or in a boss bar) for the whole mute, and a chat
+- Muted players see how long their mute lasts above their hotbar for the whole mute, and a chat
   reminder at most every 30 seconds when they talk and nobody hears them. Choose this with `mute.feedback` and
   change the text in `messages.yml`.
 - If a mute lets the player talk anywhere, the LuckPerms mirror no longer denies `voicechat.speak`, because that

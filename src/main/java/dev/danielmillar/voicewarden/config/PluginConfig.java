@@ -139,14 +139,8 @@ public record PluginConfig(
     ) {
     }
 
-    /** Where a muted player sees their mute. Action bar and boss bar update every second; chat is the reminder only. */
-    public enum MuteDisplay {
-        ACTION_BAR, BOSS_BAR, CHAT, OFF;
-
-        public boolean ticks() {
-            return this == ACTION_BAR || this == BOSS_BAR;
-        }
-    }
+    /** Where a muted player sees their mute. The action bar updates every second; chat is the reminder only. */
+    public enum MuteDisplay { ACTION_BAR, CHAT, OFF }
 
     public record Alerts(boolean staff, boolean console) {
     }

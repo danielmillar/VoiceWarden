@@ -6,7 +6,6 @@ import dev.danielmillar.voicewarden.config.PluginConfig;
 import dev.danielmillar.voicewarden.config.PluginConfig.MuteDisplay;
 import dev.danielmillar.voicewarden.mute.MuteService;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
-import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -21,7 +20,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * What a muted player sees: a status line (action bar or boss bar) for the whole mute, and a throttled chat reminder
+ * What a muted player sees: an action bar for the whole mute, and a throttled chat reminder
  * when they talk and nobody hears them. Players without the speak permission get a throttled action bar instead.
  *
  * <p>The status is one repeating task per muted online player, on that player's scheduler. It ends itself on the first
@@ -42,12 +41,11 @@ public final class VoiceSpeechNotice implements AutoCloseable {
     private final Logger logger;
     private volatile boolean active = true;
 
-    /** One player's status line. {@code bar} and {@code shown} are only touched on that player's scheduler. */
+    /** One player's status line. {@code shown} is only touched on that player's scheduler. */
     private static final class Status {
         final Player player;
         volatile @Nullable ScheduledTask task;
-        @Nullable BossBar bar;
-        @Nullable MuteDisplay shown;
+        boolean shown;
 
         Status(Player player) {
             this.player = player;
@@ -137,34 +135,16 @@ public final class VoiceSpeechNotice implements AutoCloseable {
             clear(status);
             return;
         }
-        MuteDisplay display = settings.display();
-        if (status.shown != display) {
-            clear(status);
-        }
         boolean permanent = mute.get().expiresAt() == MuteService.PERMANENT;
-        String key = (permanent ? "player.muted-permanent-" : "player.muted-")
-                + (display == MuteDisplay.BOSS_BAR ? "bossbar" : "actionbar");
+        String key = permanent ? "player.muted-permanent-actionbar" : "player.muted-actionbar";
         Messages current = messages.get();
         if (current.isEmpty(key)) {
             clear(status);
             return;
         }
-        long now = System.currentTimeMillis();
-        Component text = permanent ? current.render(key)
-                : current.render(key, Messages.text("remaining", Durations.formatShort(mute.get().remaining(now))));
-        status.shown = display;
-        if (display == MuteDisplay.ACTION_BAR) {
-            player.sendActionBar(text);
-            return;
-        }
-        float progress = permanent ? 1f : progress(mute.get(), now);
-        if (status.bar == null) {
-            status.bar = BossBar.bossBar(text, progress, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
-            player.showBossBar(status.bar);
-        } else {
-            status.bar.name(text);
-            status.bar.progress(progress);
-        }
+        status.shown = true;
+        player.sendActionBar(permanent ? current.render(key) : current.render(key, Messages.text("remaining",
+                Durations.formatShort(mute.get().remaining(System.currentTimeMillis())))));
     }
 
     private void remind(Player player) {
@@ -218,23 +198,14 @@ public final class VoiceSpeechNotice implements AutoCloseable {
     }
 
     private static boolean showsStatus(PluginConfig.Mute settings) {
-        return settings.notifyPlayer() && settings.display().ticks();
-    }
-
-    private static float progress(MuteService.Mute mute, long now) {
-        long total = mute.expiresAt() - mute.createdAt();
-        return total <= 0 ? 0f : Math.clamp((float) (mute.expiresAt() - now) / total, 0f, 1f);
+        return settings.notifyPlayer() && settings.display() == MuteDisplay.ACTION_BAR;
     }
 
     private static void clear(Status status) {
-        if (status.bar != null) {
-            status.player.hideBossBar(status.bar);
-            status.bar = null;
-        }
-        if (status.shown == MuteDisplay.ACTION_BAR) {
+        if (status.shown) {
             status.player.sendActionBar(Component.empty());
+            status.shown = false;
         }
-        status.shown = null;
     }
 
     /** Claims the next send for {@code id} when at least {@code interval} has passed since the last one. */

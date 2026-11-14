@@ -35,11 +35,9 @@ player:
   warned: "<prefix>Please keep voice chat respectful. <muted>Further violations will get you voice-muted."
   muted: "<prefix>You have been voice-muted for <error><duration></error>. <muted>Reason: <reason>"
   muted-permanent: "<prefix>You have been voice-muted <error>permanently</error>. <muted>Reason: <reason>"
-  # Shown for the whole mute when mute.feedback.display is action-bar or boss-bar. <remaining> = time left, e.g. 9m 47s
+  # Shown for the whole mute when mute.feedback.display is action-bar. <remaining> = time left, e.g. 9m 47s
   muted-actionbar: "<error>Voice muted</error> <dark_gray>-</dark_gray> <body><remaining> left"
   muted-permanent-actionbar: "<error>Voice muted</error> <dark_gray>-</dark_gray> <body>permanent"
-  muted-bossbar: "<error>Voice muted</error> <dark_gray>-</dark_gray> <body><remaining> left"
-  muted-permanent-bossbar: "<error>Voice muted</error> <dark_gray>-</dark_gray> <body>permanent"
   # Chat line when a muted player talks and nobody can hear them, at most once per mute.feedback.reminder-interval.
   # <remaining> = time left
   muted-reminder: "<prefix>You are voice muted, so nobody can hear you. <muted><remaining> left."

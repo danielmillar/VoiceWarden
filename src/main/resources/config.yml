@@ -165,8 +165,8 @@ mute:
   # Tell players when muted/warned/unmuted, and show the feedback below. Text is under player.* in messages.yml.
   notify-player: true
   feedback:
-    # Where a muted player sees their mute and the time left: action-bar or boss-bar (shown for the whole mute,
-    # updated every second), chat (only the reminder below) or off.
+    # Where a muted player sees their mute: action-bar (the time left, shown for the whole mute and updated every
+    # second), chat (only the reminder below) or off.
     display: action-bar
     # When a muted player talks and nobody can hear them, remind them in chat at most this often. 0 turns it off.
     reminder-interval: 30s
