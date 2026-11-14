@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -16,6 +18,7 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -31,6 +34,9 @@ class DownloaderTest {
     private Downloader downloader;
     private URI uri;
     private volatile boolean honorRange;
+    private volatile boolean chunked;
+    private volatile int sizeDelta = 7;
+    private final AtomicInteger requests = new AtomicInteger();
 
     @BeforeEach void setup() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -42,6 +48,14 @@ class DownloaderTest {
                 if (start > 0) exchange.getResponseHeaders().set("Content-Range", "bytes " + start + "-" + (content.length - 1) + "/" + content.length);
                 exchange.sendResponseHeaders(start > 0 ? 206 : 200, content.length - start);
                 exchange.getResponseBody().write(content, start, content.length - start);
+            }
+        });
+        server.createContext("/sized", exchange -> {
+            try (exchange) {
+                requests.incrementAndGet();
+                byte[] larger = Arrays.copyOf(content, content.length + sizeDelta);
+                exchange.sendResponseHeaders(200, chunked ? 0 : larger.length);
+                exchange.getResponseBody().write(larger);
             }
         });
         server.start();
@@ -65,7 +79,7 @@ class DownloaderTest {
 
     @Test void checksumMismatchDeletesPartAndThrowsWithoutRetry() throws Exception {
         Path target = folder.resolve("model.onnx");
-        var error = assertThrows(Downloader.ChecksumException.class,
+        var error = assertThrows(Downloader.IntegrityException.class,
                 () -> downloader.download(uri, target, content.length, "00".repeat(32), "test model"));
         assertTrue(error.getMessage().contains("SHA-256 mismatch"));
         assertFalse(Files.exists(part(target)));
@@ -88,6 +102,34 @@ class DownloaderTest {
         downloader.download(uri, target, content.length, sha256(), "test model");
         assertEquals("bytes=13-", range.get());
         assertArrayEquals(content, Files.readAllBytes(target));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void largerFileThanPinnedFailsAsSizeMismatchWithoutRetry(boolean withoutContentLength) throws Exception {
+        chunked = withoutContentLength;
+        Path target = folder.resolve("model.onnx");
+        var error = assertThrows(Downloader.IntegrityException.class, () -> downloader.download(
+                uri.resolve("/sized"), target, content.length, sha256(), "test model"));
+        assertTrue(error.getMessage().startsWith("Size mismatch for test model"), error.getMessage());
+        assertTrue(error.getMessage().contains("expects exactly " + content.length), error.getMessage());
+        if (!withoutContentLength) {
+            assertTrue(error.getMessage().contains("serves " + (content.length + 7) + " bytes"), error.getMessage());
+        }
+        assertEquals(1, requests.get());
+        assertFalse(Files.exists(part(target)));
+        assertFalse(Files.exists(target));
+    }
+
+    @Test void smallerFileAnnouncedThanPinnedFailsAsSizeMismatchWithoutDownloading() throws Exception {
+        sizeDelta = -7;
+        Path target = folder.resolve("model.onnx");
+        var error = assertThrows(Downloader.IntegrityException.class, () -> downloader.download(
+                uri.resolve("/sized"), target, content.length, sha256(), "test model"));
+        assertTrue(error.getMessage().contains("serves " + (content.length - 7) + " bytes"), error.getMessage());
+        assertEquals(1, requests.get());
+        assertFalse(Files.exists(part(target)));
+        assertFalse(Files.exists(target));
     }
 
     private static Path part(Path target) { return target.resolveSibling(target.getFileName() + ".part"); }
