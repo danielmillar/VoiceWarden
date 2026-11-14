@@ -186,6 +186,8 @@ report:
   nothing: "<hold-up>There is no recent speech from <accent><player></accent> to report."
   submitted: "<primary><b>THANKS!</b></primary> <body>Your report about <accent><player></accent> went to staff with <accent><lines></accent> lines of speech."
   staff-alert: "<primary><b>REPORT!</b></primary> <body><accent><reporter></accent> reported <accent><player></accent>'s voice chat.</body> <muted>(<lines> lines, last <window>)</muted><newline>   <click:run_command:'/viewreport <id>'><hover:show_text:'<body>Open the report.'><primary>▸ ᴠɪᴇᴡ</primary></hover></click>"
+  # /viewreport from the console: a card. <player> <count>; <details> = "Report <id> by <reporter>" or "Last <window>"
+  console-header: "<newline> <primary><b><player></b></primary><newline> <dim>ᴠᴏɪᴄᴇ ʀᴇᴘᴏʀᴛ</dim><newline><newline> <primary>|</primary> <body><details></body><dim> · </dim><muted><count> lines<newline>"
   staff-transcript-line: " <dim><time></dim> <body><text>"
   # /reportinbox: a card. inbox-header: <count>; inbox-entry: <id> <player> <reporter> <ago> <lines>
   inbox-header: "<newline> <primary><b>Voice reports</b></primary><newline> <dim>ɪɴʙᴏx</dim><newline><newline> <primary>|</primary> <body>Open: <accent><count></accent>"

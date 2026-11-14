@@ -128,8 +128,8 @@ final class ReportCommands {
             return;
         }
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(msg().render("command.history-header", Messages.text("player", targetName),
-                    Messages.text("count", Integer.toString(lines.size()))));
+            sender.sendMessage(msg().render("report.console-header", Messages.text("player", targetName),
+                    Messages.text("details", subtitle), Messages.text("count", Integer.toString(lines.size()))));
             for (TranscriptLine line : lines) {
                 sender.sendMessage(msg().render("command.history-line",
                         Messages.text("time", Formats.clock(line.spokenAt())), Messages.text("text", line.text())));

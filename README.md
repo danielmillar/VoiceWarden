@@ -131,7 +131,7 @@ With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, Voi
 
 ## Troubleshooting
 
-- **Something isn't working.** Run `/vw check`. Each WARN or FAIL line names the setting or step that fixes it.
+- **Something isn't working.** Run `/vw check`. Each ⚠ or ✘ line names the setting or step that fixes it.
 - **Nothing is happening.** Check the console for `Speech engine ready`. Until it appears, the first download is still
   running.
 - **Someone isn't being picked up.** Make sure they don't have `voicewarden.bypass`.
