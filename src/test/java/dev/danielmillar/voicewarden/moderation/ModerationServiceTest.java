@@ -194,7 +194,8 @@ class ModerationServiceTest {
                     new TranscriptBuffer(new TranscriptBuffer.Limits(Duration.ofHours(1), 10, 0)), offenses, mutes,
                     new StaffAlertService(() -> settings, () -> messages, players, log), discord,
                     new EvidenceStore(settings::recordings, Runnable::run, log), new CustomCommandRunner(null, log),
-                    new TranscriptLog(folder.resolve("logs"), Runnable::run, log), players, new Metrics(), log);
+                    new TranscriptLog(folder.resolve("logs"), Runnable::run, log), players, new Metrics(), log,
+                    segment -> { throw new AssertionError("double check is off"); });
             var segment = new AudioSegment(player, "Alex", TestFixtures.AUDIO, 16000, Instant.now(), System.nanoTime(), null, false);
             offenses.recordNext(player, 0);
             moderation.onTranscript(new Transcript(segment, "badword", 0));

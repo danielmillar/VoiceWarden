@@ -53,6 +53,6 @@ class StaffAlertServiceTest {
 
     private static Incident incident(ModerationAction action, boolean dryRun) {
         return new Incident(UUID.randomUUID(), Instant.now(), Instant.now(), Duration.ofSeconds(1), UUID.randomUUID(),
-                "Steve", "badword", List.of(), 1, 1, 1, action, 1, dryRun, List.of(), null, new short[0], 16000);
+                "Steve", "badword", List.of(), 1, 1, 1, action, 1, dryRun, List.of(), null, new short[0], 16000, null);
     }
 }
