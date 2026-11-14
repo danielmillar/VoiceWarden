@@ -38,7 +38,7 @@ import java.util.concurrent.CompletableFuture;
  */
 final class VoiceWardenCommand {
 
-    private static final int HISTORY_PAGE_SIZE = 8;
+    private static final int HISTORY_PAGE_SIZE = 6;
 
     private final VoiceWardenPlugin plugin;
 

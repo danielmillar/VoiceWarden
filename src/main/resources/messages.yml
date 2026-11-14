@@ -31,7 +31,7 @@ alert:
   staff-mute: "<prefix><accent><actor></accent> voice-muted <error><player></error> for <accent><duration></accent><muted><reason></muted>"
   staff-unmute: "<prefix><accent><actor></accent> removed the voice mute from <success><player></success>"
   # <actor> <player> <reason> (": reason", or empty)
-  staff-pardon: "<prefix><accent><actor></accent> pardoned <success><player></success> <dark_gray>(<muted>mute lifted, offenses cleared</muted>)</dark_gray><muted><reason></muted>"
+  staff-pardon: "<prefix><accent><actor></accent> pardoned <success><player></success><muted><reason></muted>"
 
 player:
   warned: "<prefix>Please keep voice chat respectful. <muted>Further violations will get you voice-muted."
