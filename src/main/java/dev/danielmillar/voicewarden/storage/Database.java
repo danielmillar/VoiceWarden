@@ -26,7 +26,7 @@ import java.util.logging.Logger;
  */
 public final class Database implements AutoCloseable {
 
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
     private static final int SQLITE_CORRUPT = 11;
     private static final int SQLITE_NOTADB = 26;
 
@@ -141,6 +141,9 @@ public final class Database implements AutoCloseable {
         if (version < 3) {
             inTransaction(connection, Database::migrateToVersion3);
         }
+        if (version < 4) {
+            inTransaction(connection, Database::migrateToVersion4);
+        }
     }
 
     private static void createVersion1(Connection c) throws SQLException {
@@ -230,6 +233,18 @@ public final class Database implements AutoCloseable {
                         decided_at    INTEGER NOT NULL
                     )""");
             s.execute("PRAGMA user_version = 3");
+        }
+    }
+
+    /**
+     * Records when each player with a consent answer was last seen, so answers of players who stopped playing can be
+     * deleted. Existing answers count as seen at the upgrade, so none is pruned before its player had a chance to return.
+     */
+    private static void migrateToVersion4(Connection c) throws SQLException {
+        try (Statement s = c.createStatement()) {
+            s.execute("ALTER TABLE consents ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0");
+            s.execute("UPDATE consents SET last_seen_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000");
+            s.execute("PRAGMA user_version = 4");
         }
     }
 

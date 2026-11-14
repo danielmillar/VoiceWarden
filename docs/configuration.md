@@ -64,8 +64,9 @@ Players see their answer and change it with `/voiceconsent`, and staff see it in
   treated as not consented.
 - Everyone is asked, including players with `voicewarden.bypass`. Until they accept, they are blocked like anyone
   else.
-- Withdrawing consent stops processing from that moment. What was transcribed or recorded before stays until it ages
-  out as usual.
+- Withdrawing consent stops processing from that moment and deletes the player's recent speech held in memory.
+  Recordings, reports and history from before stay until they age out (see [Privacy](privacy.md)), or until
+  `/vw forget` erases them.
 
 ## Placeholders
 
@@ -86,7 +87,9 @@ All files are in `plugins/VoiceWarden/`.
 | `wordlist.txt` | Your list of swear words and words that cause a mute. Wildcards such as `word*` are allowed. |
 | `rules.yml` | More advanced rules, such as phrases and an "always allowed" list. |
 | `recordings/` | Saved recordings used as evidence. Old ones are deleted automatically based on age and size. |
-| `data/voicewarden.db` | A SQLite database holding voice mutes (and their LuckPerms mirror records), offence counts for the mute ladder, voice reports, and each player's consent answer. Nothing extra needs installing. Offence counts are per server. If the file is unreadable, it is moved aside as `voicewarden.db.corrupt-<UUID>` and a fresh one is created. |
+| `logs/` | Daily transcript logs, only when `logging.transcripts` is true. Deleted after `privacy.retention.transcript-logs-days`. |
+| `exports/` | Files written by `/vw export`. Deleted after `privacy.retention.exports-days`. |
+| `data/voicewarden.db` | A SQLite database holding voice mutes (and their LuckPerms mirror records), mute history, offence counts for the mute ladder, voice reports, and each player's consent answer. Old records are deleted under `privacy.retention` (see [Privacy](privacy.md)). Nothing extra needs installing. Offence counts are per server. If the file is unreadable, it is moved aside as `voicewarden.db.corrupt-<UUID>` and a fresh one is created. |
 | `models/` and `natives/` | The downloaded speech recognition files. |
 
 ## Updating

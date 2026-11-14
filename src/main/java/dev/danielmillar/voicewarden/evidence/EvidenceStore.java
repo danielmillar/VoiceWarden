@@ -110,54 +110,148 @@ public final class EvidenceStore {
     public record CleanupResult(int filesDeleted, long bytesFreed, long bytesRemaining) {}
 
     public CompletableFuture<CleanupResult> cleanup() {
+        return cleanup(Instant.now());
+    }
+
+    /**
+     * Deletes expired evidence, then the oldest until under the size cap. An incident's JSON and WAV share a name and
+     * are deleted together, so neither outlives the other.
+     */
+    public CompletableFuture<CleanupResult> cleanup(Instant now) {
         return async(() -> {
             EvidenceSettings current = settings.get();
             Path root = current.directory();
             if (!Files.exists(root)) return new CleanupResult(0, 0, 0);
-            List<StoredFile> files = new ArrayList<>();
-            try (var paths = Files.walk(root)) {
-                for (Path path : paths.filter(p -> Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS))
-                        .filter(p -> p.toString().endsWith(".json") || p.toString().endsWith(".wav")).toList()) {
-                    files.add(new StoredFile(path, Files.getLastModifiedTime(path).toInstant(), Files.size(path)));
-                }
-            }
-            files.sort(Comparator.comparing(StoredFile::modified).thenComparing(f -> f.path().toString()));
-            long total = files.stream().mapToLong(StoredFile::size).sum();
+            List<Evidence> items = new ArrayList<>(scan(root));
+            items.sort(Comparator.comparing(Evidence::modified).thenComparing(e -> e.stem().toString()));
+            long total = items.stream().mapToLong(Evidence::size).sum();
             long freed = 0;
             int deleted = 0;
-            Instant cutoff = current.retentionDays() > 0 ? Instant.now().minus(Duration.ofDays(current.retentionDays())) : null;
-            for (Iterator<StoredFile> iterator = files.iterator(); iterator.hasNext();) {
-                StoredFile file = iterator.next();
-                if (cutoff != null && file.modified().isBefore(cutoff) && Files.deleteIfExists(file.path())) {
-                    total -= file.size();
-                    freed += file.size();
-                    deleted++;
+            Instant cutoff = current.retentionDays() > 0 ? now.minus(Duration.ofDays(current.retentionDays())) : null;
+            for (Iterator<Evidence> iterator = items.iterator(); iterator.hasNext();) {
+                Evidence item = iterator.next();
+                if (cutoff != null && item.modified().isBefore(cutoff)) {
+                    deleted += delete(item);
+                    total -= item.size();
+                    freed += item.size();
                     iterator.remove();
                 }
             }
-            for (StoredFile file : files) {
+            for (Evidence item : items) {
                 if (current.maxTotalBytes() <= 0 || total <= current.maxTotalBytes()) break;
-                if (Files.deleteIfExists(file.path())) {
-                    total -= file.size();
-                    freed += file.size();
-                    deleted++;
-                }
+                deleted += delete(item);
+                total -= item.size();
+                freed += item.size();
             }
-            try (var children = Files.list(root)) {
-                for (Path dateDirectory : children.filter(p -> Files.isDirectory(p, LinkOption.NOFOLLOW_LINKS))
-                        .filter(p -> p.getFileName().toString().matches("\\d{4}-\\d{2}-\\d{2}")).toList()) {
-                    try (var contents = Files.list(dateDirectory)) {
-                        if (contents.findAny().isEmpty()) {
-                            try { Files.delete(dateDirectory); } catch (DirectoryNotEmptyException ignored) { /* concurrent save */ }
-                        }
-                    }
-                }
-            }
+            removeEmptyDateDirectories(root);
             return new CleanupResult(deleted, freed, total);
         });
     }
 
-    private record StoredFile(Path path, Instant modified, long size) {}
+    /** One saved record: its JSON (when written) and WAV (when audio was kept), named {@code stem.json} and {@code stem.wav}. */
+    private record Evidence(Path stem, List<Path> files, Instant modified, long size) {}
+
+    private static List<Evidence> scan(Path root) throws IOException {
+        Map<Path, List<Path>> byStem = new TreeMap<>();
+        try (var paths = Files.walk(root)) {
+            for (Path path : paths.filter(p -> Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS)).toList()) {
+                String name = path.getFileName().toString();
+                if (name.endsWith(".json") || name.endsWith(".wav")) {
+                    Path stem = path.resolveSibling(name.substring(0, name.lastIndexOf('.')));
+                    byStem.computeIfAbsent(stem, k -> new ArrayList<>()).add(path);
+                }
+            }
+        }
+        List<Evidence> items = new ArrayList<>();
+        for (var entry : byStem.entrySet()) {
+            Instant modified = Instant.MIN;
+            long size = 0;
+            for (Path file : entry.getValue()) {
+                Instant m = Files.getLastModifiedTime(file).toInstant();
+                if (m.isAfter(modified)) modified = m;
+                size += Files.size(file);
+            }
+            items.add(new Evidence(entry.getKey(), List.copyOf(entry.getValue()), modified, size));
+        }
+        return items;
+    }
+
+    private static int delete(Evidence item) throws IOException {
+        int deleted = 0;
+        for (Path file : item.files()) {
+            if (Files.deleteIfExists(file)) deleted++;
+        }
+        return deleted;
+    }
+
+    private static void removeEmptyDateDirectories(Path root) throws IOException {
+        try (var children = Files.list(root)) {
+            for (Path dateDirectory : children.filter(p -> Files.isDirectory(p, LinkOption.NOFOLLOW_LINKS))
+                    .filter(p -> p.getFileName().toString().matches("\\d{4}-\\d{2}-\\d{2}")).toList()) {
+                try (var contents = Files.list(dateDirectory)) {
+                    if (contents.findAny().isEmpty()) {
+                        try { Files.delete(dateDirectory); } catch (DirectoryNotEmptyException ignored) { /* concurrent save */ }
+                    }
+                }
+            }
+        }
+    }
+
+    /** A saved record that names the player as speaker, report target or reporter. */
+    public record Found(Path json, JsonObject content, @Nullable Path audio) {}
+
+    private static final List<String> PLAYER_FIELDS = List.of("playerId", "targetId", "reporterId");
+
+    /** Every saved record that names the player. */
+    public CompletableFuture<List<Found>> find(UUID player) {
+        return async(() -> {
+            Path root = settings.get().directory();
+            if (!Files.exists(root)) return List.of();
+            List<Found> found = new ArrayList<>();
+            for (Evidence item : scan(root)) {
+                Path json = item.files().stream().filter(p -> p.toString().endsWith(".json")).findFirst().orElse(null);
+                if (json == null) continue;
+                JsonObject content;
+                try {
+                    content = JsonParser.parseString(Files.readString(json)).getAsJsonObject();
+                } catch (RuntimeException e) {
+                    continue; // not a VoiceWarden record
+                }
+                if (names(content, player)) {
+                    Path audio = item.files().stream().filter(p -> p.toString().endsWith(".wav")).findFirst().orElse(null);
+                    found.add(new Found(json, content, audio));
+                }
+            }
+            return List.copyOf(found);
+        });
+    }
+
+    /** Deletes every saved record that names the player, JSON and WAV. Completes with the number of files deleted. */
+    public CompletableFuture<Integer> forget(UUID player) {
+        return find(player).thenApplyAsync(found -> {
+            int deleted = 0;
+            try {
+                for (Found f : found) {
+                    if (Files.deleteIfExists(f.json())) deleted++;
+                    if (f.audio() != null && Files.deleteIfExists(f.audio())) deleted++;
+                }
+                removeEmptyDateDirectories(settings.get().directory());
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            return deleted;
+        }, ioExecutor);
+    }
+
+    private static boolean names(JsonObject content, UUID player) {
+        String id = player.toString();
+        for (String field : PLAYER_FIELDS) {
+            JsonElement value = content.get(field);
+            if (value != null && value.isJsonPrimitive() && id.equalsIgnoreCase(value.getAsString())) return true;
+        }
+        return false;
+    }
+
     @FunctionalInterface private interface IOOperation<T> { T run() throws Exception; }
 
     private <T> CompletableFuture<T> async(IOOperation<T> operation) {

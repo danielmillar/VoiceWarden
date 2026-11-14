@@ -162,6 +162,46 @@ class EvidenceStoreTest {
         assertEquals(1, logs.size());
     }
 
+    @Test void anIncidentsJsonAndWavAreDeletedTogether() throws Exception {
+        Instant now = Instant.parse("2026-10-10T00:00:00Z");
+        config.set(new EvidenceSettings(EvidenceSettings.Mode.ALL, directory, true, 2, 0));
+        // The WAV is written first, so the pair straddles the cutoff; neither may outlive the other.
+        Path wav = file("2026-10-07/120000_Alex_incident_a.wav", 15, now.minus(Duration.ofDays(3)));
+        Path json = file("2026-10-07/120000_Alex_incident_a.json", 10, now.minus(Duration.ofDays(1)));
+        assertEquals(new EvidenceStore.CleanupResult(0, 0, 25), store.cleanup(now).get(3, TimeUnit.SECONDS));
+        assertTrue(Files.exists(wav));
+        assertEquals(new EvidenceStore.CleanupResult(2, 25, 0),
+                store.cleanup(now.plus(Duration.ofDays(2))).get(3, TimeUnit.SECONDS));
+        assertFalse(Files.exists(wav));
+        assertFalse(Files.exists(json));
+    }
+
+    @Test void sizeCapDeletesWholeIncidentsOldestFirst() throws Exception {
+        Instant now = Instant.parse("2026-10-10T00:00:00Z");
+        config.set(new EvidenceSettings(EvidenceSettings.Mode.ALL, directory, true, 0, 30));
+        Path oldWav = file("2026-10-07/a.wav", 15, now.minusSeconds(30));
+        Path oldJson = file("2026-10-07/a.json", 5, now.minusSeconds(30));
+        Path newJson = file("2026-10-08/b.json", 20, now.minusSeconds(10));
+        assertEquals(new EvidenceStore.CleanupResult(2, 20, 20), store.cleanup(now).get(3, TimeUnit.SECONDS));
+        assertFalse(Files.exists(oldWav));
+        assertFalse(Files.exists(oldJson));
+        assertTrue(Files.exists(newJson));
+    }
+
+    @Test void forgetDeletesEveryRecordNamingThePlayerAndNoOther() throws Exception {
+        UUID other = UUID.randomUUID();
+        Path incident = store.saveIncident(TestFixtures.incident()).get(3, TimeUnit.SECONDS);
+        Path report = store.saveReport(TestFixtures.report()).get(3, TimeUnit.SECONDS);
+        Path kept = store.saveUtterance(other, "Bob", TestFixtures.TIME, "hi", TestFixtures.AUDIO, 16_000).get(3, TimeUnit.SECONDS);
+        assertEquals(2, store.find(TestFixtures.PLAYER).get(3, TimeUnit.SECONDS).size());
+        assertEquals(4, store.forget(TestFixtures.PLAYER).get(3, TimeUnit.SECONDS));
+        assertFalse(Files.exists(incident));
+        assertFalse(Files.exists(report));
+        assertTrue(Files.exists(kept));
+        assertTrue(Files.exists(kept.resolveSibling(kept.getFileName().toString().replace(".json", ".wav"))));
+        assertTrue(store.find(TestFixtures.PLAYER).get(3, TimeUnit.SECONDS).isEmpty());
+    }
+
     private JsonObject read(Path path) throws Exception { return JsonParser.parseString(Files.readString(path)).getAsJsonObject(); }
     private Path file(String name, int size, Instant modified) throws Exception {
         Path path = directory.resolve(name);
