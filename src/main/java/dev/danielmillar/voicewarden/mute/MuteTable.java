@@ -114,12 +114,19 @@ final class MuteTable {
 
     /** Newest first. Insertion order breaks ties, since several events can share a millisecond. */
     static MuteEvent.Page history(Connection c, UUID player, int page, int perPage) throws SQLException {
+        int total;
+        try (PreparedStatement s = c.prepareStatement("SELECT COUNT(*) FROM mute_events WHERE player_id = ?")) {
+            s.setString(1, player.toString());
+            try (ResultSet r = s.executeQuery()) {
+                total = r.next() ? r.getInt(1) : 0;
+            }
+        }
         List<MuteEvent> events = new ArrayList<>();
         try (PreparedStatement s = c.prepareStatement("""
                 SELECT player_name, type, at, actor, reason, expires_at, automatic FROM mute_events
                 WHERE player_id = ? ORDER BY id DESC LIMIT ? OFFSET ?""")) {
             s.setString(1, player.toString());
-            s.setInt(2, perPage + 1);
+            s.setInt(2, perPage);
             s.setLong(3, (long) (page - 1) * perPage);
             try (ResultSet r = s.executeQuery()) {
                 while (r.next()) {
@@ -131,7 +138,6 @@ final class MuteTable {
                 }
             }
         }
-        boolean more = events.size() > perPage;
-        return new MuteEvent.Page(more ? List.copyOf(events.subList(0, perPage)) : List.copyOf(events), page, more);
+        return new MuteEvent.Page(List.copyOf(events), page, (total + perPage - 1) / perPage);
     }
 }

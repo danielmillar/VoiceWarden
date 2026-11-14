@@ -83,14 +83,18 @@ public final class StaffAlertService {
         if (incident.dryRun() && incident.action().type() != ActionType.NONE) {
             line = line.append(m.render("alert.dry-run-suffix"));
         }
+        boolean autoMuted = !alreadyMuted && !incident.dryRun() && incident.action().type() == ActionType.MUTE;
         Component hover = m.render("alert.hover",
+                Messages.component("click-hint", m.render(autoMuted ? "alert.click-pardon" : "alert.click-mute")),
                 Messages.text("id", incident.shortId()),
                 Messages.text("flags", Integer.toString(incident.flagsInWindow())),
                 Messages.text("threshold", Integer.toString(incident.flagThreshold())),
                 Messages.text("location", incident.location() == null ? "unknown" : incident.location().formatBlock()),
                 Messages.component("context", context(m, incident.context(), incident.spokenAt())));
         line = line.hoverEvent(HoverEvent.showText(hover))
-                .clickEvent(ClickEvent.suggestCommand("/voicewarden vcmute " + incident.playerName() + " 30m "));
+                .clickEvent(ClickEvent.suggestCommand(autoMuted
+                        ? "/voicewarden pardon " + incident.playerName() + " "
+                        : "/voicewarden vcmute " + incident.playerName() + " 30m "));
 
         if (cfg.alerts().staff()) {
             broadcast(line, ALERTS_PERMISSION);

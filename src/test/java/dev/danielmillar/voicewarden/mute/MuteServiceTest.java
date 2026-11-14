@@ -253,6 +253,11 @@ class MuteServiceTest {
         assertEquals(java.util.List.of(MuteEvent.Type.MUTE), types(third));
         assertEquals(Duration.ofHours(1), third.events().getFirst().duration());
         assertFalse(third.more());
+        var beyond = reloaded.history(alice, 9, 2).join();
+        assertTrue(beyond.events().isEmpty());
+        assertEquals(3, beyond.pages());
+        assertEquals(3, beyond.newer());
+        assertEquals(1, second.newer());
         assertNull(reloaded.history(bob, 1, 10).join().events().getFirst().duration());
     }
 

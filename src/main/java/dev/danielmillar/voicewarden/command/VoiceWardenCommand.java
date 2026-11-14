@@ -312,13 +312,14 @@ final class VoiceWardenCommand {
         if (page.page() > 1 || page.more()) {
             var literals = java.util.Map.of("player", target.name());
             var newer = page.page() > 1 ? msg().renderWithLiterals("command.record-newer",
-                    java.util.Map.of("player", target.name(), "page", Integer.toString(page.page() - 1)))
+                    java.util.Map.of("player", target.name(), "page", Integer.toString(page.newer())))
                     : net.kyori.adventure.text.Component.empty();
             var older = page.more() ? msg().renderWithLiterals("command.record-older",
                     java.util.Map.of("player", target.name(), "page", Integer.toString(page.page() + 1)))
                     : net.kyori.adventure.text.Component.empty();
             sender.sendMessage(msg().renderWithLiterals("command.record-footer", literals,
                     Messages.text("page", Integer.toString(page.page())),
+                    Messages.text("pages", Integer.toString(Math.max(1, page.pages()))),
                     Messages.component("newer", newer), Messages.component("older", older)));
         }
     }

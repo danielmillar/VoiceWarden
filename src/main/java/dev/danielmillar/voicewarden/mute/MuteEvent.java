@@ -24,8 +24,16 @@ public record MuteEvent(UUID playerId, String playerName, Type type, long at, St
         }
     }
 
-    /** One page of history, newest first. */
-    public record Page(List<MuteEvent> events, int page, boolean more) {
+    /** One page of history, newest first. {@code pages} is 0 when the player has no history. */
+    public record Page(List<MuteEvent> events, int page, int pages) {
+        public boolean more() {
+            return page < pages;
+        }
+
+        /** The page "newer" opens: the previous one, or the last page when this one is past the end. */
+        public int newer() {
+            return Math.min(page - 1, Math.max(1, pages));
+        }
     }
 
     static MuteEvent muted(MuteService.Mute mute) {

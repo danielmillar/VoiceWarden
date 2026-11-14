@@ -24,8 +24,11 @@ alert:
   mute: "<prefix><error><player></error> was auto-muted for <error><duration></error> <dark_gray>(<muted>offense #<offense></muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted>"
   already-muted: "<prefix><accent><player></accent> <dark_gray>(<muted>already muted</muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted>"
   dry-run-suffix: " <dark_gray><italic>(dry run, not applied)</italic></dark_gray>"
-  # Hover text on alerts. <context> = earlier lines, <location> = world x, y, z
-  hover: "<accent>Incident <id></accent>\n<muted>Flags: <body><flags>/<threshold></body>\nLocation: <body><location></body></muted>\n<context>\n\n<muted>Click to prepare a voice mute"
+  # Hover text on alerts. <context> = earlier lines, <location> = world x, y, z, <click-hint> = click-mute or click-pardon
+  hover: "<accent>Incident <id></accent>\n<muted>Flags: <body><flags>/<threshold></body>\nLocation: <body><location></body></muted>\n<context>\n\n<click-hint>"
+  # Clicking an alert prepares a voice mute, or a pardon when the alert is an auto-mute that was applied.
+  click-mute: "<muted>Click to prepare a voice mute"
+  click-pardon: "<muted>Click to prepare a pardon if this was a wrong call"
   context-line: "<dark_gray><ago></dark_gray> <muted><text></muted>"
   no-context: "<dark_gray>(no earlier speech)</dark_gray>"
   staff-mute: "<prefix><accent><actor></accent> voice-muted <error><player></error> for <accent><duration></accent><muted><reason></muted>"
@@ -75,8 +78,8 @@ command:
   record-unmute: " <dark_gray><time></dark_gray> <success>Unmuted</success> <muted>by <actor><reason>"
   record-expire: " <dark_gray><time></dark_gray> <muted>Mute expired"
   record-pardon: " <dark_gray><time></dark_gray> <success>Pardoned</success> <muted>by <actor><reason>"
-  # <page> <newer> <older>; the buttons can use <player> and <page> (the page they open) in their click command
-  record-footer: " <newer> <muted>Page <page></muted> <older>"
+  # <page> <pages> <newer> <older>; the buttons can use <player> and <page> (the page they open) in their click command
+  record-footer: " <newer> <muted>Page <page> of <pages></muted> <older>"
   record-newer: "<click:run_command:'/vw history <player> <page>'><hover:show_text:'<muted>Newer entries'><accent>[« Newer]</accent></hover></click>"
   record-older: "<click:run_command:'/vw history <player> <page>'><hover:show_text:'<muted>Older entries'><accent>[Older »]</accent></hover></click>"
   # /vw transcript and /viewreport. <player> <count>; history-line: <time> <text>
