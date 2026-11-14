@@ -85,10 +85,12 @@ theme tag of the same name, so `command.reload-warning`, whose placeholder is `<
   is `accent`; the other is plain. No red buttons.
 - **Kick screen:** the reason in `error` (it stopped the player), an empty line, then what to do in `body`.
 - **Console:** cards and replies sent to the console use the same messages. Log lines are plain sentences.
-- **Discord:** one embed per event. The title is `Voice <event>: <player>`, the colour follows the event (mute red, warn
-  amber, flag yellow, unmute green, report and pardon blue), field names are short sentence-case labels and values are
-  plain sentences or `label: value` lines. Separators are ` · `. Operators can override the title, footer and colour per
-  webhook, so the embed keeps those settings.
+- **Discord:** one Components V2 container per event, its accent the event's colour (mute red, warn amber, flag
+  yellow, unmute green, report and pardon blue). A `##` title `Voice <event>: <player>` over one line saying what
+  happened and when (`<t:…:f>`), then parts between dividers, each a `###` heading with an emoji (`🗣️ Transcript`,
+  `📋 Details`, `🕘 Said before`). Details are `**Label** value` rows; earlier speech is `-#` lines. The recording is a
+  file under the parts, and the `-#` footer comes last. Separators are ` · `. Operators can override the title, footer
+  and colour per webhook.
 
 ## Small capitals
 

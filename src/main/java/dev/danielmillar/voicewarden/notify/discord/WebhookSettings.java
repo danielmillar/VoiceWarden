@@ -7,15 +7,15 @@ package dev.danielmillar.voicewarden.notify.discord;
  * @param url                 webhook URL (https://discord.com/api/webhooks/...)
  * @param username            overrides the webhook display name
  * @param avatarUrl           overrides the webhook avatar
- * @param color               embed colour as 0xRRGGBB; -1 = use the built-in colour for the event type
+ * @param color               message accent colour as 0xRRGGBB; -1 = use the built-in colour for the event type
  * @param pingRoleId          role id (digits) to mention, "" = none
  * @param includeAudio        attach the utterance / report audio as a WAV file
  * @param includeTranscript   include the transcript text
  * @param includeContext      include the speaker's preceding utterances
  * @param includeServerInfo   include server name and the player's world/coordinates
  * @param spoilerFlaggedWords wrap flagged words in ||spoilers||
- * @param title               embed title template, "" = built-in. Placeholders: {player} {action} {duration} {id}
- * @param footer              embed footer template, "" = built-in. Placeholders: {server} {id}
+ * @param title               message heading template, "" = built-in. Placeholders: {player} {action} {duration} {id}
+ * @param footer              message footer template, "" = built-in. Placeholders: {server} {id}
  */
 public record WebhookSettings(
         boolean enabled,

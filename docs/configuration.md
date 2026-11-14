@@ -143,7 +143,7 @@ A speech model sometimes "hears" a word in noise or mumbling. If you turn on `sp
 different model (Moonshine v2 Base, about 140 MB download, about 130 MB more RAM) listens again to every clip that hit
 a mute rule. A hit is acted on only if both models hear the same rule. Otherwise nobody is warned or muted, the hit
 does not count towards `flag-threshold`, and staff get an alert marked unconfirmed. `/vw stats` counts these, and the
-Discord embed and evidence file record what the second model heard. If the second model can't keep up (more than 32
+Discord message and evidence file record what the second model heard. If the second model can't keep up (more than 32
 hits waiting), hits are treated as unconfirmed rather than punished unchecked. Expect about 0.1-0.3 s more before a
 mute on a typical clip, and around 1 s for an utterance over 15 s. The second model is English only, so the double check
 stays off unless `moderation.languages` is exactly `[en]`. Offline servers need the files under

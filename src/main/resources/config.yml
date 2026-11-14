@@ -13,7 +13,7 @@ config-version: 1
 # Master switch. When false, voice is not transcribed or moderated (existing mutes are still enforced).
 enabled: true
 
-# Name of this server, shown in Discord embeds. Useful when several servers share a webhook.
+# Name of this server, shown in Discord messages. Useful when several servers share a webhook.
 server-name: ""
 
 # ── Speech-to-text ───────────────────────────────────────────────────────────
@@ -253,7 +253,8 @@ discord:
     include-context: true
     include-server-info: true
     spoiler-flagged-words: true
-    # Placeholders: {player} {action} {duration} {id} {server}. Empty = default.
+    # The message's heading and its small last line. Placeholders: {player} {action} {duration} {id} {server}.
+    # Empty = default.
     title: ""
     footer: ""
 

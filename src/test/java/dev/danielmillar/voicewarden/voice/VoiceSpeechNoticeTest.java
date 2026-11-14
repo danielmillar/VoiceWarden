@@ -111,7 +111,7 @@ class VoiceSpeechNoticeTest {
         assertTrue(notice.onDeniedSpeech(player));
         drain();
         assertEquals(1, actionBars.size());
-        assertTrue(text(actionBars).contains("/voiceconsent"));
+        assertEquals(rendered("player.consent-needed-actionbar"), text(actionBars));
         consent.answer(id, true);
         now = 5_000;
         assertFalse(notice.onDeniedSpeech(player));
@@ -122,7 +122,7 @@ class VoiceSpeechNoticeTest {
         assertTrue(actionBars.isEmpty(), "Never send from the voice-chat packet thread");
         drain();
         assertEquals(1, actionBars.size());
-        assertTrue(text(actionBars).contains("You can't speak in voice chat."));
+        assertEquals(rendered("player.no-speak-permission-actionbar"), text(actionBars));
         assertTrue(repeating.isEmpty());
     }
 
@@ -133,7 +133,7 @@ class VoiceSpeechNoticeTest {
         assertTrue(notice.onDeniedSpeech(player));
         drain();
         assertEquals(1, chat.size());
-        assertTrue(text(chat).contains("nobody hears you"));
+        assertEquals(rendered("player.muted-permanent-reminder"), text(chat));
         now = 30_000;
         notice.onDeniedSpeech(player);
         drain();
@@ -167,8 +167,7 @@ class VoiceSpeechNoticeTest {
         notice.onDeniedSpeech(player);
         assertEquals(1, repeating.size());
         tick();
-        assertTrue(text(actionBars).contains("ᴍᴜᴛᴇᴅ"));
-        assertTrue(text(actionBars).contains("5m left"));
+        assertEquals(rendered("player.muted-actionbar", Messages.text("remaining", "5m")), text(actionBars));
     }
 
     @Test void statusEndsOnUnmuteAndClearsTheActionBar() {
@@ -222,7 +221,7 @@ class VoiceSpeechNoticeTest {
         assertEquals(2, repeating.size());
         assertTrue(repeating.getFirst().cancelled);
         tick();
-        assertTrue(text(actionBars).contains("for good"));
+        assertEquals(rendered("player.muted-permanent-actionbar"), text(actionBars));
     }
 
     @Test void restoredPermissionBeforeTheScheduledSendPreventsAStaleNotice() {
@@ -262,6 +261,11 @@ class VoiceSpeechNoticeTest {
         List<Runnable> pending = List.copyOf(scheduled);
         scheduled.clear();
         pending.forEach(Runnable::run);
+    }
+
+    /** What a message key says, so these tests check which message was sent and not its wording. */
+    private String rendered(String key, net.kyori.adventure.text.minimessage.tag.resolver.TagResolver... resolvers) {
+        return PlainTextComponentSerializer.plainText().serialize(messages.render(key, resolvers));
     }
 
     private static String text(List<Component> sent) {

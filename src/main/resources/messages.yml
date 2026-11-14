@@ -75,6 +75,7 @@ alert:
   match: "<warning><u><text></u></warning>"
   match-hover: "<body>Matched <category> <muted>(<rule>)</muted>."
   staff-mute: "<primary><b>MUTED!</b></primary> <accent><actor></accent> voice-muted <accent><player></accent> for <accent><duration></accent><muted><reason></muted>"
+  staff-mute-permanent: "<primary><b>MUTED!</b></primary> <accent><actor></accent> voice-muted <accent><player></accent> for good<muted><reason></muted>"
   staff-unmute: "<primary><b>UNMUTED!</b></primary> <accent><actor></accent> removed the voice mute from <accent><player></accent>."
   # <actor> <player> <reason> (": reason", or empty)
   staff-pardon: "<primary><b>PARDONED!</b></primary> <accent><actor></accent> pardoned <accent><player></accent><muted><reason></muted>"
@@ -100,13 +101,16 @@ command:
   player-not-found: "<hold-up>No player called <accent><name></accent> was found."
   invalid-duration: "<hold-up><accent><input></accent> is not a duration.<newline>   <muted>Try 30m, 2h, 1d or perm."
   muted: "<prefix>Voice-muted <accent><player></accent> for <accent><duration></accent>."
+  muted-permanent: "<prefix>Voice-muted <accent><player></accent> for good."
   unmuted: "<prefix>Removed the voice mute from <accent><player></accent>."
   action-failed: "<oops>That did not work: <reason>"
   not-muted: "<hold-up><accent><player></accent> is not voice-muted."
   cannot-mute-bypass: "<hold-up><accent><player></accent> has <accent>voicewarden.bypass</accent> and cannot be voice-muted."
-  # /vw mutes: a card. mutes-header: <count>; mutes-entry: <player> <remaining> <reason> <actor>
+  # /vw mutes: a card. mutes-header: <count>; mutes-entry: <player> <remaining> <reason> <actor>; mutes-entry-permanent
+  # is the same without <remaining>.
   mutes-header: "<newline> <primary><b>Voice mutes</b></primary><newline> <dim>ᴀᴄᴛɪᴠᴇ</dim><newline><newline> <primary>|</primary> <body>Muted: <accent><count></accent>"
   mutes-entry: " <primary>|</primary> <accent><player></accent><dim>:</dim> <body><remaining> left</body><dim> · </dim><muted><reason>, by <actor>"
+  mutes-entry-permanent: " <primary>|</primary> <accent><player></accent><dim>:</dim> <body>for good</body><dim> · </dim><muted><reason>, by <actor>"
   mutes-empty: "<prefix>Nobody is voice-muted."
   reloading: "<prefix>Reloading…"
   # <time> in milliseconds, <details> = what was loaded
@@ -123,6 +127,7 @@ command:
   record-header: "<newline> <primary><b><player></b></primary><newline> <dim>ᴠᴏɪᴄᴇ ʀᴇᴄᴏʀᴅ</dim><newline>"
   record-offenses: " <primary>|</primary> <body>Offenses: <accent><count></accent></body><dim> · </dim><muted>next auto-mute <next>"
   record-muted: " <primary>|</primary> <body>Muted: <accent><remaining> left</accent></body><dim> · </dim><muted><reason>, by <actor>"
+  record-muted-permanent: " <primary>|</primary> <body>Muted: <accent>for good</accent></body><dim> · </dim><muted><reason>, by <actor>"
   record-not-muted: " <primary>|</primary> <body>Muted: <accent>no</accent>"
   # Consent lines: <time> = when they answered, <version> = the rules-version they answered
   record-consent-accepted: " <primary>|</primary> <body>Consent: <success>accepted</success></body><dim> · </dim><muted><time>, rules v<version><newline>"
@@ -133,6 +138,7 @@ command:
   record-page-empty: " <muted>Nothing on this page."
   # Entries, newest first: <time> <actor> <reason> (": reason", or empty); record-mute also has <duration>
   record-mute: " <dim><time></dim> <primary>Muted</primary> <body>for <duration></body> <muted>by <actor><reason>"
+  record-mute-permanent: " <dim><time></dim> <primary>Muted</primary> <body>for good</body> <muted>by <actor><reason>"
   record-unmute: " <dim><time></dim> <success>Unmuted</success> <muted>by <actor><reason>"
   record-expire: " <dim><time></dim> <muted>Mute expired"
   record-pardon: " <dim><time></dim> <success>Pardoned</success> <muted>by <actor><reason>"
@@ -148,8 +154,13 @@ command:
   test-none: "<prefix>No rules matched."
   offenses: "<prefix><accent><player></accent> has <accent><count></accent> auto-mute offense(s).<newline>   <muted>Next auto-mute: <next>."
   offenses-reset: "<prefix>Reset the offense count of <accent><player></accent>."
-  discordtest-sent: "<prefix>Sending Discord test payloads…"
-  discordtest-line: "<prefix>Discord <muted><line>"
+  # /vw discordtest, one line per webhook. <webhook> = flags, mutes or reports; <status> = Discord's answer;
+  # <reason> = why it failed
+  discordtest-sent: "<prefix>Sending a test to each Discord webhook…"
+  discordtest-ok: "<prefix>The <accent><webhook></accent> webhook works. <muted>(<status>)"
+  discordtest-off: "<prefix>The <accent><webhook></accent> webhook is <muted>off</muted>."
+  discordtest-failed: "<oops>The <webhook> webhook failed.<newline>   <muted><reason>"
+  discordtest-stopped: "<oops>The Discord test could not run.<newline>   <muted><reason>"
 
 # /vw check: a card, one line per finding. <area> <finding> <fix> (the check.fix line, or empty when OK)
 check:

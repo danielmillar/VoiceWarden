@@ -20,6 +20,7 @@ import dev.danielmillar.voicewarden.mute.MuteEvent;
 import dev.danielmillar.voicewarden.mute.MuteService;
 import dev.danielmillar.voicewarden.notify.Formats;
 import dev.danielmillar.voicewarden.notify.StaffAlertService;
+import dev.danielmillar.voicewarden.notify.discord.WebhookTestResult;
 import dev.danielmillar.voicewarden.notify.discord.WebhookTestTarget;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -186,8 +187,8 @@ final class VoiceWardenCommand {
                 if (result == StaffModerationService.Result.BYPASSED) {
                     sender.sendMessage(msg().render("command.cannot-mute-bypass", Messages.text("player", t.name())));
                 } else {
-                    sender.sendMessage(msg().render("command.muted", Messages.text("player", t.name()),
-                            Messages.text("duration", Durations.format(duration))));
+                    sender.sendMessage(msg().render(duration == null ? "command.muted-permanent" : "command.muted",
+                            Messages.text("player", t.name()), Messages.text("duration", Durations.format(duration))));
                 }
             });
         }).whenComplete((ignored, error) -> actionError(sender, error));
@@ -220,9 +221,10 @@ final class VoiceWardenCommand {
         sender.sendMessage(msg().render("command.mutes-header", Messages.text("count", Integer.toString(active.size()))));
         long now = System.currentTimeMillis();
         for (MuteService.Mute m : active.stream().limit(50).toList()) {
-            sender.sendMessage(msg().render("command.mutes-entry",
+            var remaining = m.remaining(now);
+            sender.sendMessage(msg().render(remaining == null ? "command.mutes-entry-permanent" : "command.mutes-entry",
                     Messages.text("player", m.playerName()),
-                    Messages.text("remaining", Durations.formatShort(m.remaining(now))),
+                    Messages.text("remaining", Durations.formatShort(remaining)),
                     Messages.text("reason", m.reason()),
                     Messages.text("actor", m.actor())));
         }
@@ -294,7 +296,8 @@ final class VoiceWardenCommand {
             sender.sendMessage(msg().render("command.record-offenses",
                     Messages.text("count", Integer.toString(offenses.count())),
                     Messages.text("next", Durations.format(mod.muteDurationFor(offenses.count() + 1)))));
-            plugin.mutes().get(target.id()).ifPresentOrElse(m -> sender.sendMessage(msg().render("command.record-muted",
+            plugin.mutes().get(target.id()).ifPresentOrElse(m -> sender.sendMessage(msg().render(
+                            m.expiresAt() == MuteService.PERMANENT ? "command.record-muted-permanent" : "command.record-muted",
                             Messages.text("remaining", Durations.formatShort(m.remaining(System.currentTimeMillis()))),
                             Messages.text("reason", m.reason()), Messages.text("actor", m.actor()))),
                     () -> sender.sendMessage(msg().render("command.record-not-muted")));
@@ -308,7 +311,7 @@ final class VoiceWardenCommand {
             var actor = Messages.text("actor", event.actor());
             var reason = Messages.text("reason", event.reason().isBlank() ? "" : ": " + event.reason());
             sender.sendMessage(switch (event.type()) {
-                case MUTE -> msg().render("command.record-mute", time, actor, reason,
+                case MUTE -> msg().render(event.duration() == null ? "command.record-mute-permanent" : "command.record-mute", time, actor, reason,
                         Messages.text("duration", Durations.format(event.duration())));
                 case UNMUTE -> msg().render("command.record-unmute", time, actor, reason);
                 case EXPIRE -> msg().render("command.record-expire", time);
@@ -413,12 +416,24 @@ final class VoiceWardenCommand {
     private int discordTest(CommandContext<CommandSourceStack> ctx, WebhookTestTarget target) {
         CommandSender sender = ctx.getSource().getSender();
         sender.sendMessage(msg().render("command.discordtest-sent"));
-        plugin.discord().sendTest(target).whenComplete((lines, error) -> {
+        plugin.discord().sendTest(target).whenComplete((results, error) -> {
             if (error != null) {
-                sender.sendMessage(msg().render("command.discordtest-line", Messages.text("line", "failed: " + error.getMessage())));
+                sender.sendMessage(msg().render("command.discordtest-stopped", Messages.text("reason", String.valueOf(error.getMessage()))));
                 return;
             }
-            lines.forEach(line -> sender.sendMessage(msg().render("command.discordtest-line", Messages.text("line", line))));
+            for (WebhookTestResult result : results) {
+                var webhook = Messages.text("webhook", result.webhook());
+                var status = Messages.text("status", Integer.toString(result.status()));
+                var reason = Messages.text("reason", result.status() == 0 ? result.detail()
+                        : result.detail().isEmpty() ? "Discord answered " + result.status() + "."
+                        : "Discord answered " + result.status() + ": " + result.detail());
+                sender.sendMessage(result.webhook().isEmpty() ? msg().render("command.discordtest-stopped", reason)
+                        : switch (result.outcome()) {
+                            case SENT -> msg().render("command.discordtest-ok", webhook, status);
+                            case OFF -> msg().render("command.discordtest-off", webhook);
+                            case FAILED -> msg().render("command.discordtest-failed", webhook, reason);
+                        });
+            }
         });
         return Command.SINGLE_SUCCESS;
     }

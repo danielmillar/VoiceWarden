@@ -110,6 +110,8 @@ class DiscordWebhookServiceTest {
         assertTrue(request.text().contains("name=\"files[0]\"; filename=\"voice-abcdef01.wav\""));
         JsonObject json = request.json();
         assertEquals("voice-abcdef01.wav", json.getAsJsonArray("attachments").get(0).getAsJsonObject().get("filename").getAsString());
+        assertEquals("attachment://voice-abcdef01.wav", new View(json).file());
+        assertLimits(json);
         String binary = new String(request.bytes(), StandardCharsets.ISO_8859_1);
         int start = binary.indexOf("Content-Type: audio/wav\r\n\r\n") + "Content-Type: audio/wav\r\n\r\n".length();
         byte[] expected = WavEncoder.encode(TestFixtures.AUDIO, 16000);
@@ -125,18 +127,20 @@ class DiscordWebhookServiceTest {
         Captured request = take();
         assertEquals("application/json", request.contentType());
         assertFalse(request.json().has("attachments"));
-        JsonObject embed = embed(request);
-        assertEquals("Voice flag: Alex\\_\\*", embed.get("title").getAsString());
-        assertEquals("\\*\\***badword**\\*\\* \\> text \\`code\\` \\[link\\]\\(x\\) @everyone", embed.get("description").getAsString());
-        assertTrue(field(embed, "Player").startsWith("Alex\\_\\*\n`"));
-        assertTrue(field(embed, "Player").endsWith("`" + TestFixtures.PLAYER + "`"));
-        assertEquals("Flagged \\(dry run, not applied\\)", field(embed, "Action"));
-        assertEquals("2 of 3 in the window", field(embed, "Flags"));
-        assertEquals("Profanity: badword", field(embed, "Matched"));
-        assertEquals("\\-12s prior \\*line\\* @here", field(embed, "Context"));
-        assertEquals("Test server\nworld -1, 64, 12", field(embed, "Server"));
-        assertEquals(TestFixtures.TIME.toString(), embed.get("timestamp").getAsString());
-        assertEquals(0xF1C40F, embed.get("color").getAsInt());
+        View view = new View(request);
+        assertLimits(view.json());
+        assertNull(view.file());
+        assertEquals("Voice flag: Alex\\_\\*", view.title());
+        assertEquals("> \\*\\***badword**\\*\\* \\> text \\`code\\` \\[link\\]\\(x\\) @everyone", view.part("Transcript"));
+        assertEquals("Alex\\_\\* · `" + TestFixtures.PLAYER + "`", view.row("Player"));
+        assertTrue(view.summary().contains("dry run"));
+        assertTrue(view.summary().endsWith("<t:" + TestFixtures.TIME.getEpochSecond() + ":f>"));
+        assertTrue(view.row("Flags").startsWith("2 of 3"));
+        assertEquals("Profanity: badword", view.row("Matched"));
+        assertEquals("-# \\-12s prior \\*line\\* @here", view.part("before"));
+        assertEquals("Test server · world -1, 64, 12", view.row("Server"));
+        assertEquals("`" + TestFixtures.ID + "`", view.row("Incident"));
+        assertEquals(0xF1C40F, view.color());
     }
 
     @ParameterizedTest @ValueSource(strings = {"", "123456789", "123@everyone", "１２３"})
@@ -147,13 +151,14 @@ class DiscordWebhookServiceTest {
         JsonObject json = take().json();
         assertTrue(json.getAsJsonObject("allowed_mentions").getAsJsonArray("parse").isEmpty());
         if (role.equals("123456789")) {
-            assertEquals("<@&123456789>", json.get("content").getAsString());
+            assertEquals("<@&123456789>", new View(json).ping());
             assertEquals(List.of("123456789"), json.getAsJsonObject("allowed_mentions").getAsJsonArray("roles").asList().stream().map(JsonElement::getAsString).toList());
         } else {
-            assertFalse(json.has("content"));
+            assertNull(new View(json).ping());
             assertFalse(json.getAsJsonObject("allowed_mentions").has("roles"));
         }
-        assertTrue(embed(json).get("description").getAsString().contains("||**badword**||"));
+        assertLimits(json);
+        assertTrue(new View(json).part("Transcript").contains("||**badword**||"));
     }
 
     @Test void invalidRoleWarnsOnceAndNeverOnCaller() throws Exception {
@@ -179,11 +184,11 @@ class DiscordWebhookServiceTest {
         service.submitIncident(TestFixtures.incident("Alex", "badword", ModerationAction.WARN, new short[0]));
         Captured request = take();
         assertEquals("application/json", request.contentType());
-        assertEquals(0xE67E22, embed(request).get("color").getAsInt());
-        assertEquals("Voice warning: Alex", embed(request).get("title").getAsString());
+        assertEquals(0xE67E22, new View(request).color());
+        assertEquals("Voice warning: Alex", new View(request).title());
     }
 
-    @Test void hugeTranscriptAndTemplatesObeyAllEmbedLimitsWithBalancedMarkdown() throws Exception {
+    @Test void hugeTranscriptAndTemplatesObeyMessageLimitsWithBalancedMarkdown() throws Exception {
         String transcript = "badword " + "*_[\\😀]()".repeat(20_000);
         WebhookSettings webhook = new WebhookSettings(true, url, "", "", -1, "", false, true, true, true, true,
                 "Title {player} " + "*".repeat(400), "Footer {server} " + "_".repeat(4000));
@@ -192,12 +197,10 @@ class DiscordWebhookServiceTest {
         service.submitIncident(TestFixtures.incident("Long".repeat(300), transcript, ModerationAction.NONE, TestFixtures.AUDIO));
         JsonObject json = take().json();
         assertLimits(json);
-        JsonObject embed = embed(json);
-        assertTrue(embed.get("description").getAsString().endsWith("…"));
-        assertBalanced(embed.get("description").getAsString());
-        assertBalanced(embed.get("title").getAsString());
-        assertBalanced(embed.getAsJsonObject("footer").get("text").getAsString());
-        embed.getAsJsonArray("fields").forEach(field -> assertBalanced(field.getAsJsonObject().get("value").getAsString()));
+        View view = new View(json);
+        assertTrue(view.part("Transcript").endsWith("…"));
+        assertNotNull(view.part("Details"));
+        view.texts().forEach(DiscordWebhookServiceTest::assertBalanced);
     }
 
     @Test void truncationInsideSpoilerClosesBothMarkers() {
@@ -216,12 +219,12 @@ class DiscordWebhookServiceTest {
         config.set(settings(webhook, webhook, WebhookSettings.disabled(), 10, 0));
         start(); service.start();
         service.submitIncident(TestFixtures.incident("Alex", "badword", ModerationAction.mute(Duration.ofMinutes(90)), TestFixtures.AUDIO));
-        JsonObject embed = embed(take());
+        View view = new View(take());
         deliveries(1, 0);
         assertTrue(requests.isEmpty());
-        assertEquals("Voice auto-mute: Alex", embed.get("title").getAsString());
-        assertEquals(0xE74C3C, embed.get("color").getAsInt());
-        assertEquals("Muted for 1h 30m \\(offense 2\\) \\(dry run, not applied\\)", field(embed, "Action"));
+        assertEquals("Voice auto-mute: Alex", view.title());
+        assertEquals(0xE74C3C, view.color());
+        assertTrue(view.summary().contains("1h 30m"));
     }
 
     @Test void autoMuteDistinctUrlsSendsToBothAndStaffOnlyToMutes() throws Exception {
@@ -234,21 +237,22 @@ class DiscordWebhookServiceTest {
                 Duration.ofDays(2), "reason _word_ @everyone", TestFixtures.TIME));
         Captured staff = take();
         assertTrue(staff.path().endsWith("-mutes"));
-        assertEquals("Staff\\`", field(embed(staff), "By"));
-        assertEquals("2d", field(embed(staff), "Duration"));
-        assertEquals("reason \\_word\\_ @everyone", field(embed(staff), "Reason"));
+        View view = new View(staff);
+        assertEquals("Staff\\`", view.row("By"));
+        assertTrue(view.summary().contains("2d"));
+        assertEquals("reason \\_word\\_ @everyone", view.row("Reason"));
     }
 
-    @Test void staffUnmuteHasGreenColorAndNoDurationOrAbsentReason() throws Exception {
+    @Test void staffUnmuteHasGreenColorAndNoAbsentReason() throws Exception {
         config.set(settings(WebhookSettings.disabled(), webhook(url, false, "", false), WebhookSettings.disabled(), 10, 0));
         start();
         service.submitStaffAction(new StaffAction(StaffAction.Type.UNMUTE, TestFixtures.PLAYER, "Alex", "System", null, null, TestFixtures.TIME));
-        JsonObject embed = embed(take());
-        assertEquals("Voice unmute: Alex", embed.get("title").getAsString());
-        assertEquals(0x2ECC71, embed.get("color").getAsInt());
-        assertNull(field(embed, "Duration"));
-        assertNull(field(embed, "Reason"));
+        View view = new View(take());
+        assertEquals("Voice unmute: Alex", view.title());
+        assertEquals(0x2ECC71, view.color());
+        assertNull(view.row("Reason"));
     }
+
 
     @Test void reportUsesUtcDropsOldestLinesAndAttachesAudio() throws Exception {
         config.set(settings(WebhookSettings.disabled(), WebhookSettings.disabled(), webhook(url, true, "", false), 10, 0));
@@ -260,14 +264,14 @@ class DiscordWebhookServiceTest {
         service.submitReport(report);
         Captured request = take();
         assertTrue(request.contentType().startsWith("multipart/"));
-        JsonObject embed = embed(request);
-        String description = embed.get("description").getAsString();
-        assertFalse(description.contains("line0 "));
-        assertTrue(description.contains("\\[12:35:25\\] line29 "));
-        assertEquals("30", field(embed, "Lines"));
-        assertEquals("1m", field(embed, "Window"));
-        assertEquals("Console", field(embed, "Reporter"));
-        assertEquals(0x3498DB, embed.get("color").getAsInt());
+        View view = new View(request);
+        String transcript = view.part("Transcript");
+        assertFalse(transcript.contains("line0 "));
+        assertTrue(transcript.contains("\\[12:35:25\\] line29 "));
+        assertTrue(view.row("Speech").startsWith("30 lines"));
+        assertEquals("Console", view.row("Reporter"));
+        assertEquals(0x3498DB, view.color());
+        assertEquals("attachment://voice-abcdef01.wav", view.file());
         assertLimits(request.json());
     }
 
@@ -277,23 +281,24 @@ class DiscordWebhookServiceTest {
         config.set(settings(webhook, WebhookSettings.disabled(), WebhookSettings.disabled(), 10, 0));
         start();
         service.submitIncident(TestFixtures.incident("Alex", "badword", ModerationAction.mute(Duration.ofMinutes(15)), TestFixtures.AUDIO));
-        JsonObject json = take().json(), embed = embed(json);
+        JsonObject json = take().json();
+        View view = new View(json);
         assertEquals("VoiceBot", json.get("username").getAsString());
         assertEquals("https://example.test/avatar.png", json.get("avatar_url").getAsString());
-        assertEquals(0x123456, embed.get("color").getAsInt());
-        assertTrue(embed.get("title").getAsString().contains("Alex/Muted for 15m"));
-        assertTrue(embed.get("title").getAsString().endsWith("/15m/abcdef01/Test server"));
-        assertEquals("Custom Test server abcdef01", embed.getAsJsonObject("footer").get("text").getAsString());
-        assertFalse(embed.has("description"));
-        assertNull(field(embed, "Context"));
-        assertNull(field(embed, "Server"));
+        assertEquals(0x123456, view.color());
+        assertTrue(view.title().startsWith("Alex/"));
+        assertTrue(view.title().endsWith("/15m/abcdef01/Test server"));
+        assertEquals("Custom Test server abcdef01", view.footer());
+        assertNull(view.part("Transcript"));
+        assertNull(view.part("before"));
+        assertNull(view.row("Server"));
     }
 
     @Test void emptyServerFooterOmitsBullet() throws Exception {
         DiscordSettings current = config.get();
         config.set(new DiscordSettings("", 2, 0, 10, current.flags(), current.mutes(), current.reports()));
         start(); service.submitIncident(TestFixtures.incident());
-        assertEquals("VoiceWarden", embed(take()).getAsJsonObject("footer").get("text").getAsString());
+        assertEquals("VoiceWarden", new View(take()).footer());
     }
 
     @Test void retries429AfterFractionalBodyDelayEvenWithZeroOrdinaryRetries() throws Exception {
@@ -410,7 +415,7 @@ class DiscordWebhookServiceTest {
         release.countDown();
         take(); Captured second = take();
         assertTrue(second.path().endsWith("-new"));
-        assertEquals("Voice flag: Second", embed(second).get("title").getAsString());
+        assertEquals("Voice flag: Second", new View(second).title());
         deliveries(2, 0);
         assertEquals(0, service.queueSize());
     }
@@ -436,10 +441,10 @@ class DiscordWebhookServiceTest {
             var completed = service.sendTest(WebhookTestTarget.MUTE);
             release.countDown();
             take();
-            assertEquals("Voice flag: Second", embed(take()).get("title").getAsString());
-            assertEquals("Voice flag: Third", embed(take()).get("title").getAsString());
-            assertEquals("Voice flag: Fourth", embed(take()).get("title").getAsString());
-            assertEquals(List.of("mutes: disabled"), completed.get(5, TimeUnit.SECONDS));
+            assertEquals("Voice flag: Second", new View(take()).title());
+            assertEquals("Voice flag: Third", new View(take()).title());
+            assertEquals("Voice flag: Fourth", new View(take()).title());
+            assertEquals(List.of(off("mutes")), completed.get(5, TimeUnit.SECONDS));
             assertEquals(4, service.sentCount());
             assertEquals(1, service.droppedCount());
         } finally {
@@ -459,7 +464,7 @@ class DiscordWebhookServiceTest {
         var completion = service.sendTest(WebhookTestTarget.FLAG);
         for (int index = 0; index < 20; index++) assertFalse(service.submitIncident(TestFixtures.incident()));
         release.countDown();
-        assertEquals(List.of("flags: OK (204)"), completion.get(5, TimeUnit.SECONDS));
+        assertEquals(List.of(sent("flags")), completion.get(5, TimeUnit.SECONDS));
         assertEquals(2, service.sentCount());
         logMatching(record -> record.getMessage().contains("queue full"));
         assertEquals(20, service.droppedCount());
@@ -471,22 +476,21 @@ class DiscordWebhookServiceTest {
         reply = (exchange, attempt) -> respond(exchange, exchange.getRequestURI().getPath().endsWith("-reports") ? 404 : 204,
                 exchange.getRequestURI().getPath().endsWith("-reports") ? "{\"message\":\"Unknown Webhook\"}" : "");
         start();
-        List<String> lines = service.sendTest(WebhookTestTarget.ALL).get(3, TimeUnit.SECONDS);
-        assertEquals(List.of("flags: OK (204)", "mutes: disabled", "reports: FAILED 404 Unknown Webhook"), lines);
+        var results = service.sendTest(WebhookTestTarget.ALL).get(3, TimeUnit.SECONDS);
+        assertEquals(List.of(sent("flags"), off("mutes"), new WebhookTestResult("reports", WebhookTestResult.Outcome.FAILED, 404, "Unknown Webhook")), results);
         Captured flag = take(); take();
         assertTrue(flag.contentType().startsWith("multipart/"));
-        assertTrue(embed(flag).get("description").getAsString().contains("**badword**"));
-        assertEquals(List.of("mutes: disabled"), service.sendTest(WebhookTestTarget.MUTE).get(3, TimeUnit.SECONDS));
+        assertTrue(new View(flag).part("Transcript").contains("**badword**"));
+        assertEquals(List.of(off("mutes")), service.sendTest(WebhookTestTarget.MUTE).get(3, TimeUnit.SECONDS));
     }
 
     @ParameterizedTest @EnumSource(value = WebhookTestTarget.class, names = {"FLAG", "MUTE", "REPORT"})
     void testTargetSendsOnlySelectedWebhook(WebhookTestTarget target) throws Exception {
         config.set(settings(webhook(url, false, "", false), webhook(url + "-mutes", false, "", false), webhook(url + "-reports", false, "", false), 10, 0));
         start();
-        var lines = service.sendTest(target).get(3, TimeUnit.SECONDS);
-        assertEquals(1, lines.size());
+        var results = service.sendTest(target).get(3, TimeUnit.SECONDS);
         String route = switch (target) { case FLAG -> "flags"; case MUTE -> "mutes"; case REPORT -> "reports"; default -> throw new AssertionError(); };
-        assertEquals(List.of(route + ": OK (204)"), lines);
+        assertEquals(List.of(sent(route)), results);
         take(); assertEquals(1, attempts.get());
     }
 
@@ -499,7 +503,7 @@ class DiscordWebhookServiceTest {
         var pending = service.sendTest(WebhookTestTarget.ALL);
         long before = System.nanoTime(); service.close();
         assertTrue(System.nanoTime() - before < TimeUnit.MILLISECONDS.toNanos(200));
-        assertEquals(List.of("test: FAILED service closed"), pending.get(3, TimeUnit.SECONDS));
+        assertNotRun(pending.get(3, TimeUnit.SECONDS));
         logMatching(record -> record.getMessage().contains("discarded 1 pending"));
         assertFalse(service.submitIncident(TestFixtures.incident()));
         service.start();
@@ -514,7 +518,7 @@ class DiscordWebhookServiceTest {
         var future = service.sendTest(WebhookTestTarget.FLAG);
         assertTrue(sleeping.await(3, TimeUnit.SECONDS));
         service.close();
-        assertEquals(List.of("test: FAILED service closed"), future.get(3, TimeUnit.SECONDS));
+        assertNotRun(future.get(3, TimeUnit.SECONDS));
     }
 
     @Test void disabledAndInvalidUrlsSkipWithoutExposingToken() throws Exception {
@@ -546,14 +550,47 @@ class DiscordWebhookServiceTest {
         assertNotNull(captured, "No HTTP request received");
         return captured;
     }
-    private static JsonObject embed(Captured request) { return embed(request.json()); }
-    private static JsonObject embed(JsonObject payload) { return payload.getAsJsonArray("embeds").get(0).getAsJsonObject(); }
-    private static String field(JsonObject embed, String name) {
-        for (JsonElement element : embed.getAsJsonArray("fields")) {
-            JsonObject field = element.getAsJsonObject();
-            if (field.get("name").getAsString().equals(name)) return field.get("value").getAsString();
+    /** The Components V2 message: a container holding text displays, separators and an optional file. */
+    private record View(JsonObject json) {
+        View(Captured request) { this(request.json()); }
+        JsonObject container() {
+            for (JsonElement element : json.getAsJsonArray("components"))
+                if (element.getAsJsonObject().get("type").getAsInt() == 17) return element.getAsJsonObject();
+            throw new AssertionError("No container");
         }
-        return null;
+        int color() { return container().get("accent_color").getAsInt(); }
+        List<String> texts() {
+            List<String> texts = new ArrayList<>();
+            for (JsonElement element : container().getAsJsonArray("components"))
+                if (element.getAsJsonObject().get("type").getAsInt() == 10) texts.add(element.getAsJsonObject().get("content").getAsString());
+            return texts;
+        }
+        String title() { return texts().getFirst().lines().findFirst().orElseThrow().substring(3); }
+        String summary() { return texts().getFirst().lines().skip(1).findFirst().orElseThrow(); }
+        String footer() { return texts().getLast().substring(3); }
+        /** The body under a {@code ###} heading containing {@code heading}, or null. */
+        String part(String heading) {
+            for (String text : texts())
+                if (text.startsWith("### ") && text.lines().findFirst().orElseThrow().contains(heading)) return text.substring(text.indexOf('\n') + 1);
+            return null;
+        }
+        /** A {@code **label** value} row of the details part, or null. */
+        String row(String label) {
+            String details = part("Details");
+            if (details == null) return null;
+            return details.lines().filter(line -> line.startsWith("**" + label + "** ")).findFirst()
+                    .map(line -> line.substring(label.length() + 5)).orElse(null);
+        }
+        String ping() {
+            JsonObject first = json.getAsJsonArray("components").get(0).getAsJsonObject();
+            return first.get("type").getAsInt() == 10 ? first.get("content").getAsString() : null;
+        }
+        String file() {
+            for (JsonElement element : container().getAsJsonArray("components"))
+                if (element.getAsJsonObject().get("type").getAsInt() == 13)
+                    return element.getAsJsonObject().getAsJsonObject("file").get("url").getAsString();
+            return null;
+        }
     }
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
@@ -565,11 +602,18 @@ class DiscordWebhookServiceTest {
         WebhookTestTarget disabled = !current.mutes().enabled() ? WebhookTestTarget.MUTE
                 : !current.reports().enabled() ? WebhookTestTarget.REPORT : WebhookTestTarget.FLAG;
         var barrier = service.sendTest(disabled).get(5, TimeUnit.SECONDS);
-        assertTrue(barrier.getFirst().endsWith(": disabled"), barrier.toString());
+        assertEquals(WebhookTestResult.Outcome.OFF, barrier.getFirst().outcome(), barrier.toString());
         assertEquals(sent, service.sentCount());
         assertEquals(failed, service.failedCount());
     }
 
+    private static WebhookTestResult sent(String webhook) { return new WebhookTestResult(webhook, WebhookTestResult.Outcome.SENT, 204, ""); }
+    private static WebhookTestResult off(String webhook) { return new WebhookTestResult(webhook, WebhookTestResult.Outcome.OFF, 0, ""); }
+    private static void assertNotRun(List<WebhookTestResult> results) {
+        assertEquals(1, results.size());
+        assertEquals("", results.getFirst().webhook());
+        assertEquals(WebhookTestResult.Outcome.FAILED, results.getFirst().outcome());
+    }
     private void logMatching(java.util.function.Predicate<LogRecord> predicate) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (logs.stream().noneMatch(predicate)) {
@@ -583,27 +627,23 @@ class DiscordWebhookServiceTest {
     private static DiscordSettings settings(WebhookSettings flags, WebhookSettings mutes, WebhookSettings reports, int queue, int retries) {
         return new DiscordSettings("Test server", 2, retries, queue, flags, mutes, reports);
     }
+    /** Discord refuses a Components V2 message over 4,000 characters of text or 40 components. */
     private static void assertLimits(JsonObject json) {
-        if (json.has("content")) assertTrue(json.get("content").getAsString().length() <= 2000);
-        JsonObject embed = embed(json);
-        int length = embed.get("title").getAsString().length();
-        assertTrue(length <= 256);
-        String footer = embed.getAsJsonObject("footer").get("text").getAsString();
-        assertTrue(footer.length() <= 2048);
-        length += footer.length();
-        if (embed.has("description")) {
-            String description = embed.get("description").getAsString();
-            assertTrue(description.length() <= 4096);
-            length += description.length();
+        assertFalse(json.has("content"));
+        assertFalse(json.has("embeds"));
+        assertEquals(1 << 15, json.get("flags").getAsInt() & (1 << 15));
+        int[] length = {0}, count = {0};
+        countComponents(json.getAsJsonArray("components"), length, count);
+        assertTrue(length[0] <= 4000, "Text total was " + length[0]);
+        assertTrue(count[0] <= 40, "Components: " + count[0]);
+    }
+    private static void countComponents(JsonArray components, int[] length, int[] count) {
+        for (JsonElement element : components) {
+            JsonObject component = element.getAsJsonObject();
+            count[0]++;
+            if (component.has("content")) length[0] += component.get("content").getAsString().length();
+            if (component.has("components")) countComponents(component.getAsJsonArray("components"), length, count);
         }
-        assertTrue(embed.getAsJsonArray("fields").size() <= 25);
-        for (JsonElement element : embed.getAsJsonArray("fields")) {
-            JsonObject field = element.getAsJsonObject();
-            assertTrue(field.get("name").getAsString().length() <= 256);
-            assertTrue(field.get("value").getAsString().length() <= 1024);
-            length += field.get("name").getAsString().length() + field.get("value").getAsString().length();
-        }
-        assertTrue(length <= 6000, "Embed total was " + length);
     }
     private static void assertBalanced(String text) {
         int bold = 0, spoilers = 0, code = 0;
