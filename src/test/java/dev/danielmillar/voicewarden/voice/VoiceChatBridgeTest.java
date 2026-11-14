@@ -14,6 +14,7 @@ import de.maxhenkel.voicechat.api.packets.MicrophonePacket;
 import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
 import dev.danielmillar.voicewarden.config.Messages;
 import dev.danielmillar.voicewarden.config.PluginConfig;
+import dev.danielmillar.voicewarden.consent.ConsentService;
 import dev.danielmillar.voicewarden.health.Metrics;
 import dev.danielmillar.voicewarden.luckperms.LuckPermsHook;
 import dev.danielmillar.voicewarden.mute.MuteScope;
@@ -47,6 +48,8 @@ class VoiceChatBridgeTest {
     private final Metrics metrics = new Metrics();
     private final Map<Class<?>, Consumer<Event>> handlers = new HashMap<>();
     private PluginConfig.Mute settings;
+    private PluginConfig.Consent consentSettings;
+    private ConsentService consent;
     private MuteService mutes;
     private VoiceChatBridge bridge;
     private VoicechatConnection connection;
@@ -60,11 +63,14 @@ class VoiceChatBridgeTest {
         Logger log = Logger.getLogger("VoiceChatBridgeTest");
         var permissions = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, args) -> { throw new AssertionError(m); }));
         var messages = Messages.load(folder.resolve("messages.yml"));
-        mutes = new MuteService(() -> config, () -> messages, permissions, new OnlinePlayers(), Runnable::run, log, Fakes.database(folder));
+        var database = Fakes.database(folder);
+        mutes = new MuteService(() -> config, () -> messages, permissions, new OnlinePlayers(), Runnable::run, log, database);
+        consentSettings = defaults.consent();
+        consent = new ConsentService(() -> consentSettings, database, System::currentTimeMillis, log);
         var ingest = new AudioIngestService(() -> config, metrics, new Fakes.Executor(false), s -> { },
-                key -> null, p -> false, log);
+                key -> null, p -> false, consent::allowsProcessing, log);
         ingest.setAccepting(true);
-        bridge = new VoiceChatBridge(ingest, mutes, () -> settings, player -> notices.incrementAndGet());
+        bridge = new VoiceChatBridge(ingest, mutes, consent, () -> settings, player -> notices.incrementAndGet());
         bridge.registerEvents(Fakes.proxy(EventRegistration.class, (p, method, args) -> {
             assertEquals("registerEvent", method.getName());
             if (args.length == 3) assertEquals(100, args[2]);
@@ -165,6 +171,33 @@ class VoiceChatBridgeTest {
         settings = Fakes.with(settings, "disableListening", true);
         assertTrue(sound(EntitySoundPacketEvent.class, SoundPacketEvent.SOURCE_PROXIMITY, false));
         assertTrue(sound(StaticSoundPacketEvent.class, SoundPacketEvent.SOURCE_GROUP, false));
+    }
+
+    @Test void playerWhoHasNotAcceptedIsBlockedWithANoticeUntilTheyAccept() {
+        mutes.unmute(id, "staff").join();
+        consentSettings = new PluginConfig.Consent(PluginConfig.ConsentMode.CONFIRM, 1, PluginConfig.OnDeny.STAY, false);
+        assertTrue(packet(new byte[]{1}, false));
+        assertEquals(1, notices.get());
+        assertEquals(0, metrics.packets.sum());
+        consent.answer(id, true);
+        assertFalse(packet(new byte[]{1}, false));
+        assertEquals(1, metrics.packets.sum());
+    }
+
+    @Test void speakingWithoutConsentIsHeardButNeverReachesModeration() {
+        mutes.unmute(id, "staff").join();
+        consentSettings = new PluginConfig.Consent(PluginConfig.ConsentMode.CONFIRM, 1, PluginConfig.OnDeny.STAY, true);
+        consent.answer(id, false);
+        assertFalse(packet(new byte[]{1}, false));
+        assertEquals(0, notices.get());
+        assertEquals(0, metrics.packets.sum());
+    }
+
+    @Test void muteStillWinsForAPlayerWhoAccepted() {
+        consentSettings = new PluginConfig.Consent(PluginConfig.ConsentMode.CONFIRM, 1, PluginConfig.OnDeny.STAY, false);
+        consent.answer(id, true);
+        assertTrue(packet(new byte[]{1}, false));
+        assertEquals(0, metrics.packets.sum());
     }
 
     private void scope(MuteScope scope) {

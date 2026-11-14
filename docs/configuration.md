@@ -43,6 +43,38 @@ A few things to know:
 - Players name their own voice chat groups, so a muted player can create a group with an allowed name. Only list
   groups that staff watch.
 
+## Consent
+
+`consent.mode: notice`, the default, tells players on join that voice chat is moderated (`privacy.join-message`), and
+joining counts as consent.
+
+With `consent.mode: confirm`, each player is asked to accept or deny in a menu when they join (or when they respawn,
+if they joined dead). Until they answer, the menu can't be closed with Escape. Until a player accepts, VoiceWarden never decodes, transcribes, buffers or records their voice.
+Players see their answer and change it with `/voiceconsent`, and staff see it in `/vw history <player>`.
+
+- **Denied or not answered yet.** By default (`consent.speak-without-consent: false`) the player can listen but
+  nobody hears them, so denying is not a way to speak unmoderated. Set it to `true` to let them be heard while
+  VoiceWarden ignores their voice. A voice mute still applies either way. A blocked player sees an action bar
+  pointing to `/voiceconsent`, even when `mute.notify-player` is false.
+- **Reminder.** Under `stay`, a player who denied gets a chat reminder each time they join.
+- **`consent.on-deny`.** With `stay` the player keeps playing and isn't asked again on join. With `kick` they are
+  disconnected and asked again next time they join.
+- **`consent.rules-version`.** Raise it when your rules change. Players are asked again on their next join, and
+  online players are asked straight away after `/vw reload`. Until they accept the new version, their voice is
+  treated as not consented.
+- Everyone is asked, including players with `voicewarden.bypass`. Until they accept, they are blocked like anyone
+  else.
+- Withdrawing consent stops processing from that moment. What was transcribed or recorded before stays until it ages
+  out as usual.
+
+## Placeholders
+
+With PlaceholderAPI installed, `%voicewarden_muted%`, `%voicewarden_mute_remaining%`, `%voicewarden_mute_reason%`,
+`%voicewarden_offenses%` and `%voicewarden_next_mute%` show a player's voice mute status (the README describes each).
+The offence count is the one the mute ladder uses, so it drops to 0 once `moderation.mute-ladder.reset-after-days`
+have passed since the last automatic mute. They work for offline players too, and are empty where there is no player,
+such as in the console.
+
 ## Customising
 
 All files are in `plugins/VoiceWarden/`.
@@ -54,7 +86,7 @@ All files are in `plugins/VoiceWarden/`.
 | `wordlist.txt` | Your list of swear words and words that cause a mute. Wildcards such as `word*` are allowed. |
 | `rules.yml` | More advanced rules, such as phrases and an "always allowed" list. |
 | `recordings/` | Saved recordings used as evidence. Old ones are deleted automatically based on age and size. |
-| `data/voicewarden.db` | A SQLite database holding voice mutes (and their LuckPerms mirror records), offence counts for the mute ladder, and voice reports. Nothing extra needs installing. Offence counts are per server. If the file is unreadable, it is moved aside as `voicewarden.db.corrupt-<UUID>` and a fresh one is created. |
+| `data/voicewarden.db` | A SQLite database holding voice mutes (and their LuckPerms mirror records), offence counts for the mute ladder, voice reports, and each player's consent answer. Nothing extra needs installing. Offence counts are per server. If the file is unreadable, it is moved aside as `voicewarden.db.corrupt-<UUID>` and a fresh one is created. |
 | `models/` and `natives/` | The downloaded speech recognition files. |
 
 ## Updating

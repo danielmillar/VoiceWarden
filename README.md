@@ -26,6 +26,8 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 - **Staff tools.** In-game alerts show what was said, what was said just before, and where the player is, with a button
   to mute them. Alerts can also go to Discord with the recording attached.
 - **Player reports.** Players report each other with `/reportvoice`. Staff review reports and listen to the recording.
+- **Player consent.** By default, players are told on join that voice chat is moderated. Or ask each player to accept
+  in an in-game menu first: until they do, their voice is never processed.
 - **Light on the server.** Audio is processed in the background and should not slow your server down.
 
 ## Requirements
@@ -35,6 +37,8 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 - Optional: [LuckPerms](https://luckperms.net) (version 5.5 or newer). VoiceWarden enforces mutes itself, so it works
   without it. With LuckPerms, mutes also apply on other servers sharing your LuckPerms storage, and commands can find
   players who have never joined this server.
+- Optional: [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi), to show a player's voice mute on
+  scoreboards, tab lists, chat formats and holograms. See [Placeholders](#placeholders).
 - Linux, Windows or macOS.
 - About **3 GB of spare memory (RAM)** for the best-quality speech model, plus free disk space for the model
   (between about 400 MB and 1 GB, depending on which you choose).
@@ -76,7 +80,7 @@ The main command is `/voicewarden`, or `/vw` for short.
 | `/vw pardon <player> [reason]` | Undoes a wrong call in one step: removes the mute, clears the offence count and flags, and records the pardon. | `voicewarden.vcmute` |
 | `/vw mutes` | Lists everyone currently muted. | `voicewarden.vcmute` |
 | `/vw offenses <player> [reset]` | Shows a player's offence count, or resets it. | `voicewarden.vcmute` |
-| `/vw history <player> [page]` | Shows a player's voice record: offences, current mute, and past mutes, unmutes, expiries and pardons, newest first. | `voicewarden.vcmute` |
+| `/vw history <player> [page]` | Shows a player's voice record: offences, current mute, consent, and past mutes, unmutes, expiries and pardons, newest first. | `voicewarden.vcmute` |
 | `/vw transcript <player> [lines]` | Shows what a player recently said. | `voicewarden.report.review` |
 | `/vw alerts` | Turns your own in-game alerts on or off. | `voicewarden.alerts` |
 | `/viewreport <id or player> [minutes]` (`/vr`) | Opens a report, or a player's recent speech, as a book. | `voicewarden.report.review` |
@@ -92,11 +96,12 @@ The main command is `/voicewarden`, or `/vw` for short.
 | `/vw test <text>` | Checks some text against your rules, which is handy when editing word lists. | `voicewarden.admin` |
 | `/vw discordtest [all, flag, mute or report]` | Sends a test message to your Discord webhooks. | `voicewarden.admin` |
 
-### Command for players
+### Commands for players
 
 | Command | What it does | Permission |
 |---|---|---|
 | `/reportvoice <player> [minutes]` (`/rvoice`) | Reports a player's recent voice chat to staff, with a recording. | `voicewarden.report` (everyone by default) |
+| `/voiceconsent` | Shows your answer to voice moderation and, in `confirm` mode, opens the menu to change it. | `voicewarden.consent` (everyone by default) |
 
 ## Permissions
 
@@ -109,6 +114,19 @@ The main command is `/voicewarden`, or `/vw` for short.
 | `voicewarden.stats` | Operators | Using `/vw stats`. |
 | `voicewarden.vcmute` | Operators | Using `/vw vcmute`, `unvcmute`, `pardon`, `mutes`, `offenses` and `history`. |
 | `voicewarden.report` | Everyone | Using `/reportvoice`. |
+| `voicewarden.consent` | Everyone | Using `/voiceconsent`. |
+
+## Placeholders
+
+With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, VoiceWarden adds these:
+
+| Placeholder | Shows |
+|---|---|
+| `%voicewarden_muted%` | `true` or `false`. |
+| `%voicewarden_mute_remaining%` | Time left on the voice mute, such as `9m 47s`, or `permanent`. Empty when not muted. |
+| `%voicewarden_mute_reason%` | The mute's reason. Empty when not muted. |
+| `%voicewarden_offenses%` | The player's offence count on the mute ladder. |
+| `%voicewarden_next_mute%` | How long their next automatic mute would last, such as `15m`. |
 | `voicewarden.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/vw transcript`. |
 
 ## Troubleshooting

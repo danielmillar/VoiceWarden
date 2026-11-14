@@ -15,6 +15,10 @@ dependencies:
       load: BEFORE
       required: false
       join-classpath: true
+    PlaceholderAPI:
+      load: BEFORE
+      required: false
+      join-classpath: true
 permissions:
   voicewarden.admin:
     description: Full access to VoiceWarden commands (does not include bypass).
@@ -40,6 +44,9 @@ permissions:
   voicewarden.vcmute:
     description: Use /voicewarden vcmute, unvcmute, pardon, mutes, offenses and history.
     default: op
+  voicewarden.consent:
+    description: Use /voiceconsent to review or change voice moderation consent.
+    default: true
   voicewarden.report:
     description: Use /reportvoice to report a player's voice chat.
     default: true
