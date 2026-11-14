@@ -26,7 +26,7 @@ import java.util.logging.Logger;
  */
 public final class Database implements AutoCloseable {
 
-    static final int SCHEMA_VERSION = 1;
+    static final int SCHEMA_VERSION = 2;
     private static final int SQLITE_CORRUPT = 11;
     private static final int SQLITE_NOTADB = 26;
 
@@ -132,64 +132,107 @@ public final class Database implements AutoCloseable {
             throw new IllegalStateException("voicewarden.db was written by a newer VoiceWarden (schema " + version
                     + "); update VoiceWarden or restore an older database");
         }
-        if (version == SCHEMA_VERSION) {
-            return;
+        if (version < 1) {
+            inTransaction(connection, Database::createVersion1);
         }
-        inTransaction(connection, c -> {
-            try (Statement s = c.createStatement()) {
-                s.execute("""
-                        CREATE TABLE mutes (
-                            player_id   TEXT PRIMARY KEY,
-                            player_name TEXT NOT NULL,
-                            created_at  INTEGER NOT NULL,
-                            expires_at  INTEGER NOT NULL,
-                            reason      TEXT NOT NULL,
-                            actor       TEXT NOT NULL,
-                            automatic   INTEGER NOT NULL
-                        )""");
-                s.execute("""
-                        CREATE TABLE mute_mirrors (
-                            player_id         TEXT NOT NULL,
-                            position          INTEGER NOT NULL,
-                            speak_permission  TEXT NOT NULL,
-                            listen_permission TEXT NOT NULL,
-                            server_context    TEXT NOT NULL,
-                            PRIMARY KEY (player_id, position)
-                        )""");
-                s.execute("""
-                        CREATE TABLE offenses (
-                            player_id       TEXT PRIMARY KEY,
-                            count           INTEGER NOT NULL,
-                            last_offense_at INTEGER NOT NULL
-                        )""");
-                s.execute("""
-                        CREATE TABLE reports (
-                            id             TEXT PRIMARY KEY,
-                            created_at     TEXT NOT NULL,
-                            reporter_id    TEXT,
-                            reporter_name  TEXT NOT NULL,
-                            target_id      TEXT NOT NULL,
-                            target_name    TEXT NOT NULL,
-                            window_seconds INTEGER NOT NULL,
-                            reviewed       INTEGER NOT NULL,
-                            reviewer       TEXT,
-                            reviewed_at    TEXT
-                        )""");
-                s.execute("""
-                        CREATE TABLE report_lines (
-                            report_id TEXT NOT NULL,
-                            position  INTEGER NOT NULL,
-                            spoken_at TEXT NOT NULL,
-                            text      TEXT NOT NULL,
-                            PRIMARY KEY (report_id, position)
-                        )""");
-                s.execute("PRAGMA user_version = " + SCHEMA_VERSION);
-            }
-        });
+        if (version < 2) {
+            inTransaction(connection, Database::migrateToVersion2);
+        }
+    }
+
+    private static void createVersion1(Connection c) throws SQLException {
+        try (Statement s = c.createStatement()) {
+            s.execute("""
+                    CREATE TABLE mutes (
+                        player_id   TEXT PRIMARY KEY,
+                        player_name TEXT NOT NULL,
+                        created_at  INTEGER NOT NULL,
+                        expires_at  INTEGER NOT NULL,
+                        reason      TEXT NOT NULL,
+                        actor       TEXT NOT NULL,
+                        automatic   INTEGER NOT NULL
+                    )""");
+            s.execute("""
+                    CREATE TABLE mute_mirrors (
+                        player_id         TEXT NOT NULL,
+                        position          INTEGER NOT NULL,
+                        speak_permission  TEXT NOT NULL,
+                        listen_permission TEXT NOT NULL,
+                        server_context    TEXT NOT NULL,
+                        PRIMARY KEY (player_id, position)
+                    )""");
+            s.execute("""
+                    CREATE TABLE offenses (
+                        player_id       TEXT PRIMARY KEY,
+                        count           INTEGER NOT NULL,
+                        last_offense_at INTEGER NOT NULL
+                    )""");
+            s.execute("""
+                    CREATE TABLE reports (
+                        id             TEXT PRIMARY KEY,
+                        created_at     TEXT NOT NULL,
+                        reporter_id    TEXT,
+                        reporter_name  TEXT NOT NULL,
+                        target_id      TEXT NOT NULL,
+                        target_name    TEXT NOT NULL,
+                        window_seconds INTEGER NOT NULL,
+                        reviewed       INTEGER NOT NULL,
+                        reviewer       TEXT,
+                        reviewed_at    TEXT
+                    )""");
+            s.execute("""
+                    CREATE TABLE report_lines (
+                        report_id TEXT NOT NULL,
+                        position  INTEGER NOT NULL,
+                        spoken_at TEXT NOT NULL,
+                        text      TEXT NOT NULL,
+                        PRIMARY KEY (report_id, position)
+                    )""");
+            s.execute("PRAGMA user_version = 1");
+        }
+    }
+
+    /** Adds the mute history. Mutes active at upgrade get their {@code mute} event, so later lifts have a start. */
+    private static void migrateToVersion2(Connection c) throws SQLException {
+        try (Statement s = c.createStatement()) {
+            s.execute("""
+                    CREATE TABLE mute_events (
+                        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_id   TEXT NOT NULL,
+                        player_name TEXT NOT NULL,
+                        type        TEXT NOT NULL,
+                        at          INTEGER NOT NULL,
+                        actor       TEXT NOT NULL,
+                        reason      TEXT NOT NULL,
+                        expires_at  INTEGER,
+                        automatic   INTEGER NOT NULL
+                    )""");
+            s.execute("CREATE INDEX mute_events_by_player ON mute_events (player_id, id)");
+            s.execute("""
+                    INSERT INTO mute_events (player_id, player_name, type, at, actor, reason, expires_at, automatic)
+                    SELECT player_id, player_name, 'mute', created_at, actor, reason, expires_at, automatic
+                    FROM mutes ORDER BY created_at""");
+            s.execute("PRAGMA user_version = 2");
+        }
     }
 
     /** Runs a read on the database thread and waits for it. Use at startup, never on a hot path. */
     public <T> T read(Work<T> work) throws SQLException {
+        try {
+            return query(work).join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof SQLException sql) {
+                throw sql;
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Queues a read behind the writes submitted so far. Completes exceptionally with the {@link SQLException}, or when
+     * the database is closed.
+     */
+    public <T> CompletableFuture<T> query(Work<T> work) {
         try {
             return CompletableFuture.supplyAsync(() -> {
                 try {
@@ -197,12 +240,9 @@ public final class Database implements AutoCloseable {
                 } catch (SQLException e) {
                     throw new CompletionException(e);
                 }
-            }, thread).join();
-        } catch (CompletionException e) {
-            if (e.getCause() instanceof SQLException sql) {
-                throw sql;
-            }
-            throw e;
+            }, thread);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
         }
     }
 

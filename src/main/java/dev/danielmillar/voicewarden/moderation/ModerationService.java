@@ -207,6 +207,17 @@ public final class ModerationService {
         buffer.prune(Instant.now());
     }
 
+    /**
+     * Clears the player's offence count and flag window, under the same lock as {@link #onTranscript}, so an utterance
+     * being judged right now either counts before the reset or starts from zero. Completes once the count is written.
+     */
+    public java.util.concurrent.CompletableFuture<Void> forgive(UUID player) {
+        synchronized (stripes[Math.floorMod(player.hashCode(), stripes.length)]) {
+            flags.reset(player);
+            return offenses.reset(player);
+        }
+    }
+
     public OffenseTracker offenses() {
         return offenses;
     }

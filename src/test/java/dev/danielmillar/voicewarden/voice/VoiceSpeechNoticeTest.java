@@ -106,7 +106,7 @@ class VoiceSpeechNoticeTest {
     @Test void unmuteBeforeTheScheduledSendPreventsAStaleMuteNotice() {
         mutes.mute(id, "Alice", null, "reason", "staff", false).join();
         notice.onDeniedSpeech(player);
-        mutes.unmute(id).join();
+        mutes.unmute(id, "staff").join();
         canSpeak = true;
         drain();
         assertTrue(actionBars.isEmpty());

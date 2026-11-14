@@ -38,11 +38,11 @@ permissions:
     description: Use /voicewarden stats.
     default: op
   voicewarden.vcmute:
-    description: Use /voicewarden vcmute, unvcmute, mutes and offenses.
+    description: Use /voicewarden vcmute, unvcmute, pardon, mutes, offenses and history.
     default: op
   voicewarden.report:
     description: Use /reportvoice to report a player's voice chat.
     default: true
   voicewarden.report.review:
-    description: Receive voice report alerts and use /viewreport, /reportinbox and /voicewarden history.
+    description: Receive voice report alerts and use /viewreport, /reportinbox and /voicewarden transcript.
     default: op

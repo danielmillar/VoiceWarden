@@ -61,4 +61,57 @@ class DatabaseTest {
             assertTrue(files.noneMatch(p -> p.getFileName().toString().contains("corrupt")));
         }
     }
+
+    @Test void versionOneDatabaseIsMigratedInPlaceKeepingDataAndRecordingActiveMutes() throws Exception {
+        Path file = folder.resolve("data/voicewarden.db");
+        Files.createDirectories(file.getParent());
+        try (var v1 = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file); Statement s = v1.createStatement()) {
+            // The schema VoiceWarden 2.0 snapshots shipped as version 1.
+            s.execute("""
+                    CREATE TABLE mutes (player_id TEXT PRIMARY KEY, player_name TEXT NOT NULL, created_at INTEGER NOT NULL,
+                        expires_at INTEGER NOT NULL, reason TEXT NOT NULL, actor TEXT NOT NULL, automatic INTEGER NOT NULL)""");
+            s.execute("""
+                    CREATE TABLE mute_mirrors (player_id TEXT NOT NULL, position INTEGER NOT NULL,
+                        speak_permission TEXT NOT NULL, listen_permission TEXT NOT NULL, server_context TEXT NOT NULL,
+                        PRIMARY KEY (player_id, position))""");
+            s.execute("""
+                    CREATE TABLE offenses (player_id TEXT PRIMARY KEY, count INTEGER NOT NULL,
+                        last_offense_at INTEGER NOT NULL)""");
+            s.execute("""
+                    CREATE TABLE reports (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, reporter_id TEXT,
+                        reporter_name TEXT NOT NULL, target_id TEXT NOT NULL, target_name TEXT NOT NULL,
+                        window_seconds INTEGER NOT NULL, reviewed INTEGER NOT NULL, reviewer TEXT, reviewed_at TEXT)""");
+            s.execute("""
+                    CREATE TABLE report_lines (report_id TEXT NOT NULL, position INTEGER NOT NULL,
+                        spoken_at TEXT NOT NULL, text TEXT NOT NULL, PRIMARY KEY (report_id, position))""");
+            s.execute("INSERT INTO mutes VALUES ('00000000-0000-0000-0000-000000000001', 'Alice', 1000, 61000, 'spam', 'Mod', 0)");
+            s.execute("INSERT INTO offenses VALUES ('00000000-0000-0000-0000-000000000001', 3, 1000)");
+            s.execute("PRAGMA user_version = 1");
+        }
+        try (Database db = Database.open(file, Logger.getAnonymousLogger())) {
+            assertEquals(Database.SCHEMA_VERSION, (int) db.<Integer>read(c -> single(c, "PRAGMA user_version")));
+            assertEquals(1, (int) db.<Integer>read(c -> single(c, "SELECT COUNT(*) FROM mutes")));
+            assertEquals(3, (int) db.<Integer>read(c -> single(c, "SELECT count FROM offenses")));
+            assertEquals("mute|Alice|1000|Mod|spam|61000", db.read(c -> {
+                try (Statement s = c.createStatement(); var r = s.executeQuery(
+                        "SELECT type, player_name, at, actor, reason, expires_at FROM mute_events")) {
+                    assertTrue(r.next());
+                    String row = String.join("|", r.getString(1), r.getString(2), r.getString(3), r.getString(4),
+                            r.getString(5), r.getString(6));
+                    assertFalse(r.next());
+                    return row;
+                }
+            }));
+        }
+        try (Database reopened = Database.open(file, Logger.getAnonymousLogger())) {
+            assertEquals(1, (int) reopened.<Integer>read(c -> single(c, "SELECT COUNT(*) FROM mute_events")));
+        }
+    }
+
+    private static int single(java.sql.Connection c, String sql) throws java.sql.SQLException {
+        try (Statement s = c.createStatement(); var r = s.executeQuery(sql)) {
+            r.next();
+            return r.getInt(1);
+        }
+    }
 }

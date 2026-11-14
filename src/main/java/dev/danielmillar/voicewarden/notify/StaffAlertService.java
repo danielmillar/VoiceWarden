@@ -106,15 +106,15 @@ public final class StaffAlertService {
             return; // expiries are not interesting in chat
         }
         Messages m = messages.get();
-        Component line = action.type() == StaffAction.Type.MUTE
-                ? m.render("alert.staff-mute",
-                Messages.text("actor", action.actor()),
-                Messages.text("player", action.targetName()),
-                Messages.text("duration", Durations.format(action.duration())),
-                Messages.text("reason", action.reason() == null || action.reason().isBlank() ? "" : ": " + action.reason()))
-                : m.render("alert.staff-unmute",
-                Messages.text("actor", action.actor()),
-                Messages.text("player", action.targetName()));
+        var actor = Messages.text("actor", action.actor());
+        var player = Messages.text("player", action.targetName());
+        var reason = Messages.text("reason", action.reason() == null || action.reason().isBlank() ? "" : ": " + action.reason());
+        Component line = switch (action.type()) {
+            case MUTE -> m.render("alert.staff-mute", actor, player, reason,
+                    Messages.text("duration", Durations.format(action.duration())));
+            case UNMUTE -> m.render("alert.staff-unmute", actor, player);
+            case PARDON -> m.render("alert.staff-pardon", actor, player, reason);
+        };
         broadcast(line, ALERTS_PERMISSION);
     }
 

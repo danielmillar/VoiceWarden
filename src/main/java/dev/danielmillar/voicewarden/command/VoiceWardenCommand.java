@@ -5,6 +5,8 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import dev.danielmillar.voicewarden.VoiceWardenPlugin;
 import dev.danielmillar.voicewarden.config.Durations;
 import dev.danielmillar.voicewarden.config.Messages;
@@ -13,6 +15,7 @@ import dev.danielmillar.voicewarden.health.Metrics;
 import dev.danielmillar.voicewarden.moderation.StaffModerationService;
 import dev.danielmillar.voicewarden.moderation.TranscriptLine;
 import dev.danielmillar.voicewarden.moderation.rules.RuleMatch;
+import dev.danielmillar.voicewarden.mute.MuteEvent;
 import dev.danielmillar.voicewarden.mute.MuteService;
 import dev.danielmillar.voicewarden.notify.Formats;
 import dev.danielmillar.voicewarden.notify.StaffAlertService;
@@ -26,12 +29,16 @@ import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * {@code /voicewarden} (alias {@code /vw}). Permissions use the voicewarden namespace.
  * Executors only parse arguments; anything touching disk, LuckPerms or the network replies asynchronously.
  */
 final class VoiceWardenCommand {
+
+    private static final int HISTORY_PAGE_SIZE = 8;
 
     private final VoiceWardenPlugin plugin;
 
@@ -59,23 +66,32 @@ final class VoiceWardenCommand {
                                                 .executes(c -> vcmute(c, StringArgumentType.getString(c, "reason")))))))
                 .then(Commands.literal("unvcmute").requires(perm("voicewarden.vcmute"))
                         .then(Commands.argument("player", StringArgumentType.word())
-                                .suggests((c, b) -> {
-                                    plugin.mutes().active().forEach(m -> b.suggest(m.playerName()));
-                                    return b.buildFuture();
-                                })
+                                .suggests((c, b) -> suggestMuted(b))
                                 .executes(this::unvcmute)))
+                .then(Commands.literal("pardon").requires(perm("voicewarden.vcmute"))
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .suggests((c, b) -> suggestMutedAndOnline(b))
+                                .executes(c -> pardon(c, null))
+                                .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                        .executes(c -> pardon(c, StringArgumentType.getString(c, "reason"))))))
                 .then(Commands.literal("mutes").requires(perm("voicewarden.vcmute")).executes(this::mutes))
                 .then(Commands.literal("offenses").requires(perm("voicewarden.vcmute"))
                         .then(Commands.argument("player", StringArgumentType.word())
                                 .suggests((c, b) -> Targets.suggest(plugin, b))
                                 .executes(c -> offenses(c, false))
                                 .then(Commands.literal("reset").executes(c -> offenses(c, true)))))
-                .then(Commands.literal("history").requires(perm("voicewarden.report.review"))
+                .then(Commands.literal("history").requires(perm("voicewarden.vcmute"))
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .suggests((c, b) -> suggestMutedAndOnline(b))
+                                .executes(c -> history(c, 1))
+                                .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                                        .executes(c -> history(c, IntegerArgumentType.getInteger(c, "page"))))))
+                .then(Commands.literal("transcript").requires(perm("voicewarden.report.review"))
                         .then(Commands.argument("player", StringArgumentType.word())
                                 .suggests((c, b) -> Targets.suggest(plugin, b))
-                                .executes(c -> history(c, 10))
+                                .executes(c -> transcript(c, 10))
                                 .then(Commands.argument("lines", IntegerArgumentType.integer(1, 100))
-                                        .executes(c -> history(c, IntegerArgumentType.getInteger(c, "lines"))))))
+                                        .executes(c -> transcript(c, IntegerArgumentType.getInteger(c, "lines"))))))
                 .then(Commands.literal("test").requires(perm("voicewarden.admin"))
                         .then(Commands.argument("text", StringArgumentType.greedyString()).executes(this::test)))
                 .then(Commands.literal("discordtest").requires(perm("voicewarden.admin"))
@@ -159,7 +175,7 @@ final class VoiceWardenCommand {
         Targets.resolve(plugin, name).thenCompose(target -> {
             if (target.isEmpty()) {
                 sender.sendMessage(msg().render("command.player-not-found", Messages.text("name", name)));
-                return java.util.concurrent.CompletableFuture.completedFuture(null);
+                return CompletableFuture.completedFuture(null);
             }
             Targets.Target t = target.get();
             return plugin.staffModeration().mute(t.id(), t.name(), duration, why, sender.getName()).thenAccept(result -> {
@@ -177,15 +193,10 @@ final class VoiceWardenCommand {
     private int unvcmute(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String name = StringArgumentType.getString(ctx, "player");
-        MuteService.Mute local = plugin.mutes().active().stream()
-                .filter(m -> m.playerName().equalsIgnoreCase(name)).findFirst().orElse(null);
-        var resolved = local != null
-                ? java.util.concurrent.CompletableFuture.completedFuture(java.util.Optional.of(new Targets.Target(local.playerId(), local.playerName())))
-                : Targets.resolve(plugin, name);
-        resolved.thenCompose(target -> {
+        resolveMutedFirst(name).thenCompose(target -> {
             if (target.isEmpty()) {
                 sender.sendMessage(msg().render("command.player-not-found", Messages.text("name", name)));
-                return java.util.concurrent.CompletableFuture.completedFuture(null);
+                return CompletableFuture.completedFuture(null);
             }
             Targets.Target t = target.get();
             return plugin.staffModeration().unmute(t.id(), t.name(), sender.getName()).thenAccept(result ->
@@ -238,7 +249,81 @@ final class VoiceWardenCommand {
         return Command.SINGLE_SUCCESS;
     }
 
-    private int history(CommandContext<CommandSourceStack> ctx, int count) {
+    private int pardon(CommandContext<CommandSourceStack> ctx, @Nullable String reason) {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "player");
+        String why = reason == null ? "" : reason.strip();
+        resolveMutedFirst(name).thenCompose(target -> {
+            if (target.isEmpty()) {
+                sender.sendMessage(msg().render("command.player-not-found", Messages.text("name", name)));
+                return CompletableFuture.completedFuture(null);
+            }
+            Targets.Target t = target.get();
+            return plugin.staffModeration().pardon(t.id(), t.name(), sender.getName(), why).thenAccept(result ->
+                    sender.sendMessage(msg().render(result == StaffModerationService.Result.PARDONED
+                            ? "command.pardoned" : "command.pardoned-not-muted", Messages.text("player", t.name()))));
+        }).whenComplete((ignored, error) -> actionError(sender, error));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int history(CommandContext<CommandSourceStack> ctx, int page) {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "player");
+        resolveMutedFirst(name).thenCompose(target -> {
+            if (target.isEmpty()) {
+                sender.sendMessage(msg().render("command.player-not-found", Messages.text("name", name)));
+                return CompletableFuture.completedFuture(null);
+            }
+            Targets.Target t = target.get();
+            return plugin.mutes().history(t.id(), page, HISTORY_PAGE_SIZE).thenAccept(p -> showRecord(sender, t, p));
+        }).whenComplete((ignored, error) -> actionError(sender, error));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private void showRecord(CommandSender sender, Targets.Target target, MuteEvent.Page page) {
+        var player = Messages.text("player", target.name());
+        sender.sendMessage(msg().render("command.record-header", player));
+        if (page.page() == 1) {
+            PluginConfig.Moderation mod = plugin.config().moderation();
+            var offenses = plugin.moderation().offenses().lookup(target.id(), mod.ladder().resetAfterDays()).join();
+            sender.sendMessage(msg().render("command.record-offenses",
+                    Messages.text("count", Integer.toString(offenses.count())),
+                    Messages.text("next", Durations.format(mod.muteDurationFor(offenses.count() + 1)))));
+            plugin.mutes().get(target.id()).ifPresentOrElse(m -> sender.sendMessage(msg().render("command.record-muted",
+                            Messages.text("remaining", Durations.formatShort(m.remaining(System.currentTimeMillis()))),
+                            Messages.text("reason", m.reason()), Messages.text("actor", m.actor()))),
+                    () -> sender.sendMessage(msg().render("command.record-not-muted")));
+        }
+        if (page.events().isEmpty()) {
+            sender.sendMessage(msg().render(page.page() == 1 ? "command.record-empty" : "command.record-page-empty"));
+        }
+        for (MuteEvent event : page.events()) {
+            var time = Messages.text("time", Formats.dateTime(java.time.Instant.ofEpochMilli(event.at())));
+            var actor = Messages.text("actor", event.actor());
+            var reason = Messages.text("reason", event.reason().isBlank() ? "" : ": " + event.reason());
+            sender.sendMessage(switch (event.type()) {
+                case MUTE -> msg().render("command.record-mute", time, actor, reason,
+                        Messages.text("duration", Durations.format(event.duration())));
+                case UNMUTE -> msg().render("command.record-unmute", time, actor, reason);
+                case EXPIRE -> msg().render("command.record-expire", time);
+                case PARDON -> msg().render("command.record-pardon", time, actor, reason);
+            });
+        }
+        if (page.page() > 1 || page.more()) {
+            var literals = java.util.Map.of("player", target.name());
+            var newer = page.page() > 1 ? msg().renderWithLiterals("command.record-newer",
+                    java.util.Map.of("player", target.name(), "page", Integer.toString(page.page() - 1)))
+                    : net.kyori.adventure.text.Component.empty();
+            var older = page.more() ? msg().renderWithLiterals("command.record-older",
+                    java.util.Map.of("player", target.name(), "page", Integer.toString(page.page() + 1)))
+                    : net.kyori.adventure.text.Component.empty();
+            sender.sendMessage(msg().renderWithLiterals("command.record-footer", literals,
+                    Messages.text("page", Integer.toString(page.page())),
+                    Messages.component("newer", newer), Messages.component("older", older)));
+        }
+    }
+
+    private int transcript(CommandContext<CommandSourceStack> ctx, int count) {
         CommandSender sender = ctx.getSource().getSender();
         String name = StringArgumentType.getString(ctx, "player");
         Targets.resolve(plugin, name).thenAccept(target -> {
@@ -290,6 +375,30 @@ final class VoiceWardenCommand {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /** Muted players resolve by their stored name first, so offline players who were never cached still match. */
+    private CompletableFuture<Optional<Targets.Target>> resolveMutedFirst(String name) {
+        return plugin.mutes().active().stream()
+                .filter(m -> m.playerName().equalsIgnoreCase(name)).findFirst()
+                .map(m -> CompletableFuture.completedFuture(Optional.of(new Targets.Target(m.playerId(), m.playerName()))))
+                .orElseGet(() -> Targets.resolve(plugin, name));
+    }
+
+    private CompletableFuture<Suggestions> suggestMutedAndOnline(SuggestionsBuilder builder) {
+        String prefix = builder.getRemainingLowerCase();
+        var names = new java.util.TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+        plugin.mutes().active().forEach(m -> names.add(m.playerName()));
+        plugin.players().all().forEach(p -> names.add(p.getName()));
+        names.stream().filter(n -> n.toLowerCase(Locale.ROOT).startsWith(prefix)).forEach(builder::suggest);
+        return builder.buildFuture();
+    }
+
+    private CompletableFuture<Suggestions> suggestMuted(SuggestionsBuilder builder) {
+        String prefix = builder.getRemainingLowerCase();
+        plugin.mutes().active().stream().map(MuteService.Mute::playerName)
+                .filter(n -> n.toLowerCase(Locale.ROOT).startsWith(prefix)).forEach(builder::suggest);
+        return builder.buildFuture();
+    }
 
     private void actionError(CommandSender sender, Throwable error) {
         if (error != null) {
