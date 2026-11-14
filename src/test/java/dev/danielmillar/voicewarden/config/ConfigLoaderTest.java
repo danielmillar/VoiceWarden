@@ -47,6 +47,10 @@ class ConfigLoaderTest {
         assertEquals(new MuteScope(false, true, MuteScope.Groups.OPEN_ONLY, java.util.List.of("staff-appeal")), mute.scope());
         assertEquals(PluginConfig.MuteDisplay.BOSS_BAR, mute.display());
         assertEquals(Duration.ZERO, mute.reminderInterval());
+        java.nio.file.Files.writeString(file, "mute:\n  feedback:\n    display: off\n");
+        var loaded = ConfigLoader.load(folder, file);
+        assertEquals(PluginConfig.MuteDisplay.OFF, loaded.config().mute().display());
+        assertEquals(java.util.List.of(), loaded.warnings());
     }
 
     @Test void existingConfigUsesGainDefaultsAndExplicitOptOutIsRespected() throws Exception {

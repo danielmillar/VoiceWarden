@@ -210,6 +210,16 @@ class VoiceSpeechNoticeTest {
         assertEquals(2, repeating.size());
     }
 
+    @Test void respawnStartsAFreshStatusBecausePaperDropsTheOldTask() {
+        mutes.mute(id, "Alice", null, "reason", "staff", false).join();
+        notice.show(player);
+        notice.onRespawn(player);
+        assertEquals(2, repeating.size());
+        assertTrue(repeating.getFirst().cancelled);
+        tick();
+        assertTrue(text(actionBars).contains("permanent"));
+    }
+
     @Test void restoredPermissionBeforeTheScheduledSendPreventsAStaleNotice() {
         notice.onDeniedSpeech(player);
         canSpeak = true;

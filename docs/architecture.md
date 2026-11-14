@@ -23,7 +23,8 @@ in [configuration.md](configuration.md).
 `MicrophonePacketEvent` fires before SVC routes the audio. With no group it goes to proximity (or whisper range), in
 a normal or isolated group only to the group, and in an open group to both. `mute.blocks` is applied to that routing:
 the microphone packet is cancelled when every destination is blocked, and only an open group with one side allowed
-is filtered per receiver by the sound event's source. Audio that is not cancelled is transcribed and moderated.
+is filtered per receiver by the sound event's source. Audio that is not cancelled is transcribed; flagged speech
+from a muted player alerts staff as already muted, without adding an offence.
 
 Simple Voice Chat checks `voicechat.speak` before firing `MicrophonePacketEvent`, so a speak denial overrides any
 partial `mute.blocks`. The LuckPerms mirror therefore adds the speak node only while a mute blocks everything. For

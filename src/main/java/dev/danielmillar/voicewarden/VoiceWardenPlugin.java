@@ -183,7 +183,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         voicechat.registerPlugin(bridge);
 
         getServer().getPluginManager().registerEvents(new PlayerListener(players, this::config, this::messages,
-                speechNotice::show, id -> {
+                speechNotice::show, speechNotice::onRespawn, id -> {
             speechNotice.onDisconnect(id);
             ingest.onDisconnect(id);
         }), this);

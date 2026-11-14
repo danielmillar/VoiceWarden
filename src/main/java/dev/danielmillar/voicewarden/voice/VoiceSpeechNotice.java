@@ -183,9 +183,19 @@ public final class VoiceSpeechNotice implements AutoCloseable {
         }
     }
 
+    /** Paper drops the player's scheduled tasks when they respawn, so the status starts again. */
+    public void onRespawn(Player player) {
+        stopStatus(player.getUniqueId());
+        show(player);
+    }
+
     public void onDisconnect(UUID id) {
         lastNoPermission.remove(id);
         lastReminder.remove(id);
+        stopStatus(id);
+    }
+
+    private void stopStatus(UUID id) {
         Status status = statuses.remove(id);
         if (status != null && status.task != null) {
             status.task.cancel();

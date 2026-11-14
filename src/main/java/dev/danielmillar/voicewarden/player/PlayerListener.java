@@ -1,5 +1,6 @@
 package dev.danielmillar.voicewarden.player;
 
+import com.destroystokyo.paper.event.player.PlayerPostRespawnEvent;
 import dev.danielmillar.voicewarden.config.Messages;
 import dev.danielmillar.voicewarden.config.PluginConfig;
 import org.bukkit.entity.Player;
@@ -20,14 +21,16 @@ public final class PlayerListener implements Listener {
     private final Supplier<PluginConfig> config;
     private final Supplier<Messages> messages;
     private final Consumer<Player> onJoin;
+    private final Consumer<Player> onRespawn;
     private final Consumer<UUID> onQuit;
 
     public PlayerListener(OnlinePlayers players, Supplier<PluginConfig> config, Supplier<Messages> messages,
-                          Consumer<Player> onJoin, Consumer<UUID> onQuit) {
+                          Consumer<Player> onJoin, Consumer<Player> onRespawn, Consumer<UUID> onQuit) {
         this.players = players;
         this.config = config;
         this.messages = messages;
         this.onJoin = onJoin;
+        this.onRespawn = onRespawn;
         this.onQuit = onQuit;
     }
 
@@ -38,6 +41,11 @@ public final class PlayerListener implements Listener {
             event.getPlayer().sendMessage(messages.get().render("privacy-join"));
         }
         onJoin.accept(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRespawn(PlayerPostRespawnEvent event) {
+        onRespawn.accept(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

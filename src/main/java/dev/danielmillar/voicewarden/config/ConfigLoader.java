@@ -304,7 +304,8 @@ public final class ConfigLoader {
 
     /** Reads a lowercase, dash-separated enum name such as {@code open-only}. */
     private <E extends Enum<E>> E choice(YamlConfiguration c, String key, Class<E> type, E fallback) {
-        String raw = c.getString(key, name(fallback)).trim();
+        // YAML reads an unquoted "off" as false.
+        String raw = Boolean.FALSE.equals(c.get(key)) ? "off" : c.getString(key, name(fallback)).trim();
         try {
             return Enum.valueOf(type, raw.toUpperCase(Locale.ROOT).replace('-', '_'));
         } catch (IllegalArgumentException e) {
