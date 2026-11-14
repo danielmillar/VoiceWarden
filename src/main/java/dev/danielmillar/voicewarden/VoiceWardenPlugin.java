@@ -163,7 +163,8 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         OffenseTracker offenses = new OffenseTracker(database, getLogger());
         moderation = new ModerationService(this::config, this::messages, this::rules, transcriptBuffer,
                 offenses, mutes, alerts, discord, evidence,
-                new CustomCommandRunner(this, getLogger()), transcriptLog, players, metrics, getLogger());
+                new CustomCommandRunner(this, getLogger()), transcriptLog, players, metrics, getLogger(),
+                segment -> transcription.doubleCheck(segment));
         reportStore = new ReportStore(database, getLogger());
         reports = new ReportService(this::config, transcriptBuffer, reportStore, alerts, discord, evidence, executors.io(), getLogger());
 

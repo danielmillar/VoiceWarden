@@ -142,6 +142,7 @@ final class VoiceWardenCommand {
                 Messages.text("latency-p95", latency[1] < 0 ? "-" : latency[1] + "ms"),
                 Messages.text("rtf", String.format(Locale.ROOT, "%.1f", m.speedFactor())),
                 Messages.text("incidents", Long.toString(m.incidents.sum())),
+                Messages.text("unconfirmed", Long.toString(m.unconfirmed.sum())),
                 Messages.text("automutes", Long.toString(m.autoMutes.sum())),
                 Messages.text("mutes", Integer.toString(plugin.mutes().active().size())),
                 Messages.text("discord-sent", Long.toString(plugin.discord().sentCount())),

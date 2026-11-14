@@ -114,8 +114,31 @@ public final class ConfigLoader {
                         c.getString(p + "custom.encoder", ""),
                         c.getString(p + "custom.decoder", ""),
                         c.getString(p + "custom.joiner", ""),
-                        c.getString(p + "custom.tokens", ""))
+                        c.getString(p + "custom.tokens", "")),
+                doubleCheck(c)
         );
+    }
+
+    /** The second model is English only: with any other word list it would reject real hits. */
+    private boolean doubleCheck(YamlConfiguration c) {
+        if (!c.getBoolean("speech-to-text.double-check.enabled")) {
+            return false;
+        }
+        if (!languages(c).equals(Set.of("en"))) {
+            warnings.add("speech-to-text.double-check needs moderation.languages: [en]; the double check is off");
+            return false;
+        }
+        return true;
+    }
+
+    private static Set<String> languages(YamlConfiguration c) {
+        Set<String> languages = new LinkedHashSet<>();
+        for (String lang : c.getStringList("moderation.languages")) {
+            if (!lang.isBlank()) {
+                languages.add(lang.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        return Set.copyOf(languages);
     }
 
     private PluginConfig.Audio audio(YamlConfiguration c) {
@@ -154,12 +177,6 @@ public final class ConfigLoader {
         if (tiers.isEmpty()) {
             tiers.put(1, Duration.ofMinutes(5));
         }
-        Set<String> languages = new LinkedHashSet<>();
-        for (String lang : c.getStringList(p + "languages")) {
-            if (!lang.isBlank()) {
-                languages.add(lang.trim().toLowerCase(Locale.ROOT));
-            }
-        }
         return new PluginConfig.Moderation(
                 c.getBoolean(p + "dry-run"),
                 intIn(c, p + "flag-threshold", 1, 1_000),
@@ -172,7 +189,7 @@ public final class ConfigLoader {
                         duration(c, p + "mute-ladder.max-tier-duration", Duration.ofSeconds(1), Duration.ofDays(3650)),
                         intIn(c, p + "mute-ladder.reset-after-days", 0, 3650)),
                 intIn(c, p + "context-lines", 0, 50),
-                Set.copyOf(languages),
+                languages(c),
                 c.getStringList(p + "profanity-words"),
                 c.getStringList(p + "mute-words"));
     }

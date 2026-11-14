@@ -17,14 +17,20 @@ import dev.danielmillar.voicewarden.player.OnlinePlayers;
 import dev.danielmillar.voicewarden.stt.Transcript;
 import dev.danielmillar.voicewarden.voice.AudioIngestService;
 import org.bukkit.entity.Player;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,8 +44,21 @@ import java.util.logging.Logger;
  * <p>FLAG/profanity hits alert staff only. MUTE-list hits add flags; when
  * the flags inside {@code flag-window} reach {@code flag-threshold} the player is auto-muted for the ladder duration of
  * their offense number, otherwise they may be warned.
+ *
+ * <p>With {@code speech-to-text.double-check} on, a transcript with MUTE-list hits is decided only once the second
+ * model has heard the same clip, on its thread. Only MUTE rules both models heard add flags; if none did, staff are
+ * alerted and nobody is punished.
  */
 public final class ModerationService {
+
+    /** The double-check model: the text it hears in a clip, piece by piece. Never blocks. */
+    @FunctionalInterface
+    public interface SecondOpinion {
+        CompletableFuture<List<String>> transcribe(AudioSegment segment);
+    }
+
+    private record Verdict(Incident.DoubleCheck check, Set<String> confirmedRules) {
+    }
 
     private final Supplier<PluginConfig> config;
     private final Supplier<Messages> messages;
@@ -57,11 +76,14 @@ public final class ModerationService {
     private final OnlinePlayers players;
     private final Metrics metrics;
     private final Logger logger;
+    private final SecondOpinion secondOpinion;
+    private final AtomicLong lastCheckErrorLog = new AtomicLong();
 
     public ModerationService(Supplier<PluginConfig> config, Supplier<Messages> messages, Supplier<RuleEngine> rules,
                              TranscriptBuffer buffer, OffenseTracker offenses, MuteService mutes, StaffAlertService alerts,
                              DiscordWebhookService discord, EvidenceStore evidence, CustomCommandRunner commands,
-                             TranscriptLog transcriptLog, OnlinePlayers players, Metrics metrics, Logger logger) {
+                             TranscriptLog transcriptLog, OnlinePlayers players, Metrics metrics, Logger logger,
+                             SecondOpinion secondOpinion) {
         this.config = config;
         this.messages = messages;
         this.rules = rules;
@@ -76,6 +98,7 @@ public final class ModerationService {
         this.players = players;
         this.metrics = metrics;
         this.logger = logger;
+        this.secondOpinion = secondOpinion;
         for (int i = 0; i < stripes.length; i++) {
             stripes[i] = new Object();
         }
@@ -112,13 +135,66 @@ public final class ModerationService {
         if (matches.isEmpty()) {
             return;
         }
+        if (!cfg.speechToText().doubleCheck() || matches.stream().noneMatch(m -> m.action() == RuleAction.MUTE)) {
+            decide(cfg, segment, text, matches, context, null);
+            return;
+        }
+        // Never run inference under the per-player lock: decide when the second model answers, on its thread.
+        secondOpinion.transcribe(segment).whenComplete((heard, error) -> {
+            if (error instanceof CancellationException) {
+                return; // the engine stopped or the check was turned off before the second model heard it
+            }
+            try {
+                decide(config.get(), segment, text, matches, context, verdict(segment, matches, heard, error));
+            } catch (Throwable t) {
+                logger.log(Level.WARNING, "Moderation of a double-checked transcript failed", t);
+            }
+        });
+    }
 
+    /** A hit the second model could not hear, for whatever reason, is unconfirmed: never punish unchecked. */
+    private Verdict verdict(AudioSegment segment, List<RuleMatch> matches, @Nullable List<String> heard,
+                            @Nullable Throwable error) {
+        if (error != null || heard == null) {
+            Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+            long now = System.currentTimeMillis();
+            long last = lastCheckErrorLog.get();
+            if (now - last > 60_000 && lastCheckErrorLog.compareAndSet(last, now)) {
+                logger.log(Level.WARNING, "Could not double-check a hit from " + segment.playerName()
+                        + ", so it was not acted on (further errors suppressed for 60s)", cause);
+            }
+            return new Verdict(new Incident.DoubleCheck(false, null), Set.of());
+        }
+        RuleEngine engine = rules.get();
+        Set<String> heardRules = new HashSet<>();
+        for (String piece : heard) {
+            for (RuleMatch match : engine.match(piece)) {
+                if (match.action() == RuleAction.MUTE) {
+                    heardRules.add(match.ruleId());
+                }
+            }
+        }
+        Set<String> confirmed = new HashSet<>();
+        for (RuleMatch match : matches) {
+            if (match.action() == RuleAction.MUTE && heardRules.contains(match.ruleId())) {
+                confirmed.add(match.ruleId());
+            }
+        }
+        return new Verdict(new Incident.DoubleCheck(!confirmed.isEmpty(), String.join(" … ", heard)), confirmed);
+    }
+
+    private void decide(PluginConfig cfg, AudioSegment segment, String text, List<RuleMatch> matches,
+                        List<TranscriptLine> context, @Nullable Verdict verdict) {
+        UUID id = segment.playerId();
+        PluginConfig.Moderation mod = cfg.moderation();
+        Player online = players.get(id);
         int muteFlags = 0;
         for (RuleMatch match : matches) {
-            if (match.action() == RuleAction.MUTE) {
+            if (match.action() == RuleAction.MUTE && (verdict == null || verdict.confirmedRules().contains(match.ruleId()))) {
                 muteFlags += match.weight();
             }
         }
+        boolean unconfirmed = verdict != null && !verdict.check().confirmed();
         boolean dryRun = mod.dryRun();
         boolean alreadyMuted = false;
         ModerationAction action = ModerationAction.NONE;
@@ -148,12 +224,18 @@ public final class ModerationService {
             }
             incident = new Incident(UUID.randomUUID(), Instant.now(), segment.spokenAt(), segment.duration(), id,
                     segment.playerName(), text, matches, muteFlags, inWindow, mod.flagThreshold(), action, offense,
-                    dryRun, context, segment.location(), segment.pcm(), segment.sampleRate());
-            if (!dryRun && !alreadyMuted) {
+                    dryRun, context, segment.location(), segment.pcm(), segment.sampleRate(),
+                    verdict == null ? null : verdict.check());
+            if (!dryRun && !alreadyMuted && !unconfirmed) {
                 apply(cfg, incident, online); // the local mute is in place before the lock is released
             }
         }
         metrics.incidents.increment();
+        if (unconfirmed) {
+            metrics.unconfirmed.increment();
+            logger.info("Double check did not confirm " + segment.playerName() + "'s hit, no action taken: \""
+                    + text + "\", second model: " + verdict.check().describe() + " #" + incident.shortId());
+        }
         alerts.incident(incident, alreadyMuted);
         discord.submitIncident(incident);
         if (cfg.recordings().mode() != EvidenceSettings.Mode.NONE) {

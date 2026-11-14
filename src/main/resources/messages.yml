@@ -23,6 +23,9 @@ alert:
   warn: "<prefix><accent><player></accent> was warned <dark_gray>(<muted><flags>/<threshold></muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted> <dark_gray>[<muted><categories></muted>]</dark_gray>"
   mute: "<prefix><error><player></error> was auto-muted for <error><duration></error> <dark_gray>(<muted>offense #<offense></muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted>"
   already-muted: "<prefix><accent><player></accent> <dark_gray>(<muted>already muted</muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted>"
+  # A MUTE-list hit the double-check model did not hear, so nobody was punished.
+  # <heard> = what the second model heard: the quoted text, "nothing" or "could not run"
+  unconfirmed: "<prefix><accent><player></accent> <dark_gray>(<muted>unconfirmed, no action</muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted> <dark_gray>[<muted>second model heard <heard></muted>]</dark_gray>"
   dry-run-suffix: " <dark_gray><italic>(dry run, not applied)</italic></dark_gray>"
   # Hover text on alerts. <context> = earlier lines, <location> = world x, y, z, <click-hint> = click-mute or click-pardon
   hover: "<accent>Incident <id></accent>\n<muted>Flags: <body><flags>/<threshold></body>\nLocation: <body><location></body></muted>\n<context>\n\n<click-hint>"
@@ -103,7 +106,7 @@ stats:
   - " <dark_gray>▪</dark_gray> <muted>Active speakers <accent><speakers></accent> <dark_gray>•</dark_gray> Queue <accent><queue></accent> <dark_gray>•</dark_gray> Workers <accent><workers></accent>"
   - " <dark_gray>▪</dark_gray> <muted>Utterances <accent><transcribed></accent> transcribed, <accent><no-speech></accent> no speech, <accent><dropped></accent> dropped"
   - " <dark_gray>▪</dark_gray> <muted>Latency <accent><latency-avg></accent> avg, <accent><latency-p95></accent> p95 <dark_gray>•</dark_gray> Speed <accent><rtf>×</accent> real time"
-  - " <dark_gray>▪</dark_gray> <muted>Incidents <accent><incidents></accent> <dark_gray>•</dark_gray> Auto-mutes <accent><automutes></accent> <dark_gray>•</dark_gray> Active mutes <accent><mutes></accent>"
+  - " <dark_gray>▪</dark_gray> <muted>Incidents <accent><incidents></accent> <dark_gray>(<muted><unconfirmed> unconfirmed</muted>)</dark_gray> <dark_gray>•</dark_gray> Auto-mutes <accent><automutes></accent> <dark_gray>•</dark_gray> Active mutes <accent><mutes></accent>"
   - " <dark_gray>▪</dark_gray> <muted>Discord <accent><discord-sent></accent> sent, <accent><discord-queue></accent> queued, <accent><discord-failed></accent> failed"
 
 report:

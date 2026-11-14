@@ -391,6 +391,6 @@ public final class DiscordWebhookService implements AutoCloseable {
         return new Incident(UUID.randomUUID(), now, now.minusMillis(100), Duration.ofMillis(100), player, "SamplePlayer", text,
                 List.of(new RuleMatch("sample", "Sample rule", RuleAction.MUTE, 1, "badword", start, start + 7)), 1, mute ? 3 : 1, 3,
                 mute ? ModerationAction.mute(Duration.ofMinutes(15)) : ModerationAction.NONE, mute ? 1 : 0, true,
-                List.of(new TranscriptLine(now.minusSeconds(12), "Sample preceding voice context.")), new SpeakerLocation("world", 12, 64, 34), audio, 16_000);
+                List.of(new TranscriptLine(now.minusSeconds(12), "Sample preceding voice context.")), new SpeakerLocation("world", 12, 64, 34), audio, 16_000, null);
     }
 }

@@ -1,6 +1,7 @@
 package dev.danielmillar.voicewarden.stt;
 
 import com.k2fsa.sherpa.onnx.OfflineModelConfig;
+import com.k2fsa.sherpa.onnx.OfflineMoonshineModelConfig;
 import com.k2fsa.sherpa.onnx.OfflineRecognizer;
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig;
 import com.k2fsa.sherpa.onnx.OfflineStream;
@@ -63,6 +64,11 @@ public final class SherpaOnnxEngine implements AutoCloseable {
                     .setDecoder(model.decoder().toString())
                     .setLanguage("en")
                     .setTask("transcribe")
+                    .build());
+        } else if (model.modelType().equals("moonshine")) {
+            builder.setMoonshine(OfflineMoonshineModelConfig.builder()
+                    .setEncoder(model.encoder().toString())
+                    .setMergedDecoder(model.decoder().toString())
                     .build());
         } else {
             builder.setTransducer(OfflineTransducerModelConfig.builder()

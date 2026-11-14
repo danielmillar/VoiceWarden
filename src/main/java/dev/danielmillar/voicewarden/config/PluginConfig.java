@@ -34,6 +34,8 @@ public record PluginConfig(
      *
      * @param model             preset id ({@code parakeet-tdt-v2}, {@code parakeet-tdt-v3}, {@code whisper-small-en}, {@code whisper-turbo}) or {@code custom}
      * @param nativeLibraryPath directory containing sherpa-onnx native libraries; empty = download automatically
+     * @param doubleCheck       a second model must confirm MUTE-rule hits; already false unless the configured
+     *                          languages are exactly English, so changing them rebuilds the engine
      */
     public record SpeechToText(
             String model,
@@ -47,7 +49,8 @@ public record PluginConfig(
             Duration queueMaxAge,
             InputGain inputGain,
             Vad vad,
-            CustomModel custom
+            CustomModel custom,
+            boolean doubleCheck
     ) {
     }
 

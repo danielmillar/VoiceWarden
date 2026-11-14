@@ -20,6 +20,8 @@ public final class Metrics {
     public final LongAdder incidents = new LongAdder();
     public final LongAdder autoMutes = new LongAdder();
     public final LongAdder warnings = new LongAdder();
+    /** MUTE-list hits the double-check model did not confirm, so nobody was punished. */
+    public final LongAdder unconfirmed = new LongAdder();
     /** Audio duration that went through the recogniser, in milliseconds. */
     public final LongAdder audioMillis = new LongAdder();
     /** Wall time spent inside the recogniser, in milliseconds. */

@@ -3,6 +3,8 @@ package dev.danielmillar.voicewarden.evidence;
 import com.google.gson.*;
 import dev.danielmillar.voicewarden.TestFixtures;
 import dev.danielmillar.voicewarden.audio.WavEncoder;
+import dev.danielmillar.voicewarden.moderation.Incident;
+import dev.danielmillar.voicewarden.testutil.Fakes;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,11 +46,12 @@ class EvidenceStoreTest {
     @AfterEach void stop() { executor.shutdownNow(); }
 
     @Test void incidentContainsEveryMetadataFieldAndMatchingWav() throws Exception {
-        var incident = TestFixtures.incident();
+        var incident = Fakes.with(TestFixtures.incident(), "doubleCheck", new Incident.DoubleCheck(false, "bad weather"));
         Path json = store.saveIncident(incident).get(3, TimeUnit.SECONDS);
         assertEquals(directory.resolve("2026-10-03/123456_Alex___incident_abcdef01.json"), json);
         JsonObject metadata = read(json);
-        assertEquals(19, metadata.size()); // 17 non-audio record fields + schema + audioFile
+        assertEquals(20, metadata.size()); // 18 non-audio record fields + schema + audioFile
+        assertFalse(metadata.getAsJsonObject("doubleCheck").get("confirmed").getAsBoolean());
         assertEquals(1, metadata.get("schema").getAsInt());
         assertEquals(incident.detectedAt().toString(), metadata.get("detectedAt").getAsString());
         assertEquals("PT0.5S", metadata.get("audioDuration").getAsString());

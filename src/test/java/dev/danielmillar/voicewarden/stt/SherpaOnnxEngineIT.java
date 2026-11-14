@@ -100,7 +100,7 @@ class SherpaOnnxEngineIT {
                 false, "", 2, 2, 4, 100, 6, Duration.ofSeconds(30),
                 new PluginConfig.InputGain(true, -20, 40),
                 new PluginConfig.Vad(true, 0.5f, Duration.ofMillis(100), Duration.ofMillis(300), Duration.ofMillis(250), false),
-                new PluginConfig.CustomModel("nemo_transducer", "", "", "", ""));
+                new PluginConfig.CustomModel("nemo_transducer", "", "", "", ""), false);
     }
 
     @Test
