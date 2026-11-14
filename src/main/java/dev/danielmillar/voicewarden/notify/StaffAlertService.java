@@ -65,7 +65,8 @@ public final class StaffAlertService {
     public void incident(Incident incident, boolean alreadyMuted) {
         PluginConfig cfg = config.get();
         Messages m = messages.get();
-        String key = alreadyMuted ? "alert.already-muted" : switch (incident.action().type()) {
+        boolean unconfirmed = incident.doubleCheck() != null && !incident.doubleCheck().confirmed();
+        String key = unconfirmed ? "alert.unconfirmed" : alreadyMuted ? "alert.already-muted" : switch (incident.action().type()) {
             case NONE -> "alert.flag";
             case WARN -> "alert.warn";
             case MUTE -> "alert.mute";
@@ -79,7 +80,8 @@ public final class StaffAlertService {
                 Messages.text("offense", Integer.toString(incident.offense())),
                 Messages.text("flags", Integer.toString(incident.flagsInWindow())),
                 Messages.text("threshold", Integer.toString(incident.flagThreshold())),
-                Messages.text("id", incident.shortId()));
+                Messages.text("id", incident.shortId()),
+                Messages.text("heard", incident.doubleCheck() == null ? "" : incident.doubleCheck().describe()));
         if (incident.dryRun() && incident.action().type() != ActionType.NONE) {
             line = line.append(m.render("alert.dry-run-suffix"));
         }
@@ -96,7 +98,7 @@ public final class StaffAlertService {
             broadcast(line, ALERTS_PERMISSION);
         }
         if (cfg.alerts().console()) {
-            logger.info("[" + incident.action().type() + (incident.dryRun() ? " dry-run" : "") + "] "
+            logger.info("[" + (unconfirmed ? "UNCONFIRMED" : incident.action().type()) + (incident.dryRun() ? " dry-run" : "") + "] "
                     + incident.playerName() + ": \"" + incident.transcript() + "\" [" + categories + "] #" + incident.shortId());
         }
     }

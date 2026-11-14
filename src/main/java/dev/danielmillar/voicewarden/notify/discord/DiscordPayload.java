@@ -88,22 +88,28 @@ final class DiscordPayload {
 
     private static Embed incident(Incident incident, DiscordSettings settings, WebhookSettings webhook) {
         ActionType type = incident.action().type();
-        String action = switch (type) {
+        Incident.DoubleCheck check = incident.doubleCheck();
+        boolean unconfirmed = check != null && !check.confirmed();
+        String action = unconfirmed ? "Not confirmed by the double check, no action taken" : switch (type) {
             case NONE -> "Flagged";
             case WARN -> "Warned";
             case MUTE -> "Muted for " + DiscordText.duration(incident.action().duration()) + " (offense #" + incident.offense() + ")";
         };
-        String title = switch (type) {
+        String title = unconfirmed ? "Voice flag (unconfirmed): {player}" : switch (type) {
             case NONE -> "Voice flag: {player}";
             case WARN -> "Voice warning: {player}";
             case MUTE -> "Voice auto-mute: {player}";
         };
-        int color = switch (type) { case NONE -> 0xF1C40F; case WARN -> 0xE67E22; case MUTE -> 0xE74C3C; };
+        int color = unconfirmed ? 0x95A5A6 : switch (type) { case NONE -> 0xF1C40F; case WARN -> 0xE67E22; case MUTE -> 0xE74C3C; };
         Embed embed = base(settings, webhook, title, color, incident.playerName(), action,
                 incident.action().duration(), incident.shortId(), incident.detectedAt());
         embed.field("Player", player(incident.playerName(), incident.playerId()));
         embed.field("Action", DiscordText.plain(action + (incident.dryRun() ? " — dry run, not applied" : "")));
         embed.field("Flags", DiscordText.plain(incident.flagsInWindow() + " / " + incident.flagThreshold() + " in window"));
+        if (check != null) {
+            embed.field("Double check", DiscordText.plain((check.confirmed() ? "Confirmed" : "Not confirmed")
+                    + ". Second model heard: " + check.describe()));
+        }
         Map<String, Set<String>> matched = new LinkedHashMap<>();
         for (RuleMatch match : incident.matches()) {
             matched.computeIfAbsent(match.category(), ignored -> new LinkedHashSet<>()).add(match.matchedText());

@@ -33,6 +33,11 @@ To replay recorded speech through an installed model:
 Use your platform's native-library directory in place of `osx-aarch64`, and 16 kHz mono PCM WAVs. Use
 `-PsherpaModel=whisper-small-en` for Small, or omit it for Parakeet.
 
+`DoubleCheckIT` runs Parakeet and the double-check model together through `TranscriptionService`. It needs
+`parakeet-tdt-v2/` and `silero_vad.onnx` in the models directory, plus `wavs/0.wav` and `wavs/1.wav` from the
+`test_wavs` folder of sherpa-onnx's Moonshine model. It downloads any missing or outdated pinned model files into that
+directory.
+
 Audio fixtures and recordings are supplied locally and are not included in the repository. Audio files are ignored
 by Git, and CI rejects tracked files covered by `.gitignore`.
 

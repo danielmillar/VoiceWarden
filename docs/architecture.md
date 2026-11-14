@@ -42,6 +42,11 @@ SVC packet thread ── O(1) ──▶ per-player lock-free inbox ──▶ dec
 - Per-player backlog, the transcription queue, the Discord queue and the audio memory budget are all bounded. Under
   overload, audio is skipped and counted in `/vw stats`.
 - Extra workers share one model but need additional working memory. Start with one worker and measure.
+- `speech-to-text.double-check` adds a second model with one thread and its own bounded queue, fed only MUTE-rule
+  hits, so it never delays or reorders normal transcription. Those hits are decided on that thread once it answers;
+  no lock is held while it listens. A hit it can't check (queue full, an error) is unconfirmed, never punished
+  unchecked: otherwise flooding the queue would turn the check off. Moonshine v2 returns no text for clips of 10 s or
+  more, so longer utterances are heard in overlapping 9 s pieces.
 - Measured on an Apple M-series CPU with `cpu-threads: 2`, Parakeet transcribes a 3.6 s sentence in about 190 ms after
   the speaker stops, and Whisper Small a 2.86 s clip in about 500 ms. One Parakeet worker with 2 threads covers roughly
   6-8 people talking at the same moment. These are single-machine measurements, not an accuracy guarantee.

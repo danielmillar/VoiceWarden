@@ -24,7 +24,7 @@ public final class TestFixtures {
         return new Incident(ID, TIME, TIME.minusSeconds(2), Duration.ofMillis(500), PLAYER, name, transcript, matches,
                 1, 2, 3, action, action.type() == ActionType.MUTE ? 2 : 0, true,
                 List.of(new TranscriptLine(TIME.minusSeconds(14), "prior *line* @here")),
-                new SpeakerLocation("world", -0.5, 64.9, 12.5), audio, 16_000);
+                new SpeakerLocation("world", -0.5, 64.9, 12.5), audio, 16_000, null);
     }
 
     public static VoiceReport report() {

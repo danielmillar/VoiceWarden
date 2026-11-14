@@ -8,9 +8,12 @@ import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,10 +37,24 @@ import java.util.logging.Logger;
  * </ul>
  * On reload the new engine is fully loaded before the old one is retired, so transcription never pauses; queued
  * utterances survive the swap.
+ *
+ * <p>With {@code double-check} on, each runtime also loads a second model and one checker thread that only hears
+ * clips moderation sends to {@link #doubleCheck}. It has its own bounded queue, so it never delays or reorders
+ * normal transcription.
  */
 public final class TranscriptionService implements AutoCloseable {
 
     public enum State { STOPPED, PREPARING, LOADING, READY, FAILED }
+
+    /** Hits waiting for the second model. Each is one utterance, so this bounds both memory and the backlog. */
+    private static final int CHECK_QUEUE = 32;
+    /** Moonshine v2 returns nothing for clips of 10 s or more: longer clips are heard in overlapping pieces. */
+    static final int CHECK_CLIP_SAMPLES = 9 * SherpaOnnxEngine.SAMPLE_RATE;
+    /** A word or phrase up to this long is heard whole in at least one piece. */
+    static final int CHECK_OVERLAP_SAMPLES = 3 * SherpaOnnxEngine.SAMPLE_RATE;
+
+    private record Check(AudioSegment segment, CompletableFuture<List<String>> result) {
+    }
 
     private final Path dataFolder;
     private final Downloader downloader;
@@ -48,6 +65,7 @@ public final class TranscriptionService implements AutoCloseable {
     private final Consumer<Transcript> sink;
     private final Consumer<Boolean> readyListener;
     private final SegmentQueue queue = new SegmentQueue();
+    private final LinkedBlockingQueue<Check> checks = new LinkedBlockingQueue<>(CHECK_QUEUE);
     private final Object loadLock = new Object();
     private final Object swapLock = new Object();
     private final AtomicLong lastErrorLog = new AtomicLong();
@@ -87,6 +105,7 @@ public final class TranscriptionService implements AutoCloseable {
     private void load(PluginConfig.SpeechToText settings) {
         boolean reloading = hasRuntime();
         SherpaOnnxEngine engine = null;
+        SherpaOnnxEngine checker = null;
         try {
             if (!reloading) {
                 setState(State.PREPARING, "checking model files");
@@ -94,16 +113,22 @@ public final class TranscriptionService implements AutoCloseable {
             Path natives = NativeLibraries.ensure(dataFolder, settings.nativeLibraryPath(), settings.autoDownload(), downloader, logger);
             NativeLibraries.use(natives);
             ModelManager.ResolvedModel model = ModelManager.resolve(settings, dataFolder, downloader);
+            ModelManager.ResolvedModel second = settings.doubleCheck()
+                    ? ModelManager.resolveDoubleCheck(settings, dataFolder, downloader) : null;
             if (!reloading) {
                 setState(State.LOADING, "loading " + model.description());
             }
             long t0 = System.nanoTime();
             engine = SherpaOnnxEngine.load(model, settings);
+            if (second != null) {
+                checker = SherpaOnnxEngine.load(second, settings);
+            }
             long loadMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
 
-            Runtime next = new Runtime(engine, settings);
+            Runtime next = new Runtime(engine, checker, settings);
             Runtime previous;
             boolean publish;
+            List<Check> orphaned = List.of();
             synchronized (swapLock) {
                 publish = !closed;
                 previous = runtime;
@@ -111,11 +136,18 @@ public final class TranscriptionService implements AutoCloseable {
                     liveRuntimes.add(next);
                     next.start();
                     runtime = next;
-                    workerCount = next.threads.size();
+                    workerCount = settings.workers();
+                    if (checker == null) {
+                        orphaned = drainChecks();
+                    }
                 }
             }
+            cancel(orphaned);
             if (!publish) {
                 engine.close();
+                if (checker != null) {
+                    checker.close();
+                }
                 return;
             }
             if (previous != null) {
@@ -125,26 +157,32 @@ public final class TranscriptionService implements AutoCloseable {
             readyListener.accept(true);
             logger.info("Speech engine ready: " + model.description() + " (" + settings.workers() + " worker(s), "
                     + settings.cpuThreads() + " CPU thread(s), VAD " + (model.vad() != null ? "on" : "off")
+                    + (second != null ? ", double check by " + second.description() : "")
                     + ", loaded in " + loadMillis + " ms)");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            fail("interrupted", e, engine);
+            fail("interrupted", e, engine, checker);
         } catch (UnsatisfiedLinkError e) {
             fail("native libraries could not be loaded (" + e.getMessage() + "). If you reloaded the plugin with a "
-                    + "plugin manager, restart the server instead", e, engine);
+                    + "plugin manager, restart the server instead", e, engine, checker);
         } catch (Throwable e) {
-            fail(e.getMessage() == null ? e.toString() : e.getMessage(), e, engine);
+            fail(e.getMessage() == null ? e.toString() : e.getMessage(), e, engine, checker);
         }
     }
 
-    /** {@code engine} is only non-null here if it was never published to a runtime. */
-    private void fail(String reason, Throwable error, @Nullable SherpaOnnxEngine engine) {
+    /** The engines are only closed here if they were never published to a runtime. */
+    private void fail(String reason, Throwable error, @Nullable SherpaOnnxEngine engine, @Nullable SherpaOnnxEngine checker) {
         boolean published;
         synchronized (swapLock) {
             published = runtime != null && runtime.engine == engine;
         }
-        if (engine != null && !published) {
-            engine.close();
+        if (!published) {
+            if (engine != null) {
+                engine.close();
+            }
+            if (checker != null) {
+                checker.close();
+            }
         }
         if (closed) {
             return;
@@ -182,6 +220,50 @@ public final class TranscriptionService implements AutoCloseable {
                 logger.warning("Speech-to-text is falling behind: dropped " + dropped + " queued utterance(s). "
                         + "Consider more speech-to-text.workers / cpu-threads, or check CPU load. (logged at most once a minute)");
             }
+        }
+    }
+
+    /**
+     * Transcribes a clip with the double-check model, as the text of each piece it was heard in (empty when it heard
+     * no words). Fails when the model is not loaded or too many hits are already waiting, and is cancelled if the
+     * engine stops or the check is turned off first. Never blocks.
+     */
+    public CompletableFuture<List<String>> doubleCheck(AudioSegment segment) {
+        CompletableFuture<List<String>> result = new CompletableFuture<>();
+        synchronized (swapLock) {
+            if (runtime == null || runtime.checker == null) {
+                result.completeExceptionally(new IllegalStateException("the double-check model is not loaded"));
+            } else if (!checks.offer(new Check(segment, result))) {
+                result.completeExceptionally(new IllegalStateException(
+                        CHECK_QUEUE + " hits are already waiting for a double check"));
+            }
+        }
+        return result;
+    }
+
+    /** Overlapping {@code [from, to)} sample ranges of an utterance that the second model can hear whole. */
+    static List<int[]> checkClips(int samples) {
+        List<int[]> clips = new ArrayList<>();
+        for (int from = 0; ; from += CHECK_CLIP_SAMPLES - CHECK_OVERLAP_SAMPLES) {
+            int to = Math.min(samples, from + CHECK_CLIP_SAMPLES);
+            clips.add(new int[]{from, to});
+            if (to == samples) {
+                return clips;
+            }
+        }
+    }
+
+    /** Caller holds swapLock; complete the returned checks after releasing it. */
+    private List<Check> drainChecks() {
+        List<Check> drained = new ArrayList<>();
+        checks.drainTo(drained);
+        return drained;
+    }
+
+    /** Hits nobody will hear: shutdown, or a reload that turned the check off. Cancelled means dropped, not unconfirmed. */
+    private static void cancel(List<Check> drained) {
+        for (Check check : drained) {
+            check.result.cancel(false);
         }
     }
 
@@ -226,14 +308,17 @@ public final class TranscriptionService implements AutoCloseable {
     public CompletableFuture<Void> closeAsync() {
         Runtime r;
         CompletableFuture<Void> stopped;
+        List<Check> orphaned;
         synchronized (swapLock) {
             closed = true;
             r = runtime;
             runtime = null;
             workerCount = 0;
+            orphaned = drainChecks();
             stopped = CompletableFuture.allOf(liveRuntimes.stream().map(live -> live.stopped)
                     .toArray(CompletableFuture[]::new));
         }
+        cancel(orphaned);
         readyListener.accept(false);
         if (r != null) {
             r.retire();
@@ -245,14 +330,16 @@ public final class TranscriptionService implements AutoCloseable {
     /** One loaded engine and its worker threads. */
     private final class Runtime {
         final SherpaOnnxEngine engine;
+        final @Nullable SherpaOnnxEngine checker;
         final PluginConfig.SpeechToText settings;
         final List<Thread> threads = new ArrayList<>();
         final CompletableFuture<Void> stopped = new CompletableFuture<>();
         final AtomicBoolean retired = new AtomicBoolean();
         volatile boolean running = true;
 
-        Runtime(SherpaOnnxEngine engine, PluginConfig.SpeechToText settings) {
+        Runtime(SherpaOnnxEngine engine, @Nullable SherpaOnnxEngine checker, PluginConfig.SpeechToText settings) {
             this.engine = engine;
+            this.checker = checker;
             this.settings = settings;
         }
 
@@ -262,6 +349,10 @@ public final class TranscriptionService implements AutoCloseable {
             for (int i = 0; i < settings.workers(); i++) {
                 Thread t = factory.newThread(this::workerLoop);
                 threads.add(t);
+            }
+            if (checker != null) {
+                threads.add(PluginExecutors.platform("VoiceWarden-STT-Check", Thread.NORM_PRIORITY - 1)
+                        .newThread(this::checkLoop));
             }
             threads.forEach(Thread::start);
         }
@@ -279,6 +370,43 @@ public final class TranscriptionService implements AutoCloseable {
                 // retired
             } catch (Throwable t) {
                 logger.log(Level.SEVERE, "Speech-to-text worker crashed", t);
+            }
+        }
+
+        /** Leaves unclaimed checks queued for the next runtime; a reload that turns the check off fails them. */
+        private void checkLoop() {
+            try (SherpaOnnxEngine.Worker worker = Objects.requireNonNull(checker).newWorker()) {
+                while (running) {
+                    Check check = checks.poll(250, TimeUnit.MILLISECONDS);
+                    if (check != null) {
+                        runCheck(worker, check);
+                    }
+                }
+            } catch (InterruptedException e) {
+                // retired
+            } catch (Throwable t) {
+                logger.log(Level.SEVERE, "Double-check worker crashed", t);
+            }
+        }
+
+        private void runCheck(SherpaOnnxEngine.Worker worker, Check check) {
+            AudioSegment segment = check.segment();
+            try {
+                List<AudioSegment> clips = new ArrayList<>();
+                for (int[] range : checkClips(segment.pcm().length)) {
+                    short[] pcm = Arrays.copyOfRange(segment.pcm(), range[0], range[1]);
+                    clips.add(new AudioSegment(segment.playerId(), segment.playerName(), pcm, segment.sampleRate(),
+                            segment.spokenAt(), segment.endedAtNanos(), segment.location(), segment.whispering()));
+                }
+                List<String> texts = new ArrayList<>();
+                for (SherpaOnnxEngine.Result result : worker.transcribe(clips)) {
+                    if (result.text() != null && !result.text().isEmpty()) {
+                        texts.add(result.text());
+                    }
+                }
+                check.result().complete(List.copyOf(texts));
+            } catch (Throwable t) {
+                check.result().completeExceptionally(t);
             }
         }
 
@@ -358,6 +486,9 @@ public final class TranscriptionService implements AutoCloseable {
                 }
                 try {
                     engine.close();
+                    if (checker != null) {
+                        checker.close();
+                    }
                     stopped.complete(null);
                 } catch (Throwable error) {
                     stopped.completeExceptionally(error);

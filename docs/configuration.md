@@ -93,6 +93,18 @@ start also downloads the native libraries for your platform (about 9-13 MB, chec
 are downloaded from Hugging Face, verified by SHA-256, and resumed if interrupted. Supported platforms are Linux
 (glibc), Windows and macOS on x64 or arm64.
 
+### Double check
+
+A speech model sometimes "hears" a word in noise or mumbling. If you turn on `speech-to-text.double-check`, a second,
+different model (Moonshine v2 Base, about 140 MB download, about 130 MB more RAM) listens again to every clip that hit
+a mute rule. A hit is acted on only if both models hear the same rule. Otherwise nobody is warned or muted, the hit
+does not count towards `flag-threshold`, and staff get an alert marked unconfirmed. `/vw stats` counts these, and the
+Discord embed and evidence file record what the second model heard. If the second model can't keep up (more than 32
+hits waiting), hits are treated as unconfirmed rather than punished unchecked. Expect about 0.1-0.3 s more before a
+mute on a typical clip, and around 1 s for an utterance over 15 s. The second model is English only, so the double check
+stays off unless `moderation.languages` is exactly `[en]`. Offline servers need the files under
+`plugins/VoiceWarden/models/moonshine-base-en/`; the console lists the links.
+
 ### Offline servers
 
 Set `speech-to-text.auto-download: false` to disable all automatic downloads, both the speech model and the native

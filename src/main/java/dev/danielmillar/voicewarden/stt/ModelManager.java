@@ -43,7 +43,13 @@ public final class ModelManager {
                 "Whisper Large-v3 Turbo (English transcription, int8)", "2ca6ff69fc878651b770880507669577ac41c2ff", List.of(
                 new ModelFile("turbo-encoder.int8.onnx", 674_716_297L, "b02dcdf54f348741e93fe732b67d933c8dcb6735655f710640143081db38878b"),
                 new ModelFile("turbo-decoder.int8.onnx", 361_080_764L, "20accd02388482eb3a46bd615631adfdc85e1eb2c7db9ea3f02a40ffe6b81547"),
-                new ModelFile("turbo-tokens.txt", 816_730L, "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126")));
+                new ModelFile("turbo-tokens.txt", 816_730L, "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126"))),
+        /** Second opinion for {@code speech-to-text.double-check}; not selectable as {@code speech-to-text.model}. */
+        MOONSHINE_BASE_EN("moonshine-base-en", "csukuangfj2/sherpa-onnx-moonshine-base-en-quantized-2026-02-27",
+                "Moonshine v2 Base (English, quantized)", "8f4d6c58c03d40bcea40043bb7120a878f2bbef6", List.of(
+                new ModelFile("encoder_model.ort", 31_326_816L, "7c66495948d0d08ec1af454cd4b5514862ae6511e94712a60e6d83eaec8dc8cf"),
+                new ModelFile("decoder_model_merged.ort", 109_424_400L, "d9d7b333af34bc552580576ddcf248a1c6c839e0d3b43b09afb9376ed009899d"),
+                new ModelFile("tokens.txt", 549_350L, "2870d843e14c1e187bf1913a521562a63b53933814bd7f2145120468f494a049")));
 
         final String id;
         final String repository;
@@ -97,17 +103,32 @@ public final class ModelManager {
             Path tokens = existing(dataFolder, c.tokens(), "tokens");
             return new ResolvedModel("custom " + c.modelType() + " model", c.modelType(), encoder, decoder, joiner, tokens, vad);
         }
-        Preset preset = Preset.byId(settings.model()).orElseThrow(() -> new IOException(
+        Preset preset = Preset.byId(settings.model()).filter(p -> p != Preset.MOONSHINE_BASE_EN).orElseThrow(() -> new IOException(
                 "Unknown speech-to-text.model '" + settings.model()
                         + "'. Use parakeet-tdt-v2, parakeet-tdt-v3, whisper-small-en, whisper-turbo or custom."));
+        return download(preset, models, settings.autoDownload(), downloader, vad);
+    }
+
+    /** The second model for {@code speech-to-text.double-check}. It runs on clips the first model already accepted: no VAD. */
+    public static ResolvedModel resolveDoubleCheck(PluginConfig.SpeechToText settings, Path dataFolder, Downloader downloader)
+            throws IOException, InterruptedException {
+        return download(Preset.MOONSHINE_BASE_EN, dataFolder.resolve("models"), settings.autoDownload(), downloader, null);
+    }
+
+    private static ResolvedModel download(Preset preset, Path models, boolean autoDownload, Downloader downloader,
+                                          @Nullable Path vad) throws IOException, InterruptedException {
         Path dir = models.resolve(preset.id);
         for (ModelFile file : preset.files) {
-            ensure(downloader, dir.resolve(file.name()), file, preset.url(file), settings.autoDownload(), preset.id + "/" + file.name());
+            ensure(downloader, dir.resolve(file.name()), file, preset.url(file), autoDownload, preset.id + "/" + file.name());
         }
         return layout(preset, dir, vad);
     }
 
     static ResolvedModel layout(Preset preset, Path dir, @Nullable Path vad) {
+        if (preset == Preset.MOONSHINE_BASE_EN) {
+            return new ResolvedModel(preset.description, "moonshine", dir.resolve("encoder_model.ort"),
+                    dir.resolve("decoder_model_merged.ort"), null, dir.resolve("tokens.txt"), vad);
+        }
         if (preset == Preset.WHISPER_SMALL_EN || preset == Preset.WHISPER_TURBO) {
             String prefix = preset == Preset.WHISPER_SMALL_EN ? "small.en" : "turbo";
             return new ResolvedModel(preset.description, "whisper",

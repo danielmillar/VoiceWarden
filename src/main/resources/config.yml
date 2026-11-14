@@ -80,6 +80,14 @@ speech-to-text:
     joiner: models/custom/joiner.onnx
     tokens: models/custom/tokens.txt
 
+  # Before a MUTE-list hit counts (warning, flag or auto-mute), a second, different model (Moonshine v2 Base,
+  # ~140 MB download, ~130 MB more RAM) listens to the same clip. Only rules both models hear are acted on; if the
+  # second model does not hear it, nobody is punished and staff get an "unconfirmed" alert instead. This removes
+  # hits one model made up from noise or mumbling, and adds roughly 0.1-0.3 s to each MUTE-list hit.
+  # English only: it stays off unless moderation.languages is exactly [en].
+  double-check:
+    enabled: false
+
 # ── Audio capture ────────────────────────────────────────────────────────────
 audio:
   # An utterance ends after this much silence, or immediately when the speaker releases push-to-talk.

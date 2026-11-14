@@ -47,6 +47,23 @@ class ConfigLoaderTest {
         assertTrue(loaded.warnings().stream().anyMatch(w -> w.contains("input-gain.max-gain-db")));
     }
 
+    @Test void doubleCheckIsOffByDefaultAndOnlyRunsForEnglishWordLists() throws Exception {
+        var file = folder.resolve("config.yml");
+        java.nio.file.Files.writeString(file, "moderation:\n  languages: [en]\n");
+        assertFalse(ConfigLoader.load(folder, file).config().speechToText().doubleCheck());
+        java.nio.file.Files.writeString(file, "speech-to-text:\n  double-check:\n    enabled: true\n");
+        var english = ConfigLoader.load(folder, file);
+        assertTrue(english.config().speechToText().doubleCheck());
+        assertEquals(java.util.List.of(), english.warnings());
+        for (String languages : java.util.List.of("[en, es]", "[es]", "[]")) {
+            java.nio.file.Files.writeString(file, "speech-to-text:\n  double-check:\n    enabled: true\n"
+                    + "moderation:\n  languages: " + languages + "\n");
+            var other = ConfigLoader.load(folder, file);
+            assertFalse(other.config().speechToText().doubleCheck(), languages);
+            assertTrue(other.warnings().stream().anyMatch(w -> w.contains("double-check")), languages);
+        }
+    }
+
     @Test void existingConfigDefaultsToPreservingAudioAndTrimmingCanBeOptedInto() throws Exception {
         java.nio.file.Files.writeString(folder.resolve("config.yml"), "speech-to-text:\n  vad:\n    enabled: true\n");
         assertFalse(ConfigLoader.load(folder, folder.resolve("config.yml")).config().speechToText().vad().trimSilence());

@@ -30,6 +30,7 @@ import java.util.UUID;
  * @param location      where the speaker was, if known
  * @param audio         16-bit signed PCM, mono, at {@code sampleRate}; may be empty
  * @param sampleRate    sample rate of {@code audio} in Hz (16000)
+ * @param doubleCheck   what the second model heard, or {@code null} when no double check ran
  */
 public record Incident(
         UUID id,
@@ -49,8 +50,24 @@ public record Incident(
         List<TranscriptLine> context,
         @Nullable SpeakerLocation location,
         short[] audio,
-        int sampleRate
+        int sampleRate,
+        @Nullable DoubleCheck doubleCheck
 ) {
+
+    /**
+     * @param confirmed  the second model heard at least one of the MUTE rules; when false nobody was punished
+     * @param transcript what the second model heard (empty if no words), or {@code null} if it could not run
+     */
+    public record DoubleCheck(boolean confirmed, @Nullable String transcript) {
+
+        /** What the second model heard, for staff: the quoted text, "nothing" or "could not run". */
+        public String describe() {
+            if (transcript == null) {
+                return "could not run";
+            }
+            return transcript.isEmpty() ? "nothing" : "\"" + transcript + "\"";
+        }
+    }
 
     public Incident {
         matches = List.copyOf(matches);
