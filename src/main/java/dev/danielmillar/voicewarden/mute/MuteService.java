@@ -68,6 +68,7 @@ public final class MuteService implements AutoCloseable {
     private final Set<CompletableFuture<?>> pending = ConcurrentHashMap.newKeySet();
     private final Set<UUID> expiring = ConcurrentHashMap.newKeySet();
     private volatile Consumer<StaffAction> expiryListener = action -> { };
+    private volatile Consumer<Player> muteListener = player -> { };
     private @Nullable ScheduledExecutorService timer;
     private @Nullable ScheduledFuture<?> sweeper;
 
@@ -96,6 +97,11 @@ public final class MuteService implements AutoCloseable {
 
     public void onExpiry(Consumer<StaffAction> listener) {
         this.expiryListener = listener;
+    }
+
+    /** Called with the player after a mute is applied, when they are online. */
+    public void onMute(Consumer<Player> listener) {
+        this.muteListener = listener;
     }
 
     /** Hot path (SVC packet thread): one map lookup. */
@@ -149,9 +155,12 @@ public final class MuteService implements AutoCloseable {
             return mute;
         });
         Player online = players.get(playerId);
-        if (online != null && settings.notifyPlayer()) {
-            online.sendMessage(messages.get().render(duration == null ? "player.muted-permanent" : "player.muted",
-                    Messages.text("duration", Durations.format(duration)), Messages.text("reason", reason)));
+        if (online != null) {
+            if (settings.notifyPlayer()) {
+                online.sendMessage(messages.get().render(duration == null ? "player.muted-permanent" : "player.muted",
+                        Messages.text("duration", Durations.format(duration)), Messages.text("reason", reason)));
+            }
+            muteListener.accept(online);
         }
         return track(result.get().exceptionally(error -> {
             logger.log(Level.WARNING, "Could not update the LuckPerms mirror for " + playerName
@@ -247,9 +256,14 @@ public final class MuteService implements AutoCloseable {
                 settings.listenPermission(), settings.serverContext())) : List.of();
     }
 
+    /** The speak denial would block everything, so a partial {@link MuteScope} is enforced on this server only. */
     private static @Nullable VoiceMute mirror(PluginConfig.Mute settings) {
-        return settings.luckPerms() ? new VoiceMute(settings.speakPermission(),
-                settings.disableListening() ? settings.listenPermission() : "", settings.serverContext()) : null;
+        if (!settings.luckPerms()) {
+            return null;
+        }
+        String speak = settings.scope().blocksEverything() ? settings.speakPermission() : "";
+        String listen = settings.disableListening() ? settings.listenPermission() : "";
+        return speak.isEmpty() && listen.isEmpty() ? null : new VoiceMute(speak, listen, settings.serverContext());
     }
 
     private static Mute withMirrors(Mute mute, List<VoiceMute> mirrors) {

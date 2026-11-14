@@ -1,6 +1,7 @@
 package dev.danielmillar.voicewarden.config;
 
 import dev.danielmillar.voicewarden.evidence.EvidenceSettings;
+import dev.danielmillar.voicewarden.mute.MuteScope;
 import dev.danielmillar.voicewarden.notify.discord.DiscordSettings;
 import org.jspecify.annotations.Nullable;
 
@@ -123,15 +124,28 @@ public record PluginConfig(
     /**
      * @param luckPerms        also apply mutes as temporary LuckPerms permission nodes (persistent + network-wide)
      * @param serverContext    LuckPerms {@code server} context for mute nodes; empty = global
+     * @param reminderInterval shortest gap between chat reminders when a muted player talks; zero = no reminder
      */
     public record Mute(
+            MuteScope scope,
             boolean disableListening,
             boolean luckPerms,
             String speakPermission,
             String listenPermission,
             String serverContext,
-            boolean notifyPlayer
+            boolean notifyPlayer,
+            MuteDisplay display,
+            Duration reminderInterval
     ) {
+    }
+
+    /** Where a muted player sees their mute. Action bar and boss bar update every second; chat is the reminder only. */
+    public enum MuteDisplay {
+        ACTION_BAR, BOSS_BAR, CHAT, OFF;
+
+        public boolean ticks() {
+            return this == ACTION_BAR || this == BOSS_BAR;
+        }
     }
 
     public record Alerts(boolean staff, boolean console) {

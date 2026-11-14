@@ -174,14 +174,16 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         health = new HealthMonitor(this::config, metrics, transcription, getLogger());
 
         mutes.onExpiry(action -> discord.submitStaffAction(action));
-        speechNotice = new VoiceSpeechNotice(this, this::config, this::messages, mutes, getLogger());
+        speechNotice = new VoiceSpeechNotice(this, this::config, this::messages, mutes, System::currentTimeMillis, getLogger());
+        mutes.onMute(speechNotice::show);
         permissionMessageHook = VoicePermissionMessageHook.install(voicechat.getClass().getClassLoader(),
                 speechNotice::onDeniedSpeech, getLogger());
-        bridge = new VoiceChatBridge(ingest, mutes, () -> config.mute().disableListening(), speechNotice::onDeniedSpeech);
+        bridge = new VoiceChatBridge(ingest, mutes, () -> config.mute(), speechNotice::onDeniedSpeech);
         // Must happen in onEnable: Simple Voice Chat reads registered plugins once, when the server finishes loading.
         voicechat.registerPlugin(bridge);
 
-        getServer().getPluginManager().registerEvents(new PlayerListener(players, this::config, this::messages, id -> {
+        getServer().getPluginManager().registerEvents(new PlayerListener(players, this::config, this::messages,
+                speechNotice::show, id -> {
             speechNotice.onDisconnect(id);
             ingest.onDisconnect(id);
         }), this);
@@ -194,6 +196,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         reportStore.load();
         offenses.load();
         mutes.start(executors.timer());
+        players.all().forEach(speechNotice::show);
         ingest.start(executors.timer());
         transcriptLog.start(executors.timer());
         health.start(executors.timer());
@@ -276,6 +279,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
             transcriptBuffer.setLimits(bufferLimits(config));
             if (!config.mute().equals(previous.mute())) {
                 mutes.reconcileMirrors();
+                players.all().forEach(speechNotice::show);
             }
             health.start(executors.timer());
 
