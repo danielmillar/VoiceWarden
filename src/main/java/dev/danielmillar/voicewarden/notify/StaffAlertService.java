@@ -14,8 +14,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Player;
 
@@ -74,7 +72,7 @@ public final class StaffAlertService {
         String categories = categories(incident.matches());
         Component line = m.render(key,
                 Messages.text("player", incident.playerName()),
-                Messages.component("transcript", highlight(incident.transcript(), incident.matches())),
+                Messages.component("transcript", highlight(m, incident.transcript(), incident.matches())),
                 Messages.text("categories", categories),
                 Messages.text("duration", Durations.format(incident.action().duration())),
                 Messages.text("offense", Integer.toString(incident.offense())),
@@ -116,7 +114,7 @@ public final class StaffAlertService {
         var player = Messages.text("player", action.targetName());
         var reason = Messages.text("reason", action.reason() == null || action.reason().isBlank() ? "" : ": " + action.reason());
         Component line = switch (action.type()) {
-            case MUTE -> m.render("alert.staff-mute", actor, player, reason,
+            case MUTE -> m.render(action.duration() == null ? "alert.staff-mute-permanent" : "alert.staff-mute", actor, player, reason,
                     Messages.text("duration", Durations.format(action.duration())));
             case UNMUTE -> m.render("alert.staff-unmute", actor, player);
             case PARDON -> m.render("alert.staff-pardon", actor, player, reason);
@@ -152,16 +150,17 @@ public final class StaffAlertService {
     }
 
     /** Transcript as plain text with every rule match highlighted. Offsets come from the rule engine. */
-    public static Component highlight(String transcript, List<RuleMatch> matches) {
-        TextComponent.Builder out = Component.text().color(NamedTextColor.WHITE);
+    public static Component highlight(Messages m, String transcript, List<RuleMatch> matches) {
+        TextComponent.Builder out = Component.text();
         int pos = 0;
         for (RuleMatch match : matches) {
             if (match.start() < pos || match.end() > transcript.length()) {
                 continue;
             }
             out.append(Component.text(transcript.substring(pos, match.start())));
-            out.append(Component.text(transcript.substring(match.start(), match.end()), NamedTextColor.RED, TextDecoration.UNDERLINED)
-                    .hoverEvent(HoverEvent.showText(Component.text(match.category() + " (" + match.ruleId() + ")", NamedTextColor.GRAY))));
+            out.append(m.render("alert.match", Messages.text("text", transcript.substring(match.start(), match.end())))
+                    .hoverEvent(HoverEvent.showText(m.render("alert.match-hover",
+                            Messages.text("category", match.category()), Messages.text("rule", match.ruleId())))));
             pos = match.end();
         }
         out.append(Component.text(transcript.substring(pos)));

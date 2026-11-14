@@ -15,54 +15,63 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.IntFunction;
 
-/** Consumer-thread-only payload construction. */
+/**
+ * Consumer-thread-only payload construction. Each event is one Components V2 message: a container in the event's
+ * colour holding a {@code ##} title, parts between dividers, the recording as a file and a {@code -#} footer.
+ */
 final class DiscordPayload {
     record Body(byte[] bytes, String contentType) {}
     static final int MAX_ATTACHMENT_BYTES = 9 * 1024 * 1024;
+    /** Discord's limit on the text of all text displays in one message. */
+    static final int TEXT_LIMIT = 4000;
+    static final int COMPONENTS_V2 = 1 << 15;
+    private static final int TEXT = 10, SEPARATOR = 14, FILE = 13, CONTAINER = 17;
+    private static final int TITLE_LIMIT = 300, FOOTER_LIMIT = 300, DETAILS_LIMIT = 1500, CONTEXT_SHARE = 3;
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneOffset.UTC);
 
     static Body build(Object event, DiscordSettings settings, WebhookSettings webhook, String validRole) {
-        Embed embed;
+        Message message;
         short[] audio;
         int sampleRate;
         String shortId;
         if (event instanceof Incident incident) {
-            embed = incident(incident, settings, webhook);
+            message = incident(incident, settings, webhook);
             audio = incident.audio();
             sampleRate = incident.sampleRate();
             shortId = incident.shortId();
         } else if (event instanceof StaffAction action) {
-            embed = staff(action, settings, webhook);
+            message = staff(action, settings, webhook);
             audio = new short[0];
             sampleRate = 16_000;
             shortId = action.targetId().toString().substring(0, 8);
         } else if (event instanceof VoiceReport report) {
-            embed = report(report, settings, webhook);
+            message = report(report, settings, webhook);
             audio = report.audio();
             sampleRate = report.sampleRate();
             shortId = report.shortId();
         } else throw new IllegalArgumentException("Unsupported webhook event");
 
+        boolean attach = webhook.includeAudio() && audio.length > 0;
+        String filename = "voice-" + shortId + ".wav";
         JsonObject payload = new JsonObject();
         JsonObject mentions = new JsonObject();
         mentions.add("parse", new JsonArray());
+        String ping = "";
         if (!validRole.isEmpty()) {
             JsonArray roles = new JsonArray();
             roles.add(validRole);
             mentions.add("roles", roles);
-            payload.addProperty("content", "<@&" + validRole + ">");
+            ping = "<@&" + validRole + ">";
         }
         payload.add("allowed_mentions", mentions);
         if (!webhook.username().isBlank()) payload.addProperty("username", webhook.username());
         if (!webhook.avatarUrl().isBlank()) payload.addProperty("avatar_url", webhook.avatarUrl());
-        JsonArray embeds = new JsonArray();
-        embeds.add(embed.json());
-        payload.add("embeds", embeds);
-        if (!webhook.includeAudio() || audio.length == 0) {
+        payload.addProperty("flags", COMPONENTS_V2);
+        payload.add("components", message.json(ping, attach ? filename : null));
+        if (!attach) {
             return new Body(payload.toString().getBytes(StandardCharsets.UTF_8), "application/json");
         }
 
-        String filename = "voice-" + shortId + ".wav";
         JsonObject attachment = new JsonObject();
         attachment.addProperty("id", 0);
         attachment.addProperty("filename", filename);
@@ -86,14 +95,14 @@ final class DiscordPayload {
         return new Body(body, "multipart/form-data; boundary=" + boundary);
     }
 
-    private static Embed incident(Incident incident, DiscordSettings settings, WebhookSettings webhook) {
+    private static Message incident(Incident incident, DiscordSettings settings, WebhookSettings webhook) {
         ActionType type = incident.action().type();
         Incident.DoubleCheck check = incident.doubleCheck();
         boolean unconfirmed = check != null && !check.confirmed();
-        String action = unconfirmed ? "Not confirmed by the double check, no action taken" : switch (type) {
+        String action = unconfirmed ? "Not confirmed by the double check, so nothing was done" : switch (type) {
             case NONE -> "Flagged";
             case WARN -> "Warned";
-            case MUTE -> "Muted for " + DiscordText.duration(incident.action().duration()) + " (offense #" + incident.offense() + ")";
+            case MUTE -> "Muted for " + DiscordText.duration(incident.action().duration()) + " (offense " + incident.offense() + ")";
         };
         String title = unconfirmed ? "Voice flag (unconfirmed): {player}" : switch (type) {
             case NONE -> "Voice flag: {player}";
@@ -101,146 +110,210 @@ final class DiscordPayload {
             case MUTE -> "Voice auto-mute: {player}";
         };
         int color = unconfirmed ? 0x95A5A6 : switch (type) { case NONE -> 0xF1C40F; case WARN -> 0xE67E22; case MUTE -> 0xE74C3C; };
-        Embed embed = base(settings, webhook, title, color, incident.playerName(), action,
-                incident.action().duration(), incident.shortId(), incident.detectedAt());
-        embed.field("Player", player(incident.playerName(), incident.playerId()));
-        embed.field("Action", DiscordText.plain(action + (incident.dryRun() ? " — dry run, not applied" : "")));
-        embed.field("Flags", DiscordText.plain(incident.flagsInWindow() + " / " + incident.flagThreshold() + " in window"));
-        if (check != null) {
-            embed.field("Double check", DiscordText.plain((check.confirmed() ? "Confirmed" : "Not confirmed")
-                    + ". Second model heard: " + check.describe()));
+        Message message = base(settings, webhook, title, color, incident.playerName(),
+                action + (incident.dryRun() ? " (dry run, not applied)" : ""), incident.action().duration(),
+                incident.shortId(), incident.detectedAt());
+        if (webhook.includeTranscript()) {
+            DiscordText transcript = DiscordText.highlighted(incident.transcript().replace('\n', ' '),
+                    incident.matches(), webhook.spoilerFlaggedWords());
+            message.flexible("### 🗣️ Transcript\n> ", transcript::render);
         }
         Map<String, Set<String>> matched = new LinkedHashMap<>();
         for (RuleMatch match : incident.matches()) {
             matched.computeIfAbsent(match.category(), ignored -> new LinkedHashSet<>()).add(match.matchedText());
         }
-        StringJoiner matches = new StringJoiner("\n");
+        DiscordText details = new DiscordText();
+        row(details, "Player", player(incident.playerName(), incident.playerId()));
+        StringJoiner matches = new StringJoiner("; ");
         matched.forEach((category, words) -> matches.add(category + ": " + String.join(", ", words)));
-        embed.field("Matched", DiscordText.plain(matches.length() == 0 ? "—" : matches.toString()));
+        row(details, "Matched", DiscordText.plain(matches.length() == 0 ? "nothing" : matches.toString()));
+        row(details, "Flags", DiscordText.plain(incident.flagsInWindow() + " of " + incident.flagThreshold() + " in the window"));
+        if (check != null) {
+            row(details, "Double check", DiscordText.plain((check.confirmed() ? "Confirmed" : "Not confirmed")
+                    + ", the second model heard " + check.describe()));
+        }
+        if (webhook.includeServerInfo()) {
+            StringJoiner server = new StringJoiner(" · ");
+            if (!settings.serverName().isEmpty()) server.add(settings.serverName());
+            if (incident.location() != null) server.add(incident.location().formatBlock());
+            if (server.length() > 0) row(details, "Server", DiscordText.plain(server.toString()));
+        }
+        row(details, "Incident", new DiscordText().code(incident.id().toString()));
+        message.fixed("### 📋 Details\n", details, DETAILS_LIMIT);
         if (webhook.includeContext() && !incident.context().isEmpty()) {
-            StringJoiner context = new StringJoiner("\n");
+            List<String> context = new ArrayList<>();
             for (TranscriptLine line : incident.context()) {
                 long relative = Duration.between(incident.spokenAt(), line.spokenAt()).getSeconds();
                 context.add((relative > 0 ? "+" : "") + relative + "s " + line.text());
             }
-            embed.field("Context", DiscordText.plain(context.toString()));
+            message.flexible("### 🕘 Said before\n", max -> lines(context, "-# ", max, true));
         }
-        if (webhook.includeServerInfo()) {
-            String server = settings.serverName();
-            if (incident.location() != null) server += (server.isEmpty() ? "" : "\n") + incident.location().formatBlock();
-            if (!server.isEmpty()) embed.field("Server", DiscordText.plain(server));
-        }
-        embed.field("Incident id", DiscordText.plain(incident.id().toString()));
-        if (webhook.includeTranscript()) {
-            DiscordText transcript = DiscordText.highlighted(incident.transcript(), incident.matches(), webhook.spoilerFlaggedWords());
-            embed.description = transcript::render;
-        }
-        return embed;
+        return message;
     }
 
-    private static Embed staff(StaffAction action, DiscordSettings settings, WebhookSettings webhook) {
-        boolean mute = action.type() == StaffAction.Type.MUTE;
+    private static Message staff(StaffAction action, DiscordSettings settings, WebhookSettings webhook) {
+        boolean forGood = action.duration() == null;
         String title = switch (action.type()) {
             case MUTE -> "Voice mute: {player}";
             case UNMUTE -> "Voice unmute: {player}";
             case PARDON -> "Voice pardon: {player}";
         };
         String status = switch (action.type()) {
-            case MUTE -> "Muted";
+            case MUTE -> forGood ? "Muted for good" : "Muted for " + DiscordText.duration(action.duration());
             case UNMUTE -> "Unmuted";
             case PARDON -> "Pardoned";
         };
         int color = switch (action.type()) { case MUTE -> 0xE74C3C; case UNMUTE -> 0x2ECC71; case PARDON -> 0x3498DB; };
-        Embed embed = base(settings, webhook, title, color, action.targetName(), status,
+        Message message = base(settings, webhook, title, color, action.targetName(), status,
                 action.duration(), action.targetId().toString().substring(0, 8), action.timestamp());
-        embed.field("Player", player(action.targetName(), action.targetId()));
-        embed.field("By", DiscordText.plain(action.actor()));
-        if (mute) embed.field("Duration", DiscordText.plain(DiscordText.duration(action.duration())));
-        if (action.reason() != null && !action.reason().isBlank()) embed.field("Reason", DiscordText.plain(action.reason()));
-        return embed;
+        DiscordText details = new DiscordText();
+        row(details, "Player", player(action.targetName(), action.targetId()));
+        row(details, "By", DiscordText.plain(action.actor()));
+        if (action.reason() != null && !action.reason().isBlank()) row(details, "Reason", DiscordText.plain(action.reason()));
+        message.fixed("### 📋 Details\n", details, DETAILS_LIMIT);
+        return message;
     }
 
-    private static Embed report(VoiceReport report, DiscordSettings settings, WebhookSettings webhook) {
-        Embed embed = base(settings, webhook, "Voice report: {player}", 0x3498DB, report.targetName(), "Reported",
-                report.window(), report.shortId(), report.createdAt());
-        embed.field("Reported player", player(report.targetName(), report.targetId()));
-        embed.field("Reporter", report.reporterId() == null ? DiscordText.plain(report.reporterName()) : player(report.reporterName(), report.reporterId()));
-        embed.field("Window", DiscordText.plain(DiscordText.duration(report.window())));
-        embed.field("Lines", DiscordText.plain(Integer.toString(report.lines().size())));
-        if (webhook.includeTranscript()) embed.description = max -> reportLines(report.lines(), max);
-        return embed;
+    private static Message report(VoiceReport report, DiscordSettings settings, WebhookSettings webhook) {
+        Message message = base(settings, webhook, "Voice report: {player}", 0x3498DB, report.targetName(),
+                "Reported by " + report.reporterName(), report.window(), report.shortId(), report.createdAt());
+        DiscordText details = new DiscordText();
+        row(details, "Player", player(report.targetName(), report.targetId()));
+        row(details, "Reporter", report.reporterId() == null ? DiscordText.plain(report.reporterName())
+                : player(report.reporterName(), report.reporterId()));
+        row(details, "Speech", DiscordText.plain(report.lines().size() + " lines from the last "
+                + DiscordText.duration(report.window())));
+        message.fixed("### 📋 Details\n", details, DETAILS_LIMIT);
+        if (webhook.includeTranscript() && !report.lines().isEmpty()) {
+            List<String> lines = report.lines().stream()
+                    .map(line -> "[" + CLOCK.format(line.spokenAt()) + "] " + line.text()).toList();
+            message.flexible("### 🗣️ Transcript\n", max -> lines(lines, "", max, false));
+        }
+        return message;
     }
 
-    private static String reportLines(List<TranscriptLine> lines, int max) {
+    /** As many lines as fit in {@code max}: the oldest when {@code oldestFirst}, otherwise the newest, with "…" for the rest. */
+    private static String lines(List<String> lines, String prefix, int max, boolean oldestFirst) {
         if (lines.isEmpty() || max <= 0) return "";
         Deque<String> retained = new ArrayDeque<>();
         int length = 0;
-        int index = lines.size() - 1;
-        for (; index >= 0; index--) {
-            TranscriptLine line = lines.get(index);
-            String text = DiscordText.plain("[" + CLOCK.format(line.spokenAt()) + "] " + line.text()).render(max);
+        int shown = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            String raw = lines.get(oldestFirst ? i : lines.size() - 1 - i);
+            String text = prefix + DiscordText.plain(raw.replace('\n', ' ')).render(Math.max(0, max - prefix.length()));
             int added = text.length() + (retained.isEmpty() ? 0 : 1);
             if (length + added > max) break;
-            retained.addFirst(text);
+            if (oldestFirst) retained.addLast(text); else retained.addFirst(text);
             length += added;
+            shown++;
         }
-        if (index >= 0 && length + 2 <= max) retained.addFirst("…");
+        if (shown < lines.size() && length + 2 <= max) {
+            if (oldestFirst) retained.addLast("…"); else retained.addFirst("…");
+        }
         return String.join("\n", retained);
     }
 
-    private static DiscordText player(String name, UUID id) { return DiscordText.plain(name).append("\n").code(id.toString()); }
+    private static void row(DiscordText details, String label, DiscordText value) {
+        if (!details.isEmpty()) details.append("\n");
+        details.bold(label).append(" ").append(value);
+    }
 
-    private static Embed base(DiscordSettings settings, WebhookSettings webhook, String defaultTitle, int color,
-                              String player, String action, Duration duration, String id, Instant timestamp) {
+    private static DiscordText player(String name, UUID id) {
+        return DiscordText.plain(name).append(" · ").code(id.toString());
+    }
+
+    private static Message base(DiscordSettings settings, WebhookSettings webhook, String defaultTitle, int color,
+                                String player, String action, Duration duration, String id, Instant timestamp) {
         Map<String, String> values = Map.of("player", player, "action", action, "duration", DiscordText.duration(duration),
                 "id", id, "server", settings.serverName());
         String title = webhook.title().isEmpty() ? defaultTitle : webhook.title();
-        String footer = webhook.footer().isEmpty() ? "VoiceWarden" + (settings.serverName().isEmpty() ? "" : " • {server}") : webhook.footer();
-        return new Embed(DiscordText.plain(DiscordText.template(title, values)),
-                DiscordText.plain(DiscordText.template(footer, values)), webhook.color() == -1 ? color : webhook.color(), timestamp);
+        String footer = webhook.footer().isEmpty() ? "VoiceWarden" + (settings.serverName().isEmpty() ? "" : " · {server}") : webhook.footer();
+        Message message = new Message(webhook.color() == -1 ? color : webhook.color());
+        message.title = DiscordText.plain(DiscordText.template(title, values)).render(TITLE_LIMIT);
+        message.summary = DiscordText.plain(action).render(TITLE_LIMIT) + " · <t:" + timestamp.getEpochSecond() + ":f>";
+        message.footer = DiscordText.plain(DiscordText.template(footer, values)).render(FOOTER_LIMIT);
+        return message;
     }
 
-    private record Field(String name, DiscordText value) {}
-    private static final class Embed {
-        private final DiscordText title;
-        private final DiscordText footer;
+    /** A part under its heading; fixed parts are sized first, flexible ones share what is left of the text limit. */
+    private record Part(String heading, IntFunction<String> body, int cap) {}
+
+    private static final class Message {
         private final int color;
-        private final Instant timestamp;
-        private final List<Field> fields = new ArrayList<>();
-        private IntFunction<String> description = ignored -> "";
+        private String title = "";
+        private String summary = "";
+        private String footer = "";
+        private final List<Part> parts = new ArrayList<>();
 
-        private Embed(DiscordText title, DiscordText footer, int color, Instant timestamp) {
-            this.title = title; this.footer = footer; this.color = color; this.timestamp = timestamp;
-        }
-        void field(String name, DiscordText value) { fields.add(new Field(name, value)); }
+        private Message(int color) { this.color = color; }
 
-        JsonObject json() {
-            JsonObject json = new JsonObject();
-            String renderedTitle = title.render(256);
-            String renderedFooter = footer.render(2048);
-            int budget = 6000 - renderedTitle.length() - renderedFooter.length();
-            if (!renderedTitle.isEmpty()) json.addProperty("title", renderedTitle);
-            json.addProperty("color", color);
-            json.addProperty("timestamp", timestamp.toString());
-            JsonObject footerJson = new JsonObject();
-            footerJson.addProperty("text", renderedFooter);
-            json.add("footer", footerJson);
-            JsonArray renderedFields = new JsonArray();
-            for (Field field : fields) {
-                if (renderedFields.size() == 25 || budget < 2) break;
-                String name = DiscordText.plain(field.name()).render(Math.min(256, budget - 1));
-                String value = field.value().render(Math.min(1024, budget - name.length()));
-                if (value.isEmpty()) value = "—";
-                JsonObject item = new JsonObject();
-                item.addProperty("name", name);
-                item.addProperty("value", value);
-                renderedFields.add(item);
-                budget -= name.length() + value.length();
+        void fixed(String heading, DiscordText body, int cap) { parts.add(new Part(heading, body::render, cap)); }
+        void flexible(String heading, IntFunction<String> body) { parts.add(new Part(heading, body, -1)); }
+
+        JsonArray json(String ping, String attachment) {
+            String head = "## " + title + "\n" + summary;
+            String foot = "-# " + footer;
+            int budget = TEXT_LIMIT - ping.length() - head.length() - foot.length();
+            Map<Part, String> rendered = new IdentityHashMap<>();
+            for (Part part : parts) {
+                if (part.cap() < 0) continue;
+                String body = part.body().apply(Math.max(0, Math.min(part.cap(), budget - part.heading().length())));
+                rendered.put(part, body);
+                budget -= part.heading().length() + body.length();
             }
-            json.add("fields", renderedFields);
-            String renderedDescription = description.apply(Math.min(4096, budget));
-            if (!renderedDescription.isEmpty()) json.addProperty("description", renderedDescription);
-            return json;
+            List<Part> flexible = parts.stream().filter(part -> part.cap() < 0).toList();
+            for (int i = 0; i < flexible.size(); i++) {
+                Part part = flexible.get(i);
+                int room = budget - part.heading().length();
+                // Later flexible parts (earlier speech) get a share, the first (the transcript) the rest.
+                int share = i == 0 && flexible.size() > 1 ? room - room / CONTEXT_SHARE : room;
+                String body = part.body().apply(Math.max(0, share));
+                rendered.put(part, body);
+                budget -= part.heading().length() + body.length();
+            }
+
+            JsonArray inside = new JsonArray();
+            inside.add(text(head));
+            for (Part part : parts) {
+                String body = rendered.get(part);
+                if (body == null || body.isEmpty()) continue;
+                inside.add(separator(true));
+                inside.add(text(part.heading() + body));
+            }
+            if (attachment != null) {
+                JsonObject file = new JsonObject();
+                file.addProperty("type", FILE);
+                JsonObject media = new JsonObject();
+                media.addProperty("url", "attachment://" + attachment);
+                file.add("file", media);
+                inside.add(separator(true));
+                inside.add(file);
+            }
+            inside.add(separator(false));
+            inside.add(text(foot));
+            JsonObject container = new JsonObject();
+            container.addProperty("type", CONTAINER);
+            container.addProperty("accent_color", color);
+            container.add("components", inside);
+            JsonArray components = new JsonArray();
+            if (!ping.isEmpty()) components.add(text(ping));
+            components.add(container);
+            return components;
+        }
+
+        private static JsonObject text(String content) {
+            JsonObject text = new JsonObject();
+            text.addProperty("type", TEXT);
+            text.addProperty("content", content);
+            return text;
+        }
+
+        private static JsonObject separator(boolean divider) {
+            JsonObject separator = new JsonObject();
+            separator.addProperty("type", SEPARATOR);
+            separator.addProperty("divider", divider);
+            separator.addProperty("spacing", divider ? 2 : 1);
+            return separator;
         }
     }
 }

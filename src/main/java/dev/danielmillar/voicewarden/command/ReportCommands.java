@@ -128,11 +128,13 @@ final class ReportCommands {
             return;
         }
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(Component.text(targetName + " - " + subtitle, NamedTextColor.GRAY));
+            sender.sendMessage(msg().render("report.console-header", Messages.text("player", targetName),
+                    Messages.text("details", subtitle), Messages.text("count", Integer.toString(lines.size()))));
             for (TranscriptLine line : lines) {
                 sender.sendMessage(msg().render("command.history-line",
                         Messages.text("time", Formats.clock(line.spokenAt())), Messages.text("text", line.text())));
             }
+            sender.sendMessage(Component.empty());
             return;
         }
         List<Component> pages = new ArrayList<>();
@@ -168,6 +170,7 @@ final class ReportCommands {
                     Messages.text("ago", Durations.formatShort(Duration.between(r.createdAt(), Instant.now()))),
                     Messages.text("lines", Integer.toString(r.lines().size()))));
         }
+        sender.sendMessage(Component.empty());
         return Command.SINGLE_SUCCESS;
     }
 

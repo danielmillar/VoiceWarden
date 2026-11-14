@@ -34,10 +34,12 @@ public final class DiscordWebhookService implements AutoCloseable {
 
     private sealed interface Job permits EventJob, TestJob {}
     private record EventJob(Object event) implements Job {}
-    private record TestJob(WebhookTestTarget target, CompletableFuture<List<String>> result) implements Job {}
+    private record TestJob(WebhookTestTarget target, CompletableFuture<List<WebhookTestResult>> result) implements Job {}
     private record Route(String name, WebhookSettings webhook) {}
     private record Delivery(boolean success, int status, String detail) {
-        String line(String name) { return name + (success ? ": OK (" + status + ")" : ": FAILED " + (status == 0 ? "" : status + " ") + detail); }
+        WebhookTestResult result(String name) {
+            return new WebhookTestResult(name, success ? WebhookTestResult.Outcome.SENT : WebhookTestResult.Outcome.FAILED, status, detail);
+        }
     }
 
     private final Supplier<DiscordSettings> settings;
@@ -102,10 +104,10 @@ public final class DiscordWebhookService implements AutoCloseable {
         return enqueue(new EventJob(event));
     }
 
-    public CompletableFuture<List<String>> sendTest(WebhookTestTarget target) {
+    public CompletableFuture<List<WebhookTestResult>> sendTest(WebhookTestTarget target) {
         Objects.requireNonNull(target);
-        CompletableFuture<List<String>> result = new CompletableFuture<>();
-        if (!enqueue(new TestJob(target, result))) result.complete(List.of("test: FAILED service stopped or queue full"));
+        CompletableFuture<List<WebhookTestResult>> result = new CompletableFuture<>();
+        if (!enqueue(new TestJob(target, result))) result.complete(List.of(WebhookTestResult.notRun("the Discord queue is stopped or full")));
         return result;
     }
 
@@ -163,7 +165,7 @@ public final class DiscordWebhookService implements AutoCloseable {
                 } catch (RuntimeException failure) {
                     failed.incrementAndGet();
                     warn("Discord delivery failed: " + failure.getClass().getSimpleName());
-                    if (current instanceof TestJob test) test.result().complete(List.of("test: FAILED " + failure.getClass().getSimpleName()));
+                    if (current instanceof TestJob test) test.result().complete(List.of(WebhookTestResult.notRun(failure.getClass().getSimpleName())));
                 }
                 current = null;
             }
@@ -188,7 +190,7 @@ public final class DiscordWebhookService implements AutoCloseable {
     }
 
     private static void completeDiscarded(Job job) {
-        if (job instanceof TestJob test) test.result().complete(List.of("test: FAILED service closed"));
+        if (job instanceof TestJob test) test.result().complete(List.of(WebhookTestResult.notRun("the Discord queue was stopped")));
     }
 
     private void process(Object event) throws InterruptedException {
@@ -200,7 +202,7 @@ public final class DiscordWebhookService implements AutoCloseable {
     }
 
     private void processTest(TestJob test) throws InterruptedException {
-        List<String> lines = new ArrayList<>();
+        List<WebhookTestResult> lines = new ArrayList<>();
         for (String name : List.of("flags", "mutes", "reports")) {
             boolean selected = test.target() == WebhookTestTarget.ALL || switch (test.target()) {
                 case FLAG -> name.equals("flags");
@@ -210,7 +212,7 @@ public final class DiscordWebhookService implements AutoCloseable {
             };
             if (selected) {
                 Delivery delivery = send(sample(name), name);
-                lines.add(delivery == null ? name + ": disabled" : delivery.line(name));
+                lines.add(delivery == null ? new WebhookTestResult(name, WebhookTestResult.Outcome.OFF, 0, "") : delivery.result(name));
             }
         }
         test.result().complete(List.copyOf(lines));
@@ -254,7 +256,8 @@ public final class DiscordWebhookService implements AutoCloseable {
             }
             if (!running()) throw new InterruptedException();
             try {
-                HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                // Webhooks only honour Components V2 when asked to.
+                HttpRequest request = HttpRequest.newBuilder(URI.create(url + (url.contains("?") ? "&" : "?") + "with_components=true"))
                         .timeout(Duration.ofSeconds(Math.max(1, current.timeoutSeconds())))
                         .header("User-Agent", USER_AGENT).header("Content-Type", body.contentType())
                         .POST(HttpRequest.BodyPublishers.ofByteArray(body.bytes())).build();

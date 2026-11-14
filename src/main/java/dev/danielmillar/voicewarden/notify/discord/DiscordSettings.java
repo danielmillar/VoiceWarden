@@ -7,7 +7,7 @@ package dev.danielmillar.voicewarden.notify.discord;
  * {@link #mutes()}. If an auto-mute incident would be sent to the same URL by both, it is sent once.
  * {@code VoiceReport}s go to {@link #reports()}.
  *
- * @param serverName     identifies this backend server in embeds (footer / server info field), "" = omit
+ * @param serverName     identifies this backend server in Discord messages (footer and server row), "" = omit
  * @param timeoutSeconds HTTP request timeout
  * @param retryAttempts  retries for 429 / 5xx / IO errors (0 = no retry)
  * @param maxQueueSize   pending messages kept before new ones are dropped

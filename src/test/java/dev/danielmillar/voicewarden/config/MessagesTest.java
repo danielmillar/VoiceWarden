@@ -26,9 +26,10 @@ class MessagesTest {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file.toFile());
         String[] placeholders = {"player", "transcript", "categories", "action", "duration", "offense", "flags", "threshold",
                 "id", "context", "location", "ago", "text", "actor", "reason", "remaining", "name", "input", "count", "time",
-                "details", "warning", "error", "next", "line", "state", "model", "speakers", "queue", "workers", "transcribed",
+                "details", "next", "line", "state", "model", "speakers", "queue", "workers", "transcribed",
                 "no-speech", "dropped", "latency-avg", "latency-p95", "rtf", "incidents", "automutes", "mutes", "discord-sent",
-                "discord-queue", "discord-failed", "reporter", "lines", "window", "minutes", "page", "newer", "older", "pages", "click-hint", "version"};
+                "discord-queue", "discord-failed", "reporter", "lines", "window", "minutes", "page", "newer", "older", "pages", "click-hint", "version",
+                "heard", "category", "rule", "area", "finding", "fix", "ok", "warn", "fail", "webhook", "status"};
         TagResolver[] resolvers = java.util.Arrays.stream(placeholders).map(k -> Messages.text(k, "test")).toArray(TagResolver[]::new);
         int rendered = 0;
         for (String key : yaml.getKeys(true)) {
@@ -36,11 +37,18 @@ class MessagesTest {
                 assertEquals(yaml.getStringList(key).size(), assertDoesNotThrow(() -> messages.renderList(key, resolvers), key).size());
                 rendered++;
             } else if (yaml.isString(key)) {
-                assertNotNull(assertDoesNotThrow(() -> messages.renderWithLiterals(key, Map.of("id", "abc123"), resolvers), key));
+                Component message = assertDoesNotThrow(() -> messages.renderWithLiterals(key, Map.of("id", "abc123"), resolvers), key);
+                // A tag left as text means a typo, or a theme colour shadowed by a placeholder of the same name.
+                assertFalse(PlainTextComponentSerializer.plainText().serialize(message).contains("<"), key);
                 rendered++;
             }
         }
         assertTrue(rendered > 50);
+        // The reload warning's <warning> placeholder shadows the theme colour of the same name in that message.
+        String warning = PlainTextComponentSerializer.plainText().serialize(
+                messages.render("command.reload-warning", Messages.text("warning", "rules.yml has no rules")));
+        assertTrue(warning.contains("rules.yml has no rules"), warning);
+        assertFalse(warning.contains("<"), warning);
     }
 
     @Test void playerTextCannotInjectColorsOrClickCommands() throws Exception {
