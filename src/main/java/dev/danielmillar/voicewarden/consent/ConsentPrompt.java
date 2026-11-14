@@ -71,7 +71,8 @@ public final class ConsentPrompt implements Listener {
         Dialog dialog = Dialog.create(factory -> factory.empty()
                 .base(DialogBase.builder(m.render("consent.dialog.title"))
                         .canCloseWithEscape(false)
-                        .body(List.of(DialogBody.plainMessage(m.render("consent.dialog.body"), 300)))
+                        .body(List.of(DialogBody.plainMessage(m.render(config.get().consent().speakWithoutConsent()
+                                ? "consent.dialog.body-heard" : "consent.dialog.body"), 300)))
                         .build())
                 .type(DialogType.confirmation(
                         ActionButton.builder(m.render("consent.dialog.accept"))

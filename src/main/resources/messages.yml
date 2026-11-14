@@ -21,7 +21,9 @@ privacy-join: "<prefix>Voice chat on this server is transcribed and automaticall
 consent:
   dialog:
     title: "<accent>Voice chat moderation"
-    body: "Voice chat on this server is transcribed on the server and checked against its rules.\n\nFlagged speech can be recorded as evidence for staff and lead to a voice mute. Nothing is sent to an outside service.\n\nIf you deny, your voice is not processed and you can change your answer any time with /voiceconsent."
+    # body: consent.speak-without-consent is false (denying blocks the microphone); body-heard: it is true.
+    body: "Voice chat on this server is transcribed on the server and checked against its rules.\n\nFlagged speech can be recorded as evidence for staff and lead to a voice mute. Nothing is sent to an outside service.\n\nIf you deny, your voice is not processed and other players will not hear you. You can change your answer any time with /voiceconsent."
+    body-heard: "Voice chat on this server is transcribed on the server and checked against its rules.\n\nFlagged speech can be recorded as evidence for staff and lead to a voice mute. Nothing is sent to an outside service.\n\nIf you deny, your voice is not processed. You can change your answer any time with /voiceconsent."
     accept: "<success>Accept"
     deny: "<error>Deny"
   accepted: "<prefix><success>Thanks!</success> Your voice chat is on. <muted>Change your answer with /voiceconsent."
@@ -70,7 +72,7 @@ player:
   muted-reminder: "<prefix>You are voice muted, so nobody can hear you. <muted><remaining> left."
   muted-permanent-reminder: "<prefix>You are permanently voice muted, so nobody can hear you."
   # Shown when a player who has not accepted voice moderation talks (consent.speak-without-consent: false).
-  consent-needed-actionbar: "<prefix><error>Nobody can hear you.</error> <body>Accept voice moderation with <accent>/voiceconsent</accent>"
+  consent-needed-actionbar: "<error>Nobody hears you</error> <dark_gray>-</dark_gray> <body>accept voice moderation with <accent>/voiceconsent"
   no-speak-permission-actionbar: "<prefix><error>You don't have permission to speak in voice chat.</error>"
   unmuted: "<prefix>You can use voice chat again. <success>Welcome back!</success>"
 
