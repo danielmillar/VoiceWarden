@@ -59,8 +59,8 @@ work done, walk this list and say which entries applied:
   staff alert. Players report with `/reportvoice`; staff review with `/viewreport` and `/reportinbox`.
 - **Permissions.** A new command has its permission node and default in `paper-plugin.yml`, and
   `voicewarden.admin` includes it where it should.
-- **Text.** New chat and action bar text lives in `messages.yml` as MiniMessage, with every placeholder documented in
-  its comment.
+- **Text.** New chat, action bar and dialog text lives in `messages.yml` as MiniMessage, with every placeholder
+  documented in its comment, and follows the chat style guide.
 - **Config.** A new setting has its comment in `config.yml`, its validation in `ConfigLoader`, and works after
   `/vw reload` (or says it needs a restart).
 - **Persistence.** New saved state lives in `data/voicewarden.db`, survives a restart and a crash, and is written from
@@ -124,8 +124,8 @@ work done, walk this list and say which entries applied:
 Most code changes do not need a documentation change. Agents can read the code.
 
 - `docs/architecture.md` is for decisions and their reasons, the threading model, and traps that are hard to find in
-  the source. Before adding a paragraph, ask what a maintainer would get wrong without it. If reading the code
-  answers the question, leave it out.
+  the source. `docs/internals/` holds the chat style guide. Before adding a paragraph, ask what a maintainer would get
+  wrong without it. If reading the code answers the question, leave it out.
 - Do not document every feature, list config keys and their defaults (every key carries a comment in `config.yml`),
   enumerate fields or methods, narrate control flow, keep file catalogs, or append PR summaries.
 - A local reason the code cannot show goes in a short comment beside it. Use `docs/architecture.md` when the reasoning
@@ -181,7 +181,8 @@ All under `src/main/java/dev/danielmillar/voicewarden/`:
   the map update that changes it. No SQL on the packet or server thread, no connection pool, no ORM.
 - Only `luckperms/` may import `net.luckperms`, and only after LuckPerms is known to be installed, so the plugin still
   starts without it.
-- Text a player or operator sees is short, plain and consistent with the existing `messages.yml`.
+- Text a player or operator sees follows the [chat style](docs/internals/chat-style.md). Run the `style-review` skill
+  before opening a PR that changes text.
 
 ## Additional tips
 

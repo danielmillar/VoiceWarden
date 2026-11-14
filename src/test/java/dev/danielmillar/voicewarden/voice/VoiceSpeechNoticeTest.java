@@ -122,7 +122,7 @@ class VoiceSpeechNoticeTest {
         assertTrue(actionBars.isEmpty(), "Never send from the voice-chat packet thread");
         drain();
         assertEquals(1, actionBars.size());
-        assertTrue(text(actionBars).contains("You don't have permission to speak in voice chat."));
+        assertTrue(text(actionBars).contains("You can't speak in voice chat."));
         assertTrue(repeating.isEmpty());
     }
 
@@ -133,7 +133,7 @@ class VoiceSpeechNoticeTest {
         assertTrue(notice.onDeniedSpeech(player));
         drain();
         assertEquals(1, chat.size());
-        assertTrue(text(chat).contains("nobody can hear you"));
+        assertTrue(text(chat).contains("nobody hears you"));
         now = 30_000;
         notice.onDeniedSpeech(player);
         drain();
@@ -167,7 +167,7 @@ class VoiceSpeechNoticeTest {
         notice.onDeniedSpeech(player);
         assertEquals(1, repeating.size());
         tick();
-        assertTrue(text(actionBars).contains("Voice muted"));
+        assertTrue(text(actionBars).contains("ᴍᴜᴛᴇᴅ"));
         assertTrue(text(actionBars).contains("5m left"));
     }
 
@@ -222,7 +222,7 @@ class VoiceSpeechNoticeTest {
         assertEquals(2, repeating.size());
         assertTrue(repeating.getFirst().cancelled);
         tick();
-        assertTrue(text(actionBars).contains("permanent"));
+        assertTrue(text(actionBars).contains("for good"));
     }
 
     @Test void restoredPermissionBeforeTheScheduledSendPreventsAStaleNotice() {

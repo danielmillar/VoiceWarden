@@ -106,14 +106,14 @@ public final class SetupCheck {
         if (!v.registered()) {
             out.add(new Finding(Status.FAIL, area, "Simple Voice Chat" + version + " has not loaded VoiceWarden, so voice is"
                     + " not moderated and mutes are not enforced",
-                    "restart the server (voice chat picks up plugins at startup) and check the console for voice chat errors"));
+                    "Restart the server (voice chat picks up plugins at startup) and check the console for voice chat errors."));
             return;
         }
         out.add(Finding.ok(area, "Simple Voice Chat" + version + ", VoiceWarden registered"));
         if (!v.noticeHook()) {
             out.add(new Finding(Status.WARN, area, "could not replace voice chat's \"no permission to speak\" message,"
                     + " so muted players see the voice chat one; mutes still work",
-                    "use Simple Voice Chat 2.6.x; see the console at startup for the reason"));
+                    "Use Simple Voice Chat 2.6.x; see the console at startup for the reason."));
         }
     }
 
@@ -121,27 +121,27 @@ public final class SetupCheck {
         String area = "Speech engine";
         if (!e.enabled()) {
             out.add(new Finding(Status.WARN, area, "off (enabled: false): voice is not transcribed or moderated;"
-                    + " mutes are still enforced", "set enabled: true in config.yml, then /vw reload"));
+                    + " mutes are still enforced", "Set enabled: true in config.yml, then /vw reload."));
         } else {
             switch (e.state()) {
                 case READY -> out.add(Finding.ok(area, "ready: " + e.detail()));
                 case PREPARING, LOADING -> out.add(new Finding(Status.WARN, area, "starting (" + e.detail() + ")",
-                        "wait and run /vw check again; the first start downloads the model"));
+                        "Wait and run /vw check again; the first start downloads the model."));
                 case FAILED -> out.add(new Finding(Status.FAIL, area, "failed: " + e.detail(),
-                        "fix the cause, then /vw reload"));
-                case STOPPED -> out.add(new Finding(Status.FAIL, area, "stopped", "/vw reload starts it"));
+                        "Fix the cause, then /vw reload."));
+                case STOPPED -> out.add(new Finding(Status.FAIL, area, "stopped", "/vw reload starts it."));
             }
         }
         boolean ready = e.state() == State.READY;
         if (ready && e.lastFailure() != null) {
             out.add(new Finding(Status.WARN, area, "the last reload could not load the new settings (" + e.lastFailure()
-                    + "), so the previous engine is still running", "fix the cause, then /vw reload"));
+                    + "), so the previous engine is still running", "Fix the cause, then /vw reload."));
         }
         if (ready && e.doubleCheckWanted()) {
             out.add(e.doubleCheckLoaded()
                     ? Finding.ok("Double check", "second model loaded; mute-list hits are confirmed before muting")
                     : new Finding(Status.WARN, "Double check", "speech-to-text.double-check is on but the second model"
-                    + " is not loaded, so mute-list hits are not confirmed", "check the console, then /vw reload"));
+                    + " is not loaded, so mute-list hits are not confirmed", "Check the console, then /vw reload."));
         }
         if (ready) {
             workers(e, out);
@@ -154,17 +154,17 @@ public final class SetupCheck {
         int before = out.size();
         if (e.aliveWorkers() < e.workers()) {
             out.add(new Finding(Status.FAIL, area, (e.workers() - e.aliveWorkers()) + " of " + e.workers()
-                    + " worker(s) crashed", "see \"worker crashed\" in the console, then restart the server"));
+                    + " worker(s) crashed", "See \"worker crashed\" in the console, then restart the server."));
         }
         String speed = String.format(Locale.ROOT, "%.1f", e.speed());
         if (e.queueMax() > 0 && e.queue() * 2 >= e.queueMax()) {
             out.add(new Finding(Status.WARN, area, e.queue() + " of " + e.queueMax() + " queue places are waiting now"
                     + " (speed " + speed + "× real time); a full queue skips speech",
-                    "raise speech-to-text.workers or cpu-threads if the CPU has room"));
+                    "Raise speech-to-text.workers or cpu-threads if the CPU has room."));
         }
         if (e.p95Millis() > HealthMonitor.SLOW_P95_MILLIS) {
             out.add(new Finding(Status.WARN, area, "slow: 95% of utterances take up to " + e.p95Millis()
-                    + " ms", "raise speech-to-text.cpu-threads or pick a smaller model"));
+                    + " ms", "Raise speech-to-text.cpu-threads or pick a smaller model."));
         }
         if (out.size() == before) {
             String history = e.dropped() == 0 && e.errors() == 0 ? ""
@@ -183,10 +183,10 @@ public final class SetupCheck {
             out.add(Finding.ok(area, "on disk (" + which + "), not loaded yet"));
         } else if (e.autoDownload()) {
             out.add(new Finding(Status.WARN, area, "not downloaded yet (" + which + ")",
-                    e.enabled() ? "they download when the engine starts; check again shortly" : "they download once enabled"));
+                    e.enabled() ? "They download when the engine starts; check again shortly." : "They download once enabled."));
         } else {
             out.add(new Finding(Status.FAIL, area, "missing (" + which + ") and speech-to-text.auto-download is false",
-                    "set auto-download: true, or install them as the console explains"));
+                    "Set auto-download: true, or install them as the console explains."));
         }
     }
 
@@ -194,7 +194,7 @@ public final class SetupCheck {
         String area = "Model files";
         if (m.files().isEmpty()) {
             out.add(new Finding(Status.FAIL, area, "speech-to-text.model names no known model",
-                    "use parakeet-tdt-v2, parakeet-tdt-v3, whisper-small-en, whisper-turbo or custom"));
+                    "Use parakeet-tdt-v2, parakeet-tdt-v3, whisper-small-en, whisper-turbo or custom."));
             return;
         }
         int before = out.size();
@@ -205,9 +205,9 @@ public final class SetupCheck {
             String problem = !f.present() ? f.label() + " is missing"
                     : f.label() + " is " + f.actualSize() + " bytes, expected " + f.expectedSize();
             boolean custom = f.expectedSize() < 0;
-            String fix = custom ? "check the path in speech-to-text.custom"
-                    : m.autoDownload() ? "restart the server or change the model to download it again"
-                    : "download it again, or set speech-to-text.auto-download: true";
+            String fix = custom ? "Check the path in speech-to-text.custom."
+                    : m.autoDownload() ? "Restart the server or change the model to download it again."
+                    : "Download it again, or set speech-to-text.auto-download: true.";
             out.add(new Finding(m.autoDownload() && !custom && !f.present() ? Status.WARN : Status.FAIL, area, problem, fix));
         }
         if (out.size() > before) {
@@ -224,10 +224,10 @@ public final class SetupCheck {
         String area = "Database";
         if (s.error() != null) {
             out.add(new Finding(Status.FAIL, area, "read failed: " + s.error(),
-                    "check the console and plugins/VoiceWarden/data/voicewarden.db"));
+                    "Check the console and plugins/VoiceWarden/data/voicewarden.db."));
         } else if (s.schema() != s.expectedSchema()) {
             out.add(new Finding(Status.FAIL, area, "schema " + s.schema() + ", expected " + s.expectedSchema(),
-                    "restart the server so VoiceWarden can migrate it"));
+                    "Restart the server so VoiceWarden can migrate it."));
         } else {
             out.add(Finding.ok(area, "schema " + s.schema() + ", read OK (" + s.mutes() + " mute(s) stored)"));
         }
@@ -238,11 +238,11 @@ public final class SetupCheck {
         if (!l.installed()) {
             out.add(l.mirror()
                     ? new Finding(Status.WARN, area, "not installed, so mute.luckperms.enabled is ignored: mutes apply"
-                    + " on this server only", "install LuckPerms, or set mute.luckperms.enabled: false")
+                    + " on this server only", "Install LuckPerms, or set mute.luckperms.enabled: false.")
                     : Finding.ok(area, "not installed (optional)"));
         } else if (!l.connected()) {
             out.add(new Finding(Status.WARN, area, "installed but its API was not available at startup, so mutes are"
-                    + " not mirrored and offline bypass checks fail", "check LuckPerms started cleanly, then restart"));
+                    + " not mirrored and offline bypass checks fail", "Check LuckPerms started cleanly, then restart."));
         } else {
             out.add(Finding.ok(area, l.mirror() ? "connected; mutes are mirrored as deny nodes"
                     : "connected; mute mirror off (mute.luckperms.enabled: false)"));
@@ -274,7 +274,7 @@ public final class SetupCheck {
         String key = "discord." + name + ".webhook-url";
         if (w.url().isBlank()) {
             out.add(new Finding(Status.WARN, "Discord", name + " webhook is enabled but has no URL, so nothing is sent",
-                    "set " + key + ", or discord." + name + ".enabled: false"));
+                    "Set " + key + ", or discord." + name + ".enabled: false."));
             return;
         }
         boolean valid;
@@ -286,7 +286,7 @@ public final class SetupCheck {
         if (!valid) {
             out.add(new Finding(Status.FAIL, "Discord", name + " webhook URL is not a Discord webhook ("
                     + DiscordWebhookService.mask(w.url()) + "), so nothing is sent",
-                    "set " + key + " to https://discord.com/api/webhooks/…"));
+                    "Set " + key + " to a https://discord.com/api/webhooks/… URL."));
             return;
         }
         ready.add(name);
@@ -297,18 +297,18 @@ public final class SetupCheck {
         int before = out.size();
         if (c.reloadError() != null) {
             out.add(new Finding(Status.FAIL, area, "the last /vw reload failed (" + c.reloadError()
-                    + "), so the previous settings are still in use", "fix the file, then /vw reload"));
+                    + "), so the previous settings are still in use", "Fix the file, then /vw reload."));
         }
         if (c.dryRun()) {
             out.add(new Finding(Status.WARN, area, "moderation.dry-run is on: actions are decided but never applied",
-                    "set moderation.dry-run: false when you trust the rules"));
+                    "Set moderation.dry-run: false when you trust the rules."));
         }
         for (String warning : c.warnings().stream().limit(MAX_CONFIG_WARNINGS).toList()) {
-            out.add(new Finding(Status.WARN, area, warning, "fix the file, then /vw reload"));
+            out.add(new Finding(Status.WARN, area, warning, "Fix the file, then /vw reload."));
         }
         if (c.warnings().size() > MAX_CONFIG_WARNINGS) {
             out.add(new Finding(Status.WARN, area, (c.warnings().size() - MAX_CONFIG_WARNINGS) + " more warning(s)",
-                    "see the console after /vw reload"));
+                    "See the console after /vw reload."));
         }
         if (out.size() == before) {
             out.add(Finding.ok(area, "loaded without warnings, " + c.rules() + " rule(s); "
@@ -325,18 +325,18 @@ public final class SetupCheck {
         }
         if (r.error() != null) {
             out.add(new Finding(Status.FAIL, area, "cannot write to " + s.directory() + ": " + r.error(),
-                    "fix the folder's permissions or change recordings.directory"));
+                    "Fix the folder's permissions or change recordings.directory."));
             return;
         }
         String used = mb(r.usedBytes()) + (s.maxTotalBytes() > 0 ? " of " + mb(s.maxTotalBytes()) : "");
         int before = out.size();
         if (s.maxTotalBytes() > 0 && r.usedBytes() > s.maxTotalBytes()) {
             out.add(new Finding(Status.WARN, area, "using " + used + ", over the limit",
-                    "cleanup runs hourly; if this stays, check the console for evidence errors"));
+                    "Cleanup runs hourly; if this stays, check the console for evidence errors."));
         }
         if (r.freeBytes() >= 0 && r.freeBytes() < LOW_DISK_BYTES) {
             out.add(new Finding(Status.WARN, area, "only " + mb(r.freeBytes()) + " free on the disk",
-                    "free space, or lower recordings.max-total-size-mb"));
+                    "Free space, or lower recordings.max-total-size-mb."));
         }
         if (out.size() == before) {
             out.add(Finding.ok(area, "writable, using " + used + ", " + mb(r.freeBytes()) + " free"));

@@ -128,8 +128,9 @@ final class VoiceWardenCommand {
         Metrics m = plugin.metrics();
         long[] latency = m.latencySummary();
         var transcription = plugin.transcription();
-        String state = transcription.state().name()
-                + (transcription.stateDetail().isEmpty() || transcription.state().name().equals("READY") ? "" : ": " + transcription.stateDetail());
+        String name = transcription.state().name();
+        String state = name.charAt(0) + name.substring(1).toLowerCase(Locale.ROOT)
+                +(transcription.stateDetail().isEmpty() || transcription.state().name().equals("READY") ? "" : ": " + transcription.stateDetail());
         long dropped = m.queueDropped.sum() + m.staleDropped.sum() + m.packetsDropped.sum();
         List<net.kyori.adventure.text.Component> lines = msg().renderList("stats",
                 Messages.text("state", state),
@@ -225,6 +226,7 @@ final class VoiceWardenCommand {
                     Messages.text("reason", m.reason()),
                     Messages.text("actor", m.actor())));
         }
+        sender.sendMessage(net.kyori.adventure.text.Component.empty());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -326,6 +328,7 @@ final class VoiceWardenCommand {
                     Messages.text("pages", Integer.toString(Math.max(1, page.pages()))),
                     Messages.component("newer", newer), Messages.component("older", older)));
         }
+        sender.sendMessage(net.kyori.adventure.text.Component.empty());
     }
 
     private net.kyori.adventure.text.Component consentLine(java.util.UUID player) {
@@ -361,6 +364,7 @@ final class VoiceWardenCommand {
                 sender.sendMessage(msg().render("command.history-line",
                         Messages.text("time", Formats.clock(line.spokenAt())), Messages.text("text", line.text())));
             }
+            sender.sendMessage(net.kyori.adventure.text.Component.empty());
         });
         return Command.SINGLE_SUCCESS;
     }
@@ -373,7 +377,7 @@ final class VoiceWardenCommand {
             sender.sendMessage(msg().render("command.test-none"));
         } else {
             sender.sendMessage(msg().render("command.test-result",
-                    Messages.component("transcript", StaffAlertService.highlight(text, matches)),
+                    Messages.component("transcript", StaffAlertService.highlight(msg(), text, matches)),
                     Messages.text("categories", StaffAlertService.categories(matches))));
         }
         return Command.SINGLE_SUCCESS;
@@ -448,7 +452,7 @@ final class VoiceWardenCommand {
     private void actionError(CommandSender sender, Throwable error) {
         if (error != null) {
             plugin.getLogger().log(java.util.logging.Level.WARNING, "Staff moderation failed", error);
-            sender.sendMessage(msg().render("command.action-failed", Messages.text("reason", "The action failed; see the console.")));
+            sender.sendMessage(msg().render("command.action-failed", Messages.text("reason", "See the console for why.")));
         }
     }
 

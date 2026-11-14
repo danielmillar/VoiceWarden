@@ -93,7 +93,7 @@ final class DiscordPayload {
         String action = unconfirmed ? "Not confirmed by the double check, no action taken" : switch (type) {
             case NONE -> "Flagged";
             case WARN -> "Warned";
-            case MUTE -> "Muted for " + DiscordText.duration(incident.action().duration()) + " (offense #" + incident.offense() + ")";
+            case MUTE -> "Muted for " + DiscordText.duration(incident.action().duration()) + " (offense " + incident.offense() + ")";
         };
         String title = unconfirmed ? "Voice flag (unconfirmed): {player}" : switch (type) {
             case NONE -> "Voice flag: {player}";
@@ -104,8 +104,8 @@ final class DiscordPayload {
         Embed embed = base(settings, webhook, title, color, incident.playerName(), action,
                 incident.action().duration(), incident.shortId(), incident.detectedAt());
         embed.field("Player", player(incident.playerName(), incident.playerId()));
-        embed.field("Action", DiscordText.plain(action + (incident.dryRun() ? " — dry run, not applied" : "")));
-        embed.field("Flags", DiscordText.plain(incident.flagsInWindow() + " / " + incident.flagThreshold() + " in window"));
+        embed.field("Action", DiscordText.plain(action + (incident.dryRun() ? " (dry run, not applied)" : "")));
+        embed.field("Flags", DiscordText.plain(incident.flagsInWindow() + " of " + incident.flagThreshold() + " in the window"));
         if (check != null) {
             embed.field("Double check", DiscordText.plain((check.confirmed() ? "Confirmed" : "Not confirmed")
                     + ". Second model heard: " + check.describe()));
@@ -195,7 +195,7 @@ final class DiscordPayload {
         Map<String, String> values = Map.of("player", player, "action", action, "duration", DiscordText.duration(duration),
                 "id", id, "server", settings.serverName());
         String title = webhook.title().isEmpty() ? defaultTitle : webhook.title();
-        String footer = webhook.footer().isEmpty() ? "VoiceWarden" + (settings.serverName().isEmpty() ? "" : " • {server}") : webhook.footer();
+        String footer = webhook.footer().isEmpty() ? "VoiceWarden" + (settings.serverName().isEmpty() ? "" : " · {server}") : webhook.footer();
         return new Embed(DiscordText.plain(DiscordText.template(title, values)),
                 DiscordText.plain(DiscordText.template(footer, values)), webhook.color() == -1 ? color : webhook.color(), timestamp);
     }

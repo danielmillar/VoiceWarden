@@ -130,8 +130,8 @@ class DiscordWebhookServiceTest {
         assertEquals("\\*\\***badword**\\*\\* \\> text \\`code\\` \\[link\\]\\(x\\) @everyone", embed.get("description").getAsString());
         assertTrue(field(embed, "Player").startsWith("Alex\\_\\*\n`"));
         assertTrue(field(embed, "Player").endsWith("`" + TestFixtures.PLAYER + "`"));
-        assertEquals("Flagged — dry run, not applied", field(embed, "Action"));
-        assertEquals("2 / 3 in window", field(embed, "Flags"));
+        assertEquals("Flagged \\(dry run, not applied\\)", field(embed, "Action"));
+        assertEquals("2 of 3 in the window", field(embed, "Flags"));
         assertEquals("Profanity: badword", field(embed, "Matched"));
         assertEquals("\\-12s prior \\*line\\* @here", field(embed, "Context"));
         assertEquals("Test server\nworld -1, 64, 12", field(embed, "Server"));
@@ -221,7 +221,7 @@ class DiscordWebhookServiceTest {
         assertTrue(requests.isEmpty());
         assertEquals("Voice auto-mute: Alex", embed.get("title").getAsString());
         assertEquals(0xE74C3C, embed.get("color").getAsInt());
-        assertEquals("Muted for 1h 30m \\(offense \\#2\\) — dry run, not applied", field(embed, "Action"));
+        assertEquals("Muted for 1h 30m \\(offense 2\\) \\(dry run, not applied\\)", field(embed, "Action"));
     }
 
     @Test void autoMuteDistinctUrlsSendsToBothAndStaffOnlyToMutes() throws Exception {

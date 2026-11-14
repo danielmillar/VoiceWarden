@@ -1,167 +1,196 @@
 # VoiceWarden messages: MiniMessage format (https://docs.advntr.dev/minimessage/format.html)
-# Every message can use the theme colours as tags (<accent>text</accent>) and <prefix>. Player-provided text
-# (names, transcripts) is always inserted as plain text, so it can never inject formatting or click events.
+# Every message can use the theme colours as tags (<accent>text</accent>) and the prefixes, such as <prefix>. Player-provided
+# text (names, transcripts) is always inserted as plain text, so it can never inject formatting or click events.
+# Placeholders such as <player> are filled in by the plugin. Keep their names as written.
+# A message can be several chat lines joined by <newline>.
+# The plugin only adds keys missing from this file, so after an update your own edits stay and new defaults do not
+# replace them. Delete a message to get its new default back.
 
 # Colour palette available in every message as tags. Values are hex (#RRGGBB) or named colours.
 # Change these to re-theme the whole plugin.
 theme:
+  # VoiceWarden's own colour: labels, lead-in words, card titles and actions.
+  primary: "#3DD6C6"
   body: "#E4E4EC"
-  muted: "#8B8B9A"
-  accent: "#FFC857"
-  success: "#6EE7A0"
-  error: "#FF7A7A"
+  muted: "#7E7E92"
+  # Separators and times.
+  dim: "#4E4E60"
+  # The value that matters in a line: a name, a duration, a count.
+  accent: "#FFFFFF"
+  success: "#4BE38B"
+  # Needs a look but is not broken; also the words a rule matched in a transcript.
+  warning: "#FFB454"
+  # Only for something that went wrong.
+  error: "#FF5C5C"
 
 # Reusable MiniMessage snippets available as tags, e.g. <prefix>. Their styles carry into the text after them.
 prefixes:
-  prefix: "<gradient:#FFD36E:#F59E0B><b>VoiceWarden</b></gradient> <dark_gray>»</dark_gray> <body>"
+  prefix: "<primary><b>ᴠᴏɪᴄᴇ</b></primary> <dim>|</dim> <body>"
+  # A normal refusal: no permission, an unknown player, a cooldown.
+  hold-up: "<error><b>HOLD UP!</b></error> <body>"
+  # Something went wrong.
+  oops: "<error><b>OOPS!</b></error> <body>"
 
-privacy-join: "<prefix>Voice chat on this server is transcribed and automatically moderated. <muted>Flagged speech may be recorded as evidence for staff."
+privacy-join: "<prefix>Voice chat on this server is transcribed and moderated on the server.<newline>   <muted>Flagged speech may be kept as evidence for staff."
 
 # Consent (config.yml consent:). The dialog is the menu shown in confirm mode.
 consent:
   dialog:
-    title: "<accent>Voice chat moderation"
+    title: "<primary>Voice chat moderation"
     # body: consent.speak-without-consent is false (denying blocks the microphone); body-heard: it is true.
-    body: "Voice chat on this server is transcribed on the server and checked against its rules.\n\nFlagged speech can be recorded as evidence for staff and lead to a voice mute. Nothing is sent to an outside service.\n\nIf you deny, your voice is not processed and other players will not hear you. You can change your answer any time with /voiceconsent."
-    body-heard: "Voice chat on this server is transcribed on the server and checked against its rules.\n\nFlagged speech can be recorded as evidence for staff and lead to a voice mute. Nothing is sent to an outside service.\n\nIf you deny, your voice is not processed. You can change your answer any time with /voiceconsent."
-    accept: "<success>Accept"
-    deny: "<error>Deny"
-  accepted: "<prefix><success>Thanks!</success> Your voice chat is on. <muted>Change your answer with /voiceconsent."
+    body: "<body>Voice chat on this server is transcribed on the server and checked against its rules.\n\nFlagged speech can be kept as evidence for staff and lead to a voice mute. Nothing is sent to an outside service.\n\nIf you deny, your voice is not processed and other players will not hear you. Change your answer any time with <accent>/voiceconsent</accent>."
+    body-heard: "<body>Voice chat on this server is transcribed on the server and checked against its rules.\n\nFlagged speech can be kept as evidence for staff and lead to a voice mute. Nothing is sent to an outside service.\n\nIf you deny, your voice is not processed. Change your answer any time with <accent>/voiceconsent</accent>."
+    accept: "<accent>Accept"
+    deny: "Deny"
+  accepted: "<primary><b>THANKS!</b></primary> <body>Your voice chat is on.<newline>   <muted>Change your answer with /voiceconsent."
   # Sent after denying, and on join while denied. denied: the microphone is blocked; denied-heard: speak-without-consent is true.
-  denied: "<prefix>You declined voice moderation, so nobody hears you in voice chat. <muted>Change your answer with <accent>/voiceconsent</accent>."
-  denied-heard: "<prefix>You declined voice moderation. <muted>Your voice is not processed. Change your answer with <accent>/voiceconsent</accent>."
+  denied: "<prefix>You declined voice moderation, so nobody hears you in voice chat.<newline>   <muted>Change your answer with /voiceconsent."
+  denied-heard: "<prefix>You declined voice moderation, so your voice is not processed.<newline>   <muted>Change your answer with /voiceconsent."
   # Disconnect screen when on-deny is kick.
   kick: "<error>You declined voice chat moderation.</error>\n\n<body>Rejoin and accept to play on this server."
   # /voiceconsent. <time> = when the player answered
-  status-notice: "<prefix>Voice chat on this server is moderated, and joining counts as consent. <muted>Speech is transcribed on the server only."
+  status-notice: "<prefix>Voice chat on this server is moderated, and joining counts as consent.<newline>   <muted>Speech is transcribed on the server only."
   status-accepted: "<prefix>You accepted voice moderation on <accent><time></accent>."
   status-denied: "<prefix>You declined voice moderation on <accent><time></accent>."
   status-pending: "<prefix>You have not answered the current voice moderation rules yet."
 
 alert:
   # <player> <transcript> <categories> <action> <duration> <offense> <flags> <threshold> <id>
-  flag: "<prefix><accent><player></accent><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted> <dark_gray>[<muted><categories></muted>]</dark_gray>"
-  warn: "<prefix><accent><player></accent> was warned <dark_gray>(<muted><flags>/<threshold></muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted> <dark_gray>[<muted><categories></muted>]</dark_gray>"
-  mute: "<prefix><error><player></error> was auto-muted for <error><duration></error> <dark_gray>(<muted>offense #<offense></muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted>"
-  already-muted: "<prefix><accent><player></accent> <dark_gray>(<muted>already muted</muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted>"
+  flag: "<primary><b>FLAGGED!</b></primary> <accent><player></accent><dim>:</dim> <body>\"<transcript>\"</body> <muted><categories>"
+  warn: "<primary><b>WARNED!</b></primary> <accent><player></accent> <muted>(<flags> of <threshold>)</muted><dim>:</dim> <body>\"<transcript>\"</body> <muted><categories>"
+  mute: "<primary><b>MUTED!</b></primary> <accent><player></accent> for <accent><duration></accent> <muted>(offense <offense>)</muted><dim>:</dim> <body>\"<transcript>\""
+  already-muted: "<primary><b>FLAGGED!</b></primary> <accent><player></accent> <muted>(already muted)</muted><dim>:</dim> <body>\"<transcript>\""
   # A MUTE-list hit the double-check model did not hear, so nobody was punished.
   # <heard> = what the second model heard: the quoted text, "nothing" or "could not run"
-  unconfirmed: "<prefix><accent><player></accent> <dark_gray>(<muted>unconfirmed, no action</muted>)</dark_gray><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted> <dark_gray>[<muted>second model heard <heard></muted>]</dark_gray>"
-  dry-run-suffix: " <dark_gray><italic>(dry run, not applied)</italic></dark_gray>"
+  unconfirmed: "<primary><b>FLAGGED!</b></primary> <accent><player></accent> <muted>(unconfirmed, no action)</muted><dim>:</dim> <body>\"<transcript>\"</body> <muted>Second model heard <heard>."
+  dry-run-suffix: " <dim>(dry run, not applied)"
   # Hover text on alerts. <context> = earlier lines, <location> = world x, y, z, <click-hint> = click-mute or click-pardon
-  hover: "<accent>Incident <id></accent>\n<muted>Flags: <body><flags>/<threshold></body>\nLocation: <body><location></body></muted>\n<context>\n\n<click-hint>"
+  hover: "<primary><b>Incident <id></b></primary>\n<muted>Flags: <body><flags> of <threshold></body>\nLocation: <body><location></body></muted>\n<context>\n\n<click-hint>"
   # Clicking an alert prepares a voice mute, or a pardon when the alert is an auto-mute that was applied.
-  click-mute: "<muted>Click to prepare a voice mute"
-  click-pardon: "<muted>Click to prepare a pardon if this was a wrong call"
-  context-line: "<dark_gray><ago></dark_gray> <muted><text></muted>"
-  no-context: "<dark_gray>(no earlier speech)</dark_gray>"
-  staff-mute: "<prefix><accent><actor></accent> voice-muted <error><player></error> for <accent><duration></accent><muted><reason></muted>"
-  staff-unmute: "<prefix><accent><actor></accent> removed the voice mute from <success><player></success>"
+  click-mute: "<body>Click to prepare a voice mute."
+  click-pardon: "<body>Click to prepare a pardon if this was a wrong call."
+  context-line: "<dim><ago></dim> <muted><text></muted>"
+  no-context: "<dim>No earlier speech."
+  # A word a rule matched, inside <transcript>. <text> = the matched words. match-hover: <category> <rule>
+  match: "<warning><u><text></u></warning>"
+  match-hover: "<body><category> <muted>(<rule>)"
+  staff-mute: "<primary><b>MUTED!</b></primary> <accent><actor></accent> voice-muted <accent><player></accent> for <accent><duration></accent><muted><reason></muted>"
+  staff-unmute: "<primary><b>UNMUTED!</b></primary> <accent><actor></accent> removed the voice mute from <accent><player></accent>."
   # <actor> <player> <reason> (": reason", or empty)
-  staff-pardon: "<prefix><accent><actor></accent> pardoned <success><player></success><muted><reason></muted>"
+  staff-pardon: "<primary><b>PARDONED!</b></primary> <accent><actor></accent> pardoned <accent><player></accent><muted><reason></muted>"
 
 player:
-  warned: "<prefix>Please keep voice chat respectful. <muted>Further violations will get you voice-muted."
-  muted: "<prefix>You have been voice-muted for <error><duration></error>. <muted>Reason: <reason>"
-  muted-permanent: "<prefix>You have been voice-muted <error>permanently</error>. <muted>Reason: <reason>"
+  warned: "<warning><b>WARNING!</b></warning> <body>Keep voice chat respectful.<newline>   <muted>If it happens again, you will be muted in voice chat."
+  muted: "<primary><b>MUTED!</b></primary> <body>You are muted in voice chat for <accent><duration></accent>.<newline>   <muted>Reason: <reason>"
+  muted-permanent: "<primary><b>MUTED!</b></primary> <body>You are muted in voice chat <accent>for good</accent>.<newline>   <muted>Reason: <reason>"
   # Shown for the whole mute when mute.feedback.display is action-bar. <remaining> = time left, e.g. 9m 47s
-  muted-actionbar: "<error>Voice muted</error> <dark_gray>-</dark_gray> <body><remaining> left"
-  muted-permanent-actionbar: "<error>Voice muted</error> <dark_gray>-</dark_gray> <body>permanent"
+  muted-actionbar: "<primary><b>ᴍᴜᴛᴇᴅ</b></primary> <dim>|</dim> <accent><remaining></accent> <body>left"
+  muted-permanent-actionbar: "<primary><b>ᴍᴜᴛᴇᴅ</b></primary> <dim>|</dim> <body>for good"
   # Chat line when a muted player talks and nobody can hear them, at most once per mute.feedback.reminder-interval.
   # <remaining> = time left
-  muted-reminder: "<prefix>You are voice muted, so nobody can hear you. <muted><remaining> left."
-  muted-permanent-reminder: "<prefix>You are permanently voice muted, so nobody can hear you."
+  muted-reminder: "<prefix>You are muted, so nobody hears you. <accent><remaining></accent> left."
+  muted-permanent-reminder: "<prefix>You are muted for good, so nobody hears you."
   # Shown when a player who has not accepted voice moderation talks (consent.speak-without-consent: false).
-  consent-needed-actionbar: "<error>Nobody hears you</error> <dark_gray>-</dark_gray> <body>accept voice moderation with <accent>/voiceconsent"
-  no-speak-permission-actionbar: "<prefix><error>You don't have permission to speak in voice chat.</error>"
-  unmuted: "<prefix>You can use voice chat again. <success>Welcome back!</success>"
+  consent-needed-actionbar: "<hold-up>Nobody hears you. Accept voice moderation with <accent>/voiceconsent</accent>."
+  no-speak-permission-actionbar: "<hold-up>You can't speak in voice chat."
+  unmuted: "<primary><b>UNMUTED!</b></primary> <body>You can use voice chat again."
 
 command:
-  no-permission: "<prefix><error>You don't have permission to do that."
-  player-not-found: "<prefix>Player <accent><name></accent> was not found."
-  invalid-duration: "<prefix><accent><input></accent> is not a valid duration. <muted>Examples: 30m, 2h, 1d, perm"
+  no-permission: "<hold-up>You can't do that."
+  player-not-found: "<hold-up>No player called <accent><name></accent> was found."
+  invalid-duration: "<hold-up><accent><input></accent> is not a duration.<newline>   <muted>Try 30m, 2h, 1d or perm."
   muted: "<prefix>Voice-muted <accent><player></accent> for <accent><duration></accent>."
   unmuted: "<prefix>Removed the voice mute from <accent><player></accent>."
-  action-failed: "<prefix><error>That action failed<dark_gray>:</dark_gray> <reason></error>"
-  not-muted: "<prefix><accent><player></accent> is not voice-muted."
-  cannot-mute-bypass: "<prefix><accent><player></accent> has <accent>voicewarden.bypass</accent> and cannot be voice-muted."
-  mutes-header: "<prefix>Active voice mutes <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"
-  mutes-entry: " <dark_gray>▪</dark_gray> <accent><player></accent> <dark_gray>»</dark_gray> <body><remaining> left <dark_gray>•</dark_gray> <muted><reason> (by <actor>)"
+  action-failed: "<oops>That did not work. <reason>"
+  not-muted: "<hold-up><accent><player></accent> is not voice-muted."
+  cannot-mute-bypass: "<hold-up><accent><player></accent> has <accent>voicewarden.bypass</accent> and cannot be voice-muted."
+  # /vw mutes: a card. mutes-header: <count>; mutes-entry: <player> <remaining> <reason> <actor>
+  mutes-header: "<newline> <primary><b>Voice mutes</b></primary><newline> <dim>ᴀᴄᴛɪᴠᴇ</dim><newline><newline> <primary>|</primary> <body>Muted: <accent><count></accent>"
+  mutes-entry: " <primary>|</primary> <accent><player></accent><dim>:</dim> <body><remaining> left</body><dim> · </dim><muted><reason>, by <actor>"
   mutes-empty: "<prefix>Nobody is voice-muted."
-  reloading: "<prefix><muted>Reloading…"
-  reloaded: "<prefix>Reloaded in <accent><time>ms</accent>. <muted><details>"
-  reload-warning: "<prefix><accent>⚠ <warning></accent>"
-  reload-failed: "<prefix>Reload failed<dark_gray>:</dark_gray> <error><reason></error>"
-  alerts-on: "<prefix>Voice alerts <success>enabled</success>."
-  alerts-off: "<prefix>Voice alerts <error>disabled</error>."
+  reloading: "<prefix>Reloading…"
+  # <time> in milliseconds, <details> = what was loaded
+  reloaded: "<prefix>Reloaded in <accent><time>ms</accent>.<newline>   <muted><details>"
+  # <warning> = what to fix. Here <warning> is that text, so this message cannot use the warning colour.
+  reload-warning: "<prefix>Check this<dim>:</dim> <warning>"
+  reload-failed: "<oops>The reload failed, so the previous settings are still in use.<newline>   <muted><reason>"
+  alerts-on: "<prefix>Voice alerts are <success>on</success>."
+  alerts-off: "<prefix>Voice alerts are <muted>off</muted>."
   # /vw pardon. <player>
   pardoned: "<prefix>Pardoned <accent><player></accent>: removed the voice mute and cleared their offenses."
   pardoned-not-muted: "<prefix>Pardoned <accent><player></accent>: they were not muted, so only their offenses were cleared."
-  # /vw history. <player>; record-offenses: <count> <next>; record-muted: <remaining> <reason> <actor>
-  record-header: "<prefix>Voice record of <accent><player></accent><dark_gray>:</dark_gray>"
-  record-offenses: " <dark_gray>▪</dark_gray> <muted>Offenses <accent><count></accent> <dark_gray>•</dark_gray> next auto-mute <body><next></body>"
-  record-muted: " <dark_gray>▪</dark_gray> <error>Muted</error> <body><remaining> left <dark_gray>•</dark_gray> <muted><reason> (by <actor>)"
-  record-not-muted: " <dark_gray>▪</dark_gray> <success>Not muted</success>"
+  # /vw history: a card. <player>; record-offenses: <count> <next>; record-muted: <remaining> <reason> <actor>
+  record-header: "<newline> <primary><b><player></b></primary><newline> <dim>ᴠᴏɪᴄᴇ ʀᴇᴄᴏʀᴅ</dim><newline>"
+  record-offenses: " <primary>|</primary> <body>Offenses: <accent><count></accent></body><dim> · </dim><muted>next auto-mute <next>"
+  record-muted: " <primary>|</primary> <body>Muted: <accent><remaining> left</accent></body><dim> · </dim><muted><reason>, by <actor>"
+  record-not-muted: " <primary>|</primary> <body>Muted: <accent>no</accent>"
   # Consent lines: <time> = when they answered, <version> = the rules-version they answered
-  record-consent-accepted: " <dark_gray>▪</dark_gray> <muted>Consent</muted> <success>accepted</success> <muted>on <time> (rules v<version>)"
-  record-consent-denied: " <dark_gray>▪</dark_gray> <muted>Consent</muted> <error>denied</error> <muted>on <time> (rules v<version>)"
-  record-consent-pending: " <dark_gray>▪</dark_gray> <muted>Consent</muted> <accent>not answered</accent> <muted>for the current rules"
-  record-consent-notice: " <dark_gray>▪</dark_gray> <muted>Consent by joining (notice mode)"
-  record-empty: " <dark_gray>▪</dark_gray> <muted>No past mutes."
-  record-page-empty: " <dark_gray>▪</dark_gray> <muted>Nothing on this page."
+  record-consent-accepted: " <primary>|</primary> <body>Consent: <success>accepted</success></body><dim> · </dim><muted><time>, rules v<version><newline>"
+  record-consent-denied: " <primary>|</primary> <body>Consent: <error>denied</error></body><dim> · </dim><muted><time>, rules v<version><newline>"
+  record-consent-pending: " <primary>|</primary> <body>Consent: <accent>not answered</accent></body><dim> · </dim><muted>for the current rules<newline>"
+  record-consent-notice: " <primary>|</primary> <body>Consent: <accent>by joining</accent></body><dim> · </dim><muted>notice mode<newline>"
+  record-empty: " <muted>No past mutes."
+  record-page-empty: " <muted>Nothing on this page."
   # Entries, newest first: <time> <actor> <reason> (": reason", or empty); record-mute also has <duration>
-  record-mute: " <dark_gray><time></dark_gray> <error>Muted</error> <body>for <duration></body> <muted>by <actor><reason>"
-  record-unmute: " <dark_gray><time></dark_gray> <success>Unmuted</success> <muted>by <actor><reason>"
-  record-expire: " <dark_gray><time></dark_gray> <muted>Mute expired"
-  record-pardon: " <dark_gray><time></dark_gray> <success>Pardoned</success> <muted>by <actor><reason>"
+  record-mute: " <dim><time></dim> <primary>Muted</primary> <body>for <duration></body> <muted>by <actor><reason>"
+  record-unmute: " <dim><time></dim> <success>Unmuted</success> <muted>by <actor><reason>"
+  record-expire: " <dim><time></dim> <muted>Mute expired"
+  record-pardon: " <dim><time></dim> <success>Pardoned</success> <muted>by <actor><reason>"
   # <page> <pages> <newer> <older>; the buttons can use <player> and <page> (the page they open) in their click command
-  record-footer: " <newer> <muted>Page <page> of <pages></muted> <older>"
-  record-newer: "<click:run_command:'/vw history <player> <page>'><hover:show_text:'<muted>Newer entries'><accent>[« Newer]</accent></hover></click>"
-  record-older: "<click:run_command:'/vw history <player> <page>'><hover:show_text:'<muted>Older entries'><accent>[Older »]</accent></hover></click>"
-  # /vw transcript and /viewreport. <player> <count>; history-line: <time> <text>
-  history-header: "<prefix>Recent speech from <accent><player></accent> <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"
-  history-line: " <dark_gray><time></dark_gray> <muted><text></muted>"
+  record-footer: "<newline> <newer><older><muted>Page <page> of <pages>"
+  record-newer: "<click:run_command:'/vw history <player> <page>'><hover:show_text:'<body>Show newer entries.'><primary>▸ ɴᴇᴡᴇʀ</primary></hover></click>    "
+  record-older: "<click:run_command:'/vw history <player> <page>'><hover:show_text:'<body>Show older entries.'><primary>▸ ᴏʟᴅᴇʀ</primary></hover></click>    "
+  # /vw transcript and /viewreport: a card. <player> <count>; history-line: <time> <text>
+  history-header: "<newline> <primary><b><player></b></primary><newline> <dim>ʀᴇᴄᴇɴᴛ ѕᴘᴇᴇᴄʜ</dim><newline><newline> <primary>|</primary> <body>Lines: <accent><count></accent><newline>"
+  history-line: " <dim><time></dim> <body><text>"
   history-empty: "<prefix>No recent speech from <accent><player></accent>."
-  test-result: "<prefix>Matches<dark_gray>:</dark_gray> <transcript> <dark_gray>[<muted><categories></muted>]</dark_gray>"
-  test-none: "<prefix><success>No rules matched."
-  offenses: "<prefix><accent><player></accent> has <accent><count></accent> auto-mute offense(s). <muted>Next auto-mute: <body><next></body>."
+  test-result: "<prefix>Matches<dim>:</dim> <body>\"<transcript>\"</body> <muted><categories>"
+  test-none: "<prefix>No rules matched."
+  offenses: "<prefix><accent><player></accent> has <accent><count></accent> auto-mute offense(s).<newline>   <muted>Next auto-mute: <next>."
   offenses-reset: "<prefix>Reset the offense count of <accent><player></accent>."
-  discordtest-sent: "<prefix><muted>Sending Discord test payloads…"
+  discordtest-sent: "<prefix>Sending Discord test payloads…"
   discordtest-line: "<prefix>Discord <muted><line>"
 
-# /vw check: one line per finding. <area> <finding> <fix> (the check.fix line, or empty when OK)
+# /vw check: a card, one line per finding. <area> <finding> <fix> (the check.fix line, or empty when OK)
 check:
-  start: "<prefix><muted>Checking the setup…"
-  ok: " <success>OK</success> <accent><area></accent><dark_gray>:</dark_gray> <muted><finding>"
-  warn: " <accent>WARN</accent> <accent><area></accent><dark_gray>:</dark_gray> <body><finding><fix>"
-  fail: " <error>FAIL</error> <accent><area></accent><dark_gray>:</dark_gray> <body><finding><fix>"
+  start: "<newline> <primary><b>Setup</b></primary><newline> <dim>ᴄʜᴇᴄᴋ</dim><newline>"
+  ok: " <success>✔</success> <body><area></body><dim>:</dim> <muted><finding>"
+  warn: " <warning>⚠</warning> <body><area></body><dim>:</dim> <body><finding><fix>"
+  fail: " <error>✘</error> <body><area></body><dim>:</dim> <body><finding><fix>"
   # <fix>
-  fix: " <dark_gray>→</dark_gray> <muted><fix>"
+  fix: "<newline>   <muted><fix>"
   # <ok> <warn> <fail> counts
-  summary: "<prefix><success><ok> OK</success> <dark_gray>•</dark_gray> <accent><warn> WARN</accent> <dark_gray>•</dark_gray> <error><fail> FAIL</error>"
+  summary: "<newline> <success><ok> OK</success><dim> · </dim><warning><warn> to look at</warning><dim> · </dim><error><fail> broken</error><newline>"
   # <reason>
-  error: "<prefix><error>The check could not finish<dark_gray>:</dark_gray> <reason></error>"
+  error: "<oops>The check could not finish.<newline>   <muted><reason>"
 
+# /vw stats: a card, one chat line per entry.
 stats:
-  - "<prefix>Engine<dark_gray>:</dark_gray> <accent><state></accent> <dark_gray>(<muted><model></muted>)</dark_gray>"
-  - " <dark_gray>▪</dark_gray> <muted>Active speakers <accent><speakers></accent> <dark_gray>•</dark_gray> Queue <accent><queue></accent> <dark_gray>•</dark_gray> Workers <accent><workers></accent>"
-  - " <dark_gray>▪</dark_gray> <muted>Utterances <accent><transcribed></accent> transcribed, <accent><no-speech></accent> no speech, <accent><dropped></accent> dropped"
-  - " <dark_gray>▪</dark_gray> <muted>Latency <accent><latency-avg></accent> avg, <accent><latency-p95></accent> p95 <dark_gray>•</dark_gray> Speed <accent><rtf>×</accent> real time"
-  - " <dark_gray>▪</dark_gray> <muted>Incidents <accent><incidents></accent> <dark_gray>(<muted><unconfirmed> unconfirmed</muted>)</dark_gray> <dark_gray>•</dark_gray> Auto-mutes <accent><automutes></accent> <dark_gray>•</dark_gray> Active mutes <accent><mutes></accent>"
-  - " <dark_gray>▪</dark_gray> <muted>Discord <accent><discord-sent></accent> sent, <accent><discord-queue></accent> queued, <accent><discord-failed></accent> failed"
+  - ""
+  - " <primary><b>Voice stats</b></primary>"
+  - " <dim>ᴇɴɢɪɴᴇ</dim>"
+  - ""
+  - " <primary>|</primary> <body>Engine: <accent><state></accent></body><dim> · </dim><muted><model>"
+  - " <primary>|</primary> <body>Speakers: <accent><speakers></accent></body><dim> · </dim><body>Queue: <accent><queue></accent></body><dim> · </dim><body>Workers: <accent><workers></accent>"
+  - " <primary>|</primary> <body>Utterances: <accent><transcribed></accent> transcribed, <accent><no-speech></accent> no speech, <accent><dropped></accent> dropped"
+  - " <primary>|</primary> <body>Latency: <accent><latency-avg></accent> avg, <accent><latency-p95></accent> p95</body><dim> · </dim><body>Speed: <accent><rtf>×</accent> real time"
+  - " <primary>|</primary> <body>Incidents: <accent><incidents></accent></body> <muted>(<unconfirmed> unconfirmed)</muted><dim> · </dim><body>Auto-mutes: <accent><automutes></accent></body><dim> · </dim><body>Muted now: <accent><mutes></accent>"
+  - " <primary>|</primary> <body>Discord: <accent><discord-sent></accent> sent, <accent><discord-queue></accent> queued, <accent><discord-failed></accent> failed"
+  - ""
 
 report:
-  disabled: "<prefix><error>Voice reports are disabled."
-  usage: "<prefix>Usage<dark_gray>:</dark_gray> <accent>/reportvoice <player> [minutes]</accent>"
-  self: "<prefix><error>You can't report yourself."
-  cooldown: "<prefix>Please wait <accent><remaining></accent> before reporting again."
-  nothing: "<prefix>There is no recent speech from <accent><player></accent> to report."
-  submitted: "<prefix>Thanks! Your report about <accent><player></accent> <dark_gray>(<muted><lines> lines</muted>)</dark_gray> was sent to staff."
-  staff-alert: "<prefix><accent><reporter></accent> reported <accent><player></accent>'s voice chat <dark_gray>(<muted><lines> lines, last <window></muted>)</dark_gray> <click:run_command:'/viewreport <id>'><hover:show_text:'<muted>Open report'><accent>[View]</accent></hover></click>"
-  staff-transcript-line: " <dark_gray><time></dark_gray> <muted><text></muted>"
-  inbox-header: "<prefix>Open voice reports <dark_gray>(<accent><count></accent>)</dark_gray><dark_gray>:</dark_gray>"
-  inbox-entry: " <dark_gray>▪</dark_gray> <click:run_command:'/viewreport <id>'><hover:show_text:'<muted>Open report'><accent><id></accent></hover></click> <dark_gray>»</dark_gray> <body><player></body> <muted>by <reporter>, <ago> ago (<lines> lines)</muted> <click:run_command:'/reportinbox review <id>'><hover:show_text:'<muted>Mark reviewed'><success>[✔]</success></hover></click>"
+  disabled: "<hold-up>Voice reports are turned off on this server."
+  usage: "<hold-up>Tell us who to report.<newline>   <muted>/reportvoice <player> [minutes]"
+  self: "<hold-up>You can't report yourself."
+  cooldown: "<hold-up>Wait <accent><remaining></accent> before you report again."
+  nothing: "<hold-up>There is no recent speech from <accent><player></accent> to report."
+  submitted: "<primary><b>THANKS!</b></primary> <body>Your report about <accent><player></accent> went to staff with <accent><lines></accent> lines of speech."
+  staff-alert: "<primary><b>REPORT!</b></primary> <body><accent><reporter></accent> reported <accent><player></accent>'s voice chat.</body> <muted>(<lines> lines, last <window>)</muted><newline>   <click:run_command:'/viewreport <id>'><hover:show_text:'<body>Open the report.'><primary>▸ ᴠɪᴇᴡ</primary></hover></click>"
+  staff-transcript-line: " <dim><time></dim> <body><text>"
+  # /reportinbox: a card. inbox-header: <count>; inbox-entry: <id> <player> <reporter> <ago> <lines>
+  inbox-header: "<newline> <primary><b>Voice reports</b></primary><newline> <dim>ɪɴʙᴏx</dim><newline><newline> <primary>|</primary> <body>Open: <accent><count></accent>"
+  inbox-entry: " <primary>|</primary> <accent><player></accent> <muted>by <reporter>, <ago> ago, <lines> lines</muted><newline>   <click:run_command:'/viewreport <id>'><hover:show_text:'<body>Open report <id>.'><primary>▸ ᴠɪᴇᴡ</primary></hover></click>  <click:run_command:'/reportinbox review <id>'><hover:show_text:'<body>Mark report <id> as reviewed.'><muted>▸ ʀᴇᴠɪᴇᴡᴇᴅ</muted></hover></click>"
   inbox-empty: "<prefix>No open voice reports."
-  reviewed: "<prefix>Report <accent><id></accent> marked as <success>reviewed</success>."
-  not-found: "<prefix>Report <accent><id></accent> was not found."
+  reviewed: "<prefix>Marked report <accent><id></accent> as reviewed."
+  not-found: "<hold-up>No report or player called <accent><id></accent> was found."
   book-title: "Voice report: <player>"
