@@ -294,6 +294,25 @@ privacy:
   # Tell players on join that voice chat is transcribed and moderated (text in messages.yml).
   join-message: true
 
+# ── Consent ──────────────────────────────────────────────────────────────────
+consent:
+  # notice:  joining counts as consent (with the join message above, if enabled).
+  # confirm: players are asked to accept or deny voice moderation in a menu when they join. Until a player
+  #          accepts, their voice is never decoded, transcribed, buffered or recorded. Players review and
+  #          change their answer with /voiceconsent; staff see it in /voicewarden history <player>.
+  mode: notice
+  # Raise this number when your voice rules change: everyone is asked again on their next join, and
+  # online players are asked straight away after /voicewarden reload.
+  rules-version: 1
+  # What happens when a player denies (confirm mode only):
+  # stay: they keep playing and are not asked again on join (they can change it with /voiceconsent).
+  # kick: they are disconnected (message in messages.yml) and asked again the next time they join.
+  on-deny: stay
+  # Confirm mode: whether a player who has not accepted (denied, or not answered yet) is heard by others.
+  # false (recommended): they can listen but their microphone is blocked, so denying is not a way to speak
+  #                      unmoderated. true: they are heard by others, but VoiceWarden never processes it.
+  speak-without-consent: false
+
 # ── Logging & health ─────────────────────────────────────────────────────────
 logging:
   # Write every transcript to plugins/VoiceWarden/logs/transcripts-YYYY-MM-DD.log

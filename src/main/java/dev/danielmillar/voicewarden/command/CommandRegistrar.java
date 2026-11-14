@@ -12,5 +12,6 @@ public final class CommandRegistrar {
     public static void register(Commands commands, VoiceWardenPlugin plugin) {
         new VoiceWardenCommand(plugin).register(commands);
         new ReportCommands(plugin).register(commands);
+        new ConsentCommand(plugin).register(commands);
     }
 }

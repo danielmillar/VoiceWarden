@@ -6,6 +6,8 @@ import dev.danielmillar.voicewarden.config.ConfigBundle;
 import dev.danielmillar.voicewarden.config.Messages;
 import dev.danielmillar.voicewarden.config.PluginConfig;
 import dev.danielmillar.voicewarden.config.TurboModelActivation;
+import dev.danielmillar.voicewarden.consent.ConsentPrompt;
+import dev.danielmillar.voicewarden.consent.ConsentService;
 import dev.danielmillar.voicewarden.evidence.EvidenceStore;
 import dev.danielmillar.voicewarden.health.HealthMonitor;
 import dev.danielmillar.voicewarden.health.Metrics;
@@ -74,6 +76,8 @@ public final class VoiceWardenPlugin extends JavaPlugin {
     private OnlinePlayers players;
     private TranscriptBuffer transcriptBuffer;
     private MuteService mutes;
+    private ConsentService consent;
+    private ConsentPrompt consentPrompt;
     private StaffAlertService alerts;
     private DiscordWebhookService discord;
     private EvidenceStore evidence;
@@ -151,6 +155,9 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         transcriptBuffer = new TranscriptBuffer(bufferLimits(config));
         mutes = new MuteService(this::config, this::messages, luckPerms != null ? luckPerms : VoiceMuteMirror.NONE, players,
                 executors.io(), getLogger(), database);
+        consent = new ConsentService(() -> config.consent(), database, System::currentTimeMillis, getLogger());
+        consent.load();
+        consentPrompt = new ConsentPrompt(this, this::config, this::messages, consent, getLogger());
         alerts = new StaffAlertService(this::config, this::messages, players, getLogger());
         discord = new DiscordWebhookService(() -> config.discord(), http, getLogger());
         staffModeration = new StaffModerationService(mutes, this::isBypassed, id -> moderation.forgive(id), action -> {
@@ -168,26 +175,36 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         reportStore = new ReportStore(database, getLogger());
         reports = new ReportService(this::config, transcriptBuffer, reportStore, alerts, discord, evidence, executors.io(), getLogger());
 
-        ingest = new AudioIngestService(this::config, metrics, executors.decode(), segment -> transcription.submit(segment),
-                players::get, player -> player.hasPermission(AudioIngestService.BYPASS_PERMISSION), getLogger());
+        // The second consent check drops an utterance that was still open when the player withdrew consent.
+        ingest = new AudioIngestService(this::config, metrics, executors.decode(), segment -> {
+            if (consent.allowsProcessing(segment.playerId())) {
+                transcription.submit(segment);
+            }
+        }, players::get, player -> player.hasPermission(AudioIngestService.BYPASS_PERMISSION), consent::allowsProcessing,
+                getLogger());
         transcription = new TranscriptionService(dataFolder, new Downloader(http, getLogger()), executors.io(), this::config,
                 metrics, getLogger(), moderation::onTranscript, ready -> ingest.setAccepting(ready && config.enabled()));
         health = new HealthMonitor(this::config, metrics, transcription, getLogger());
 
         mutes.onExpiry(action -> discord.submitStaffAction(action));
-        speechNotice = new VoiceSpeechNotice(this, this::config, this::messages, mutes, System::currentTimeMillis, getLogger());
+        speechNotice = new VoiceSpeechNotice(this, this::config, this::messages, mutes, consent, System::currentTimeMillis,
+                getLogger());
         mutes.onMute(speechNotice::show);
         permissionMessageHook = VoicePermissionMessageHook.install(voicechat.getClass().getClassLoader(),
                 speechNotice::onDeniedSpeech, getLogger());
-        bridge = new VoiceChatBridge(ingest, mutes, () -> config.mute(), speechNotice::onDeniedSpeech);
+        bridge = new VoiceChatBridge(ingest, mutes, consent, () -> config.mute(), speechNotice::onDeniedSpeech);
         // Must happen in onEnable: Simple Voice Chat reads registered plugins once, when the server finishes loading.
         voicechat.registerPlugin(bridge);
 
         getServer().getPluginManager().registerEvents(new PlayerListener(players, this::config, this::messages,
-                speechNotice::show, speechNotice::onRespawn, id -> {
+                player -> {
+                    speechNotice.show(player);
+                    consentPrompt.onJoin(player);
+                }, speechNotice::onRespawn, id -> {
             speechNotice.onDisconnect(id);
             ingest.onDisconnect(id);
         }), this);
+        getServer().getPluginManager().registerEvents(consentPrompt, this);
         if (luckPerms != null) {
             luckPerms.onUserRecalculate(this, id -> ingest.refreshBypass(id));
         }
@@ -198,6 +215,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         offenses.load();
         mutes.start(executors.timer());
         players.all().forEach(speechNotice::show);
+        consentPrompt.askOnline(players.all());
         ingest.start(executors.timer());
         transcriptLog.start(executors.timer());
         health.start(executors.timer());
@@ -282,6 +300,9 @@ public final class VoiceWardenPlugin extends JavaPlugin {
                 mutes.reconcileMirrors();
                 players.all().forEach(speechNotice::show);
             }
+            if (!config.consent().equals(previous.consent())) {
+                consentPrompt.askOnline(players.all());
+            }
             health.start(executors.timer());
 
             String engineNote = "";
@@ -341,6 +362,14 @@ public final class VoiceWardenPlugin extends JavaPlugin {
 
     public MuteService mutes() {
         return mutes;
+    }
+
+    public ConsentService consent() {
+        return consent;
+    }
+
+    public ConsentPrompt consentPrompt() {
+        return consentPrompt;
     }
 
     public StaffAlertService alerts() {

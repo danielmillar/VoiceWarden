@@ -40,6 +40,9 @@ permissions:
   voicewarden.vcmute:
     description: Use /voicewarden vcmute, unvcmute, pardon, mutes, offenses and history.
     default: op
+  voicewarden.consent:
+    description: Use /voiceconsent to review or change voice moderation consent.
+    default: true
   voicewarden.report:
     description: Use /reportvoice to report a player's voice chat.
     default: true

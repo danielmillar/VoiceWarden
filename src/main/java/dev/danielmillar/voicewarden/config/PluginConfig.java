@@ -25,6 +25,7 @@ public record PluginConfig(
         EvidenceSettings recordings,
         DiscordSettings discord,
         boolean privacyJoinMessage,
+        Consent consent,
         Logging logging,
         Duration healthCheckInterval
 ) {
@@ -173,6 +174,21 @@ public record PluginConfig(
             return d.compareTo(maxWindow) > 0 ? maxWindow : d;
         }
     }
+
+    /**
+     * @param rulesVersion        raising it asks every player again on their next join
+     * @param speakWithoutConsent in confirm mode, whether a player who has not accepted is still heard by others
+     */
+    public record Consent(ConsentMode mode, int rulesVersion, OnDeny onDeny, boolean speakWithoutConsent) {
+        public boolean confirm() {
+            return mode == ConsentMode.CONFIRM;
+        }
+    }
+
+    /** {@code notice}: joining counts as consent. {@code confirm}: voice is processed only after the player accepts. */
+    public enum ConsentMode { NOTICE, CONFIRM }
+
+    public enum OnDeny { STAY, KICK }
 
     public record Logging(boolean transcripts, boolean debug) {
     }

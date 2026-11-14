@@ -29,6 +29,22 @@ class ConfigLoaderTest {
         assertEquals(MuteScope.EVERYTHING, loaded.config().mute().scope());
         assertEquals(PluginConfig.MuteDisplay.ACTION_BAR, loaded.config().mute().display());
         assertEquals(Duration.ofSeconds(30), loaded.config().mute().reminderInterval());
+        assertEquals(new PluginConfig.Consent(PluginConfig.ConsentMode.NOTICE, 1, PluginConfig.OnDeny.STAY, false),
+                loaded.config().consent());
+    }
+
+    @Test void consentSettingsAreReadAndInvalidOnesFallBackWithAWarning() throws Exception {
+        var file = folder.resolve("config.yml");
+        java.nio.file.Files.writeString(file, "consent: {mode: confirm, rules-version: 3, on-deny: kick, speak-without-consent: true}\n");
+        var loaded = ConfigLoader.load(folder, file);
+        assertEquals(new PluginConfig.Consent(PluginConfig.ConsentMode.CONFIRM, 3, PluginConfig.OnDeny.KICK, true),
+                loaded.config().consent());
+        assertEquals(java.util.List.of(), loaded.warnings());
+        java.nio.file.Files.writeString(file, "consent: {mode: ask, rules-version: 0, on-deny: ban}\n");
+        loaded = ConfigLoader.load(folder, file);
+        assertEquals(new PluginConfig.Consent(PluginConfig.ConsentMode.NOTICE, 1, PluginConfig.OnDeny.STAY, false),
+                loaded.config().consent());
+        assertEquals(3, loaded.warnings().size());
     }
 
     @Test void existingMuteConfigKeepsBlockingEverythingAndItsListeningChoice() throws Exception {

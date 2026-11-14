@@ -17,6 +17,25 @@ prefixes:
 
 privacy-join: "<prefix>Voice chat on this server is transcribed and automatically moderated. <muted>Flagged speech may be recorded as evidence for staff."
 
+# Consent (config.yml consent:). The dialog is the menu shown in confirm mode.
+consent:
+  dialog:
+    title: "<accent>Voice chat moderation"
+    body: "Voice chat on this server is transcribed on the server and checked against its rules.\n\nFlagged speech can be recorded as evidence for staff and lead to a voice mute. Nothing is sent to an outside service.\n\nIf you deny, your voice is not processed and you can change your answer any time with /voiceconsent."
+    accept: "<success>Accept"
+    deny: "<error>Deny"
+  accepted: "<prefix><success>Thanks!</success> Your voice chat is on. <muted>Change your answer with /voiceconsent."
+  # Sent after denying, and on join while denied. denied: the microphone is blocked; denied-heard: speak-without-consent is true.
+  denied: "<prefix>You declined voice moderation, so nobody hears you in voice chat. <muted>Change your answer with <accent>/voiceconsent</accent>."
+  denied-heard: "<prefix>You declined voice moderation. <muted>Your voice is not processed. Change your answer with <accent>/voiceconsent</accent>."
+  # Disconnect screen when on-deny is kick.
+  kick: "<error>You declined voice chat moderation.</error>\n\n<body>Rejoin and accept to play on this server."
+  # /voiceconsent. <time> = when the player answered
+  status-notice: "<prefix>Voice chat on this server is moderated, and joining counts as consent. <muted>Speech is transcribed on the server only."
+  status-accepted: "<prefix>You accepted voice moderation on <accent><time></accent>."
+  status-denied: "<prefix>You declined voice moderation on <accent><time></accent>."
+  status-pending: "<prefix>You have not answered the current voice moderation rules yet."
+
 alert:
   # <player> <transcript> <categories> <action> <duration> <offense> <flags> <threshold> <id>
   flag: "<prefix><accent><player></accent><dark_gray>:</dark_gray> <muted>\"</muted><transcript><muted>\"</muted> <dark_gray>[<muted><categories></muted>]</dark_gray>"
@@ -50,6 +69,8 @@ player:
   # <remaining> = time left
   muted-reminder: "<prefix>You are voice muted, so nobody can hear you. <muted><remaining> left."
   muted-permanent-reminder: "<prefix>You are permanently voice muted, so nobody can hear you."
+  # Shown when a player who has not accepted voice moderation talks (consent.speak-without-consent: false).
+  consent-needed-actionbar: "<prefix><error>Nobody can hear you.</error> <body>Accept voice moderation with <accent>/voiceconsent</accent>"
   no-speak-permission-actionbar: "<prefix><error>You don't have permission to speak in voice chat.</error>"
   unmuted: "<prefix>You can use voice chat again. <success>Welcome back!</success>"
 
@@ -79,6 +100,11 @@ command:
   record-offenses: " <dark_gray>▪</dark_gray> <muted>Offenses <accent><count></accent> <dark_gray>•</dark_gray> next auto-mute <body><next></body>"
   record-muted: " <dark_gray>▪</dark_gray> <error>Muted</error> <body><remaining> left <dark_gray>•</dark_gray> <muted><reason> (by <actor>)"
   record-not-muted: " <dark_gray>▪</dark_gray> <success>Not muted</success>"
+  # Consent lines: <time> = when they answered, <version> = the rules-version they answered
+  record-consent-accepted: " <dark_gray>▪</dark_gray> <muted>Consent</muted> <success>accepted</success> <muted>on <time> (rules v<version>)"
+  record-consent-denied: " <dark_gray>▪</dark_gray> <muted>Consent</muted> <error>denied</error> <muted>on <time> (rules v<version>)"
+  record-consent-pending: " <dark_gray>▪</dark_gray> <muted>Consent</muted> <accent>not answered</accent> <muted>for the current rules"
+  record-consent-notice: " <dark_gray>▪</dark_gray> <muted>Consent by joining (notice mode)"
   record-empty: " <dark_gray>▪</dark_gray> <muted>No past mutes."
   record-page-empty: " <dark_gray>▪</dark_gray> <muted>Nothing on this page."
   # Entries, newest first: <time> <actor> <reason> (": reason", or empty); record-mute also has <duration>
