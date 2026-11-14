@@ -48,8 +48,8 @@ A few things to know:
 `consent.mode: notice`, the default, tells players on join that voice chat is moderated (`privacy.join-message`), and
 joining counts as consent.
 
-With `consent.mode: confirm`, each player is asked to accept or deny in a menu when they join. The menu can't be
-closed with Escape. Until a player accepts, VoiceWarden never decodes, transcribes, buffers or records their voice.
+With `consent.mode: confirm`, each player is asked to accept or deny in a menu when they join (or when they respawn,
+if they joined dead). Until they answer, the menu can't be closed with Escape. Until a player accepts, VoiceWarden never decodes, transcribes, buffers or records their voice.
 Players see their answer and change it with `/voiceconsent`, and staff see it in `/vw history <player>`.
 
 - **Denied or not answered yet.** By default (`consent.speak-without-consent: false`) the player can listen but

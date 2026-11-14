@@ -24,13 +24,13 @@ final class ConsentCommand {
 
     void register(Commands commands) {
         commands.register(Commands.literal("voiceconsent")
-                .requires(src -> src.getSender() instanceof Player p && p.hasPermission("voicewarden.consent"))
+                .requires(src -> src.getSender().hasPermission("voicewarden.consent"))
                 .executes(this::run)
                 .build(), "Review or change your voice moderation consent", List.of());
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
-        if (!(ctx.getSource().getSender() instanceof Player player)) {
+        if (!(ctx.getSource().getExecutor() instanceof Player player)) {
             return 0;
         }
         ConsentService consent = plugin.consent();

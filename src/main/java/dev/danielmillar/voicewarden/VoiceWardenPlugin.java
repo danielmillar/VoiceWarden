@@ -200,7 +200,10 @@ public final class VoiceWardenPlugin extends JavaPlugin {
                 player -> {
                     speechNotice.show(player);
                     consentPrompt.onJoin(player);
-                }, speechNotice::onRespawn, id -> {
+                }, player -> {
+                    speechNotice.onRespawn(player);
+                    consentPrompt.onRespawn(player);
+                }, id -> {
             speechNotice.onDisconnect(id);
             ingest.onDisconnect(id);
         }), this);

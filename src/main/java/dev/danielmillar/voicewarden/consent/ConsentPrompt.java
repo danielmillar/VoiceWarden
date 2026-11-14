@@ -22,8 +22,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * The consent menu: a Paper dialog with Accept and Deny that the player cannot close with Escape. The buttons send
- * fixed custom-click keys, so an answer still lands after {@code /voicewarden reload}.
+ * The consent menu: a Paper dialog with Accept and Deny. A player who has to answer cannot close it with Escape; one
+ * whose answer stands and who opened it with /voiceconsent can. The buttons send fixed custom-click keys, so an answer
+ * still lands after {@code /voicewarden reload}.
  */
 public final class ConsentPrompt implements Listener {
 
@@ -56,6 +57,13 @@ public final class ConsentPrompt implements Listener {
         }
     }
 
+    /** A player who joined dead was on the death screen, which hides the join prompt. */
+    public void onRespawn(Player player) {
+        if (consent.shouldAsk(player.getUniqueId())) {
+            run(player, this::show, 1);
+        }
+    }
+
     /** After a reload that changed the consent settings: ask online players whose answer no longer counts. */
     public void askOnline(Iterable<? extends Player> players) {
         for (Player player : players) {
@@ -70,7 +78,7 @@ public final class ConsentPrompt implements Listener {
         Messages m = messages.get();
         Dialog dialog = Dialog.create(factory -> factory.empty()
                 .base(DialogBase.builder(m.render("consent.dialog.title"))
-                        .canCloseWithEscape(false)
+                        .canCloseWithEscape(!consent.shouldAsk(player.getUniqueId()))
                         .body(List.of(DialogBody.plainMessage(m.render(config.get().consent().speakWithoutConsent()
                                 ? "consent.dialog.body-heard" : "consent.dialog.body"), 300)))
                         .build())
