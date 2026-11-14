@@ -43,6 +43,14 @@ A few things to know:
 - Players name their own voice chat groups, so a muted player can create a group with an allowed name. Only list
   groups that staff watch.
 
+## Placeholders
+
+With PlaceholderAPI installed, `%voicewarden_muted%`, `%voicewarden_mute_remaining%`, `%voicewarden_mute_reason%`,
+`%voicewarden_offenses%` and `%voicewarden_next_mute%` show a player's voice mute status (the README describes each).
+The offence count is the one the mute ladder uses, so it drops to 0 once `moderation.mute-ladder.reset-after-days`
+have passed since the last automatic mute. They work for offline players too, and are empty where there is no player,
+such as in the console.
+
 ## Customising
 
 All files are in `plugins/VoiceWarden/`.

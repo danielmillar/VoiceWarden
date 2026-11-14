@@ -15,6 +15,10 @@ dependencies:
       load: BEFORE
       required: false
       join-classpath: true
+    PlaceholderAPI:
+      load: BEFORE
+      required: false
+      join-classpath: true
 permissions:
   voicewarden.admin:
     description: Full access to VoiceWarden commands (does not include bypass).
