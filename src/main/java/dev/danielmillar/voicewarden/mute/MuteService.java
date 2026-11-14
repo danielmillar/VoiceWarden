@@ -327,8 +327,9 @@ public final class MuteService implements AutoCloseable {
                 return current;
             }
             removed.set(true);
-            MuteEvent event = new MuteEvent(id, mute.playerName(), type, System.currentTimeMillis(), actor, reason, null,
-                    false);
+            // An expiry is dated when the mute ran out, not when the sweeper noticed (possibly after a restart).
+            long at = type == MuteEvent.Type.EXPIRE ? mute.expiresAt() : System.currentTimeMillis();
+            MuteEvent event = new MuteEvent(id, mute.playerName(), type, at, actor, reason, null, false);
             database.write("the removal of " + mute.playerName() + "'s voice mute", c -> {
                 MuteTable.delete(c, id);
                 MuteTable.record(c, event);

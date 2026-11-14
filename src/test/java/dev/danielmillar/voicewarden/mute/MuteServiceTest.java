@@ -247,6 +247,7 @@ class MuteServiceTest {
         var second = reloaded.history(alice, 2, 2).join();
         assertEquals(java.util.List.of(MuteEvent.Type.MUTE, MuteEvent.Type.UNMUTE), types(second));
         assertEquals(Duration.ZERO, second.events().getFirst().duration());
+        assertEquals(second.events().getFirst().expiresAt(), first.events().getLast().at()); // dated when it ran out
         assertEquals("mod", second.events().getLast().actor());
         var third = reloaded.history(alice, 3, 2).join();
         assertEquals(java.util.List.of(MuteEvent.Type.MUTE), types(third));
