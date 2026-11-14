@@ -99,6 +99,15 @@ default rules automatically. Back them up before comparing them with the newest 
 editing files. Restart the server after changing the plugin file itself. Changing `audio.decode-threads` needs a
 server restart to apply, and `/vw reload` tells you so.
 
+### Upgrading to retention
+
+- Old records are now deleted automatically under `privacy.retention` in `config.yml`. A `config.yml` from an older
+  version doesn't have that section, so the defaults apply: within minutes of the first start, reports older than
+  90 days, mute history older than 365 days (except for players still muted) and transcript logs older than 30 days
+  are deleted. To keep them, add the section first and set those to `0` (keep forever). See [Privacy](privacy.md).
+- The database moves to schema 4, so an older VoiceWarden can't open it afterwards. Back up `data/voicewarden.db`
+  before upgrading if you might go back.
+
 ### Upgrading from the JSON storage version
 
 - Existing voice mutes and reports are not carried over: VoiceWarden starts with no mutes and an empty report inbox.

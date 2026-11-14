@@ -22,6 +22,10 @@ keeps that record forever. Old records are deleted once an hour.
 | Consent answers: accepted or denied, rules version, when they answered, when they were last seen | `data/voicewarden.db` | Deleted once the player hasn't joined for `consent-days` (365 days). In `confirm` mode they are asked again if they come back. |
 | Exports made with `/vw export` | `exports/` | `exports-days` (7 days). |
 
+If `data/voicewarden.db` is ever unreadable, it is moved aside as `voicewarden.db.corrupt-<UUID>`. Those copies hold
+the same data, are never deleted automatically, and `/vw forget` doesn't touch them. Delete them once you no longer
+need them.
+
 ### Data that leaves VoiceWarden
 
 - **Discord.** Once a webhook is enabled, alerts are sent automatically to that Discord channel: player names, UUIDs,
@@ -32,6 +36,8 @@ keeps that record forever. Old records are deleted once an hour.
   which VoiceWarden doesn't manage.
 - **PlaceholderAPI.** `%voicewarden_mute_reason%` shows a player's mute reason wherever you use it, such as a
   scoreboard or tab list, so other players can see it.
+- **Custom commands.** `custom-commands` pass the player's name, UUID and transcript to whatever console commands you
+  set, and those commands' plugins keep what they keep.
 - **LuckPerms.** With `mute.luckperms.enabled`, a mute is copied to LuckPerms as a temporary deny node. It holds no
   reason and is removed when the mute ends.
 
@@ -42,6 +48,10 @@ consent menu's text. Both say staff may keep recordings and that alerts may go t
 record or where it goes, such as `recordings.mode: all`, update them to match. With
 `consent.mode: confirm`, players accept or deny before any of their speech is processed. See
 [Consent](configuration.md#consent).
+
+Servers that installed an older version keep their own `messages.yml`, so their consent menu may still say nothing
+is sent to an outside service. Copy the new `privacy-join` and `consent.dialog` texts from the bundled file if you
+use Discord.
 
 When a player withdraws consent with `/voiceconsent`, their recent speech in memory is deleted straight away and
 nothing more is processed. Recordings, reports and history from before stay until their retention runs out, or until
@@ -73,7 +83,8 @@ other player's speech. Read the file before you send it, and delete it afterward
 - deletes their recordings (WAV and JSON) and their exports
 - removes their lines from recent speech and from every transcript log file
 
-It reports how much of each was deleted. If LuckPerms can't remove the deny nodes, nothing is erased; run the command
+Recordings of reports they filed hold the other player's voice, and are deleted too. It reports how much of each was
+deleted. If LuckPerms can't remove the deny nodes, nothing is erased; run the command
 again. Discord messages and the server console log are not erased, so delete those yourself.
 
 In `confirm` consent mode, an erased player is asked for consent again: straight away if they are online, or on

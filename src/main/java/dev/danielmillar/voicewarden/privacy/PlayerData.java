@@ -123,8 +123,32 @@ public final class PlayerData {
             return evidence.forget(player).thenCombine(files, (evidenceFiles, logAndExports) ->
                             new Forgotten(mute.wasMuted(), mute.historyEvents(), offenceCount, hadConsent, reportCount,
                                     evidenceFiles, bufferedLines, logAndExports[0], logAndExports[1]))
-                    .thenCombine(offenceWrite.thenCompose(ignored -> database.flush()), (forgotten, ignored) -> forgotten);
+                    .thenCombine(offenceWrite.thenCompose(ignored -> database.query(c -> leftovers(c, player))),
+                            (forgotten, left) -> {
+                                if (left > 0) {
+                                    throw new IllegalStateException(left + " database row(s) could not be deleted; see the console");
+                                }
+                                return forgotten;
+                            });
         });
+    }
+
+    /** Rows still naming the player. The deletes before it are queued writes, which only log a failure. */
+    private static int leftovers(java.sql.Connection c, UUID player) throws java.sql.SQLException {
+        int left = 0;
+        for (String sql : List.of("SELECT COUNT(*) FROM mutes WHERE player_id = ?1",
+                "SELECT COUNT(*) FROM mute_events WHERE player_id = ?1",
+                "SELECT COUNT(*) FROM offenses WHERE player_id = ?1",
+                "SELECT COUNT(*) FROM consents WHERE player_id = ?1",
+                "SELECT COUNT(*) FROM reports WHERE reporter_id = ?1 OR target_id = ?1")) {
+            try (var s = c.prepareStatement(sql)) {
+                s.setString(1, player.toString());
+                try (var r = s.executeQuery()) {
+                    left += r.next() ? r.getInt(1) : 0;
+                }
+            }
+        }
+        return left;
     }
 
     /** Writes one JSON file in the exports folder with everything stored about the player. Completes with its path. */
@@ -209,7 +233,10 @@ public final class PlayerData {
         return events.thenCombine(files, (eventCount, f) -> {
             Pruned pruned = new Pruned(offenceCount, reportCount, consentCount, eventCount, f[0], f[1]);
             if (pruned.total() > 0) {
-                logger.info("Deleted old records under privacy.retention: " + pruned);
+                logger.info("Deleted old records under privacy.retention: " + pruned.reports() + " report(s), "
+                        + pruned.muteEvents() + " mute history entr(ies), " + pruned.offences() + " reset offence count(s), "
+                        + pruned.consents() + " consent answer(s), " + pruned.transcriptLogs() + " transcript log(s), "
+                        + pruned.exports() + " export(s)");
             }
             return pruned;
         });

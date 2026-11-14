@@ -435,12 +435,13 @@ final class VoiceWardenCommand {
             return plugin.playerData().forget(t.id()).handle((f, error) -> {
                 if (error != null) {
                     Throwable cause = error.getCause() != null ? error.getCause() : error;
-                    plugin.getLogger().log(java.util.logging.Level.WARNING, "Could not erase " + t.name() + " (" + t.id() + ")", cause);
+                    plugin.getLogger().log(java.util.logging.Level.WARNING, "Could not erase the VoiceWarden data of player " + t.id(), cause);
                     sender.sendMessage(msg().render("command.forget-failed", player,
                             Messages.text("reason", String.valueOf(cause.getMessage()))));
                     return null;
                 }
-                plugin.getLogger().info(sender.getName() + " erased the VoiceWarden data of " + t.name() + " (" + t.id() + ")");
+                // The UUID only: the console log is not erased, so it must not keep the name.
+                plugin.getLogger().info(sender.getName() + " erased the VoiceWarden data of player " + t.id());
                 sender.sendMessage(msg().render("command.forgotten", player,
                         Messages.text("lifted", f.wasMuted() ? "yes" : "no"),
                         Messages.text("history", Integer.toString(f.muteEvents())),
