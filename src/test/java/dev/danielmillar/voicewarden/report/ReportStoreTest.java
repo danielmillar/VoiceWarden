@@ -1,39 +1,50 @@
 package dev.danielmillar.voicewarden.report;
 
 import dev.danielmillar.voicewarden.TestFixtures;
+import dev.danielmillar.voicewarden.storage.Database;
+import dev.danielmillar.voicewarden.testutil.Fakes;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.logging.Logger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ReportStoreTest {
     @TempDir Path folder;
+    private Database database;
 
-    @ParameterizedTest
-    @ValueSource(strings = {"[unreadable original state", "null", "[null]", "[{}]"})
-    void invalidStateIsPreservedBeforeFreshSave(String original) throws Exception {
-        Path file = folder.resolve("data/reports.json");
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, original);
-        var store = new ReportStore(folder, Runnable::run, Logger.getAnonymousLogger());
-        store.load();
-        assertTrue(store.open().isEmpty());
+    @BeforeEach void open() {
+        database = Fakes.database(folder);
+    }
+
+    @AfterEach void close() {
+        database.close();
+    }
+
+    @Test void reportsAndReviewsSurviveARestart() {
+        var store = store();
         store.add(TestFixtures.report());
-        try (var files = Files.list(file.getParent())) {
-            var preserved = files.filter(path -> path.getFileName().toString().startsWith("reports.json.corrupt-")).toList();
-            assertEquals(1, preserved.size());
-            assertEquals(original, Files.readString(preserved.getFirst()));
-        }
-        var reloaded = new ReportStore(folder, Runnable::run, Logger.getAnonymousLogger());
-        reloaded.load();
-        assertEquals(TestFixtures.report().id(), reloaded.open().getFirst().id());
+        var reloaded = restartedStore();
+        var stored = reloaded.open().getFirst();
+        assertEquals(TestFixtures.report().lines(), stored.lines());
+        assertEquals(TestFixtures.report().createdAt(), stored.createdAt());
         assertTrue(reloaded.markReviewed(TestFixtures.report().id(), "Staff"));
-        var reviewed = new ReportStore(folder, Runnable::run, Logger.getAnonymousLogger());
-        reviewed.load();
+        var reviewed = restartedStore();
         assertTrue(reviewed.open().isEmpty());
         assertEquals("Staff", reviewed.find(TestFixtures.report().id().toString()).orElseThrow().reviewer());
+    }
+
+    private ReportStore store() {
+        var store = new ReportStore(database, Logger.getAnonymousLogger());
+        store.load();
+        return store;
+    }
+
+    private ReportStore restartedStore() {
+        database.close();
+        database = Fakes.database(folder);
+        return store();
     }
 }

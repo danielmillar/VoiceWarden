@@ -119,9 +119,6 @@ public final class ModerationService {
                 muteFlags += match.weight();
             }
         }
-        var storedOffenses = muteFlags > 0 && !mutes.isMuted(id)
-                ? offenses.lookup(id, mod.ladder().resetAfterDays()).join()
-                : dev.danielmillar.voicewarden.luckperms.LuckPermsHook.Offenses.NONE;
         boolean dryRun = mod.dryRun();
         boolean alreadyMuted = false;
         ModerationAction action = ModerationAction.NONE;
@@ -141,7 +138,7 @@ public final class ModerationService {
                     inWindow = flags.add(id, muteFlags, System.currentTimeMillis(), mod.flagWindow().toMillis());
                     if (inWindow >= mod.flagThreshold()) {
                         int resetDays = mod.ladder().resetAfterDays();
-                        offense = dryRun ? offenses.peekNext(id, resetDays, storedOffenses) : offenses.recordNext(id, resetDays, storedOffenses);
+                        offense = dryRun ? offenses.peekNext(id, resetDays) : offenses.recordNext(id, resetDays);
                         action = ModerationAction.mute(mod.muteDurationFor(offense));
                         flags.reset(id);
                     } else if (mod.warnBelowThreshold()) {
@@ -212,9 +209,5 @@ public final class ModerationService {
 
     public OffenseTracker offenses() {
         return offenses;
-    }
-
-    public void onQuit(UUID player) {
-        offenses.forget(player);
     }
 }

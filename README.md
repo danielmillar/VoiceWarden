@@ -32,8 +32,9 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 
 - A **Paper** server, version **26.1 or newer**, running **Java 25 or newer**.
 - [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) (version 2.6.x), which provides voice chat.
-- [LuckPerms](https://luckperms.net) (version 5.5 or newer), which handles permissions and remembers each player's
-  offences.
+- Optional: [LuckPerms](https://luckperms.net) (version 5.5 or newer). VoiceWarden enforces mutes itself, so it works
+  without it. With LuckPerms, mutes also apply on other servers sharing your LuckPerms storage, and commands can find
+  players who have never joined this server.
 - Linux, Windows or macOS.
 - About **3 GB of spare memory (RAM)** for the best-quality speech model, plus free disk space for the model
   (between about 400 MB and 1 GB, depending on which you choose).
@@ -42,11 +43,12 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 
 1. Download `VoiceWarden-<version>.jar` from the [Releases page](https://github.com/danielmillar/VoiceWarden/releases)
    (the `.sha256` file next to it can be used to check the download) and put it in your server's `plugins` folder,
-   alongside Simple Voice Chat and LuckPerms.
+   alongside Simple Voice Chat (and LuckPerms, if you use it).
 2. Start the server. The first time, VoiceWarden downloads the speech recognition files it needs. This takes a few
    minutes and your server stays playable meanwhile. Watch the server console for the message
    **`Speech engine ready`**.
-3. Let your staff see alerts by running this in the console, replacing `moderator` with your staff group's name:
+3. Let your staff see alerts by giving them the `voicewarden.alerts` permission. With LuckPerms, run this in the
+   console, replacing `moderator` with your staff group's name:
 
    ```
    /lp group moderator permission set voicewarden.alerts true

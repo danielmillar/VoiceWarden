@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "dev.danielmillar"
-version = "1.0.0"
+version = "2.0.0-SNAPSHOT"
 
 base {
     archivesName.set("VoiceWarden")
@@ -40,6 +40,8 @@ dependencies {
     compileOnly(paperApi)
     compileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.24")
     compileOnly("net.luckperms:api:5.5")
+    // Paper ships sqlite-jdbc on the server classpath (checked on 26.1.2 and 26.3), so it is not shaded.
+    compileOnly("org.xerial:sqlite-jdbc:3.49.1.0")
 
     // Speech-to-text (Java classes only, ~190 KB). Platform native libraries are downloaded at runtime
     // by NativeLibraries so the plugin jar stays small. Must NOT be relocated: JNI symbols are bound to
@@ -50,6 +52,7 @@ dependencies {
     testImplementation(paperApi)
     testImplementation("de.maxhenkel.voicechat:voicechat-api:2.6.24")
     testImplementation("net.luckperms:api:5.5")
+    testImplementation("org.xerial:sqlite-jdbc:3.49.1.0")
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

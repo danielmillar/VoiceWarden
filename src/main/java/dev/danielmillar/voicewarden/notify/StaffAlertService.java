@@ -32,7 +32,8 @@ import java.util.logging.Logger;
 
 /**
  * In-game and console alerts. Called from worker threads: recipients come from {@link OnlinePlayers} (thread-safe),
- * permission checks go through LuckPerms' thread-safe permissible, and Paper's {@code sendMessage} is thread-safe.
+ * permission checks read the player's permissible (as Simple Voice Chat does on its own threads), and Paper's
+ * {@code sendMessage} is thread-safe.
  */
 public final class StaffAlertService {
 

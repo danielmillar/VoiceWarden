@@ -22,7 +22,7 @@ class StaffModerationServiceTest {
         PluginConfig config = Fakes.config(folder);
         var settings = Fakes.with(config, "mute", Fakes.with(Fakes.with(config.mute(), "luckPerms", false), "notifyPlayer", false));
         var hook = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, a) -> { throw new AssertionError(m); }));
-        var mutes = new MuteService(() -> settings, () -> null, hook, new OnlinePlayers(), Runnable::run, Logger.getAnonymousLogger(), folder);
+        var mutes = new MuteService(() -> settings, () -> null, hook, new OnlinePlayers(), Runnable::run, Logger.getAnonymousLogger(), Fakes.database(folder));
         var bypass = new CompletableFuture<Boolean>();
         var events = new ArrayList<StaffAction>();
         var service = new StaffModerationService(mutes, id -> bypass, events::add);
@@ -48,7 +48,7 @@ class StaffModerationServiceTest {
         var config = Fakes.config(folder);
         var settings = Fakes.with(config, "mute", Fakes.with(Fakes.with(config.mute(), "luckPerms", false), "notifyPlayer", false));
         var hook = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, a) -> { throw new AssertionError(m); }));
-        var mutes = new MuteService(() -> settings, () -> null, hook, new OnlinePlayers(), Runnable::run, Logger.getAnonymousLogger(), folder);
+        var mutes = new MuteService(() -> settings, () -> null, hook, new OnlinePlayers(), Runnable::run, Logger.getAnonymousLogger(), Fakes.database(folder));
         var bypass = new CompletableFuture<Boolean>();
         var service = new StaffModerationService(mutes, id -> bypass, action -> fail("No staff action expected"));
         var id = UUID.randomUUID();

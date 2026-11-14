@@ -13,7 +13,7 @@ dependencies:
       join-classpath: true
     LuckPerms:
       load: BEFORE
-      required: true
+      required: false
       join-classpath: true
 permissions:
   voicewarden.admin:
