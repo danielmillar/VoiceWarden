@@ -39,7 +39,8 @@ theme tag of the same name, so `command.reload-warning`, whose placeholder is `<
 - **Lines:** a reply or event is one or two lines. A second line is indented three spaces and `muted`: a reason, a fix
   or how to change an answer. Detail goes in a hover.
 - **Staff alerts** are frequent, so they stay one line (two when it wraps). The whole line is the click: it suggests the
-  command, and the hover's last line says what the click does. No `▸` on an alert.
+  command, and the hover's last line says what the click does. No `▸` on an alert. A report alert is rarer and is an
+  event line with its `▸ ᴠɪᴇᴡ` action on the second line.
 - **Cards** are for staff and console output: `/vw history`, `/vw check`, `/vw mutes`, `/vw stats`, `/vw transcript`
   and `/reportinbox`. A card has no prefix and is laid out like a tooltip:
   - it starts with `<newline>` and the plugin sends an empty line after its last message; every line starts with one
@@ -48,13 +49,14 @@ theme tag of the same name, so `command.reload-warning`, whose placeholder is `<
     ` <dim>ᴛʏᴘᴇ</dim>` in small caps with no numbers, then an empty line;
   - data lines ` <primary>|</primary> <body>Label: <accent>value</accent></body>` and a `muted` note after a dim `·`;
   - a list entry starts with a mark in its state's colour or a `dim` time, one entry per line;
-  - an action line ` <primary>▸ ɴᴇxᴛ</primary>` under an empty line; a second action after four spaces.
+  - an action line ` <primary>▸ ɴᴇxᴛ</primary>` under an empty line; a second action after four spaces;
+  - an entry with its own actions (an inbox report) puts them on the entry's second line, as in a line.
 
 ## Actions and hovers
 
 - Something to click is a `▸` word in small capitals in `primary`, never `[View]`-style buttons or underlined links.
 - In a line, actions go on their own second line, `<newline>` plus three spaces, a second action two spaces later, so
-  chat wrapping never strands the `▸`.
+  chat wrapping never strands the `▸`. The main action is `primary`; a second one is `muted`.
 - A hover is a `body` sentence ending in a full stop: `<hover:show_text:'<body>Open the report.'>`.
 - A hover with detail (the incident hover) is a small tooltip: the title in bold `primary`, `muted` labels with `body`
   values, and the click's sentence last after an empty line.
@@ -70,7 +72,8 @@ theme tag of the same name, so `command.reload-warning`, whose placeholder is `<
 ## Lists
 
 - Setup check: ` <success>✔</success>` OK, ` <warning>⚠</warning>` worth a look, ` <error>✘</error>` broken, then the
-  area in `body`, a dim colon and the finding in `muted`. A fix goes on a second line, indented and `muted`.
+  area in `body`, a dim colon and the finding: `muted` when OK, `body` when it needs a look, so problems stand out. A
+  fix goes on a second line, indented and `muted`.
 - History and transcripts: the time in `dim`, then the event in its state's colour and the rest in `body` or `muted`.
 
 ## Other surfaces

@@ -452,7 +452,7 @@ final class VoiceWardenCommand {
     private void actionError(CommandSender sender, Throwable error) {
         if (error != null) {
             plugin.getLogger().log(java.util.logging.Level.WARNING, "Staff moderation failed", error);
-            sender.sendMessage(msg().render("command.action-failed", Messages.text("reason", "See the console for why.")));
+            sender.sendMessage(msg().render("command.action-failed", Messages.text("reason", "see the console for why.")));
         }
     }
 

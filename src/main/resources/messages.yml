@@ -31,7 +31,7 @@ prefixes:
   # Something went wrong.
   oops: "<error><b>OOPS!</b></error> <body>"
 
-privacy-join: "<prefix>Voice chat on this server is transcribed and moderated on the server.<newline>   <muted>Flagged speech may be kept as evidence for staff."
+privacy-join: "<prefix>Voice chat here is transcribed and moderated on the server.<newline>   <muted>Flagged speech may be kept as evidence for staff."
 
 # Consent (config.yml consent:). The dialog is the menu shown in confirm mode.
 consent:
@@ -63,17 +63,17 @@ alert:
   # A MUTE-list hit the double-check model did not hear, so nobody was punished.
   # <heard> = what the second model heard: the quoted text, "nothing" or "could not run"
   unconfirmed: "<primary><b>FLAGGED!</b></primary> <accent><player></accent> <muted>(unconfirmed, no action)</muted><dim>:</dim> <body>\"<transcript>\"</body> <muted>Second model heard <heard>."
-  dry-run-suffix: " <dim>(dry run, not applied)"
+  dry-run-suffix: " <muted>(dry run, not applied)"
   # Hover text on alerts. <context> = earlier lines, <location> = world x, y, z, <click-hint> = click-mute or click-pardon
   hover: "<primary><b>Incident <id></b></primary>\n<muted>Flags: <body><flags> of <threshold></body>\nLocation: <body><location></body></muted>\n<context>\n\n<click-hint>"
   # Clicking an alert prepares a voice mute, or a pardon when the alert is an auto-mute that was applied.
   click-mute: "<body>Click to prepare a voice mute."
   click-pardon: "<body>Click to prepare a pardon if this was a wrong call."
   context-line: "<dim><ago></dim> <muted><text></muted>"
-  no-context: "<dim>No earlier speech."
+  no-context: "<muted>No earlier speech."
   # A word a rule matched, inside <transcript>. <text> = the matched words. match-hover: <category> <rule>
   match: "<warning><u><text></u></warning>"
-  match-hover: "<body><category> <muted>(<rule>)"
+  match-hover: "<body>Matched <category> <muted>(<rule>)</muted>."
   staff-mute: "<primary><b>MUTED!</b></primary> <accent><actor></accent> voice-muted <accent><player></accent> for <accent><duration></accent><muted><reason></muted>"
   staff-unmute: "<primary><b>UNMUTED!</b></primary> <accent><actor></accent> removed the voice mute from <accent><player></accent>."
   # <actor> <player> <reason> (": reason", or empty)
@@ -101,7 +101,7 @@ command:
   invalid-duration: "<hold-up><accent><input></accent> is not a duration.<newline>   <muted>Try 30m, 2h, 1d or perm."
   muted: "<prefix>Voice-muted <accent><player></accent> for <accent><duration></accent>."
   unmuted: "<prefix>Removed the voice mute from <accent><player></accent>."
-  action-failed: "<oops>That did not work. <reason>"
+  action-failed: "<oops>That did not work: <reason>"
   not-muted: "<hold-up><accent><player></accent> is not voice-muted."
   cannot-mute-bypass: "<hold-up><accent><player></accent> has <accent>voicewarden.bypass</accent> and cannot be voice-muted."
   # /vw mutes: a card. mutes-header: <count>; mutes-entry: <player> <remaining> <reason> <actor>
