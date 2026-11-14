@@ -4,6 +4,7 @@ import dev.danielmillar.voicewarden.config.Durations;
 import dev.danielmillar.voicewarden.config.Messages;
 import dev.danielmillar.voicewarden.config.PluginConfig;
 import dev.danielmillar.voicewarden.config.PluginConfig.MuteDisplay;
+import dev.danielmillar.voicewarden.consent.ConsentService;
 import dev.danielmillar.voicewarden.mute.MuteService;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
@@ -21,7 +22,8 @@ import java.util.logging.Logger;
 
 /**
  * What a muted player sees: an action bar for the whole mute, and a throttled chat reminder
- * when they talk and nobody hears them. Players without the speak permission get a throttled action bar instead.
+ * when they talk and nobody hears them. Players without the speak permission, or blocked because they have not
+ * accepted voice moderation, get a throttled action bar instead.
  *
  * <p>The status is one repeating task per muted online player, on that player's scheduler. It ends itself on the first
  * tick after the mute ends or the display setting changes, and on quit, so nobody muted means no tasks.
@@ -37,6 +39,7 @@ public final class VoiceSpeechNotice implements AutoCloseable {
     private final Supplier<PluginConfig> config;
     private final Supplier<Messages> messages;
     private final MuteService mutes;
+    private final ConsentService consent;
     private final LongSupplier clock;
     private final Logger logger;
     private volatile boolean active = true;
@@ -53,11 +56,12 @@ public final class VoiceSpeechNotice implements AutoCloseable {
     }
 
     public VoiceSpeechNotice(Plugin plugin, Supplier<PluginConfig> config, Supplier<Messages> messages,
-                             MuteService mutes, LongSupplier clock, Logger logger) {
+                             MuteService mutes, ConsentService consent, LongSupplier clock, Logger logger) {
         this.plugin = plugin;
         this.config = config;
         this.messages = messages;
         this.mutes = mutes;
+        this.consent = consent;
         this.clock = clock;
         this.logger = logger;
     }
@@ -72,11 +76,13 @@ public final class VoiceSpeechNotice implements AutoCloseable {
             return false;
         }
         PluginConfig.Mute settings = config.get().mute();
-        if (!settings.notifyPlayer()) {
+        UUID id = player.getUniqueId();
+        boolean muted = mutes.isMuted(id);
+        boolean needsConsent = !muted && consent.blocksSpeech(id);
+        if (!settings.notifyPlayer() && !needsConsent) {
             return false;
         }
-        UUID id = player.getUniqueId();
-        if (mutes.isMuted(id)) {
+        if (muted) {
             if (settings.display() == MuteDisplay.OFF) {
                 return false;
             }
@@ -87,19 +93,23 @@ public final class VoiceSpeechNotice implements AutoCloseable {
             }
             return true;
         }
-        if (messages.get().isEmpty("player.no-speak-permission-actionbar")) {
+        String key = needsConsent ? "player.consent-needed-actionbar" : "player.no-speak-permission-actionbar";
+        if (messages.get().isEmpty(key)) {
             return false;
         }
         if (!due(lastNoPermission, id, NO_PERMISSION_INTERVAL_MILLIS)) {
             return true;
         }
         return schedule(player, lastNoPermission, () -> {
-            // The permission may have come back while the action bar waited for the player's tick.
-            if (mutes.isMuted(id) || player.hasPermission("voicechat.speak")) {
+            // The permission or consent may have come back while the action bar waited for the player's tick.
+            if (!needsConsent && !config.get().mute().notifyPlayer()) {
+                return;
+            }
+            if (mutes.isMuted(id) || (needsConsent ? !consent.blocksSpeech(id) : player.hasPermission("voicechat.speak"))) {
                 lastNoPermission.remove(id);
                 return;
             }
-            player.sendActionBar(messages.get().render("player.no-speak-permission-actionbar"));
+            player.sendActionBar(messages.get().render(key));
         });
     }
 
@@ -149,7 +159,7 @@ public final class VoiceSpeechNotice implements AutoCloseable {
 
     private void remind(Player player) {
         var mute = mutes.get(player.getUniqueId());
-        if (mute.isEmpty()) {
+        if (mute.isEmpty() || !config.get().mute().notifyPlayer()) {
             return;
         }
         Messages current = messages.get();
@@ -225,7 +235,7 @@ public final class VoiceSpeechNotice implements AutoCloseable {
     private boolean schedule(Player player, ConcurrentHashMap<UUID, Long> last, Runnable send) {
         try {
             player.getScheduler().run(plugin, task -> {
-                if (active && config.get().mute().notifyPlayer()) {
+                if (active) {
                     send.run();
                 }
             }, null);

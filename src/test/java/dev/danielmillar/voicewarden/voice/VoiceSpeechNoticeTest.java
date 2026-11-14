@@ -3,6 +3,7 @@ package dev.danielmillar.voicewarden.voice;
 import dev.danielmillar.voicewarden.config.Messages;
 import dev.danielmillar.voicewarden.config.PluginConfig;
 import dev.danielmillar.voicewarden.config.PluginConfig.MuteDisplay;
+import dev.danielmillar.voicewarden.consent.ConsentService;
 import dev.danielmillar.voicewarden.luckperms.LuckPermsHook;
 import dev.danielmillar.voicewarden.mute.MuteService;
 import dev.danielmillar.voicewarden.player.OnlinePlayers;
@@ -40,6 +41,7 @@ class VoiceSpeechNoticeTest {
     private PluginConfig config;
     private Messages messages;
     private MuteService mutes;
+    private ConsentService consent;
     private VoiceSpeechNotice notice;
     private Player player;
 
@@ -70,7 +72,9 @@ class VoiceSpeechNoticeTest {
         Logger logger = Logger.getLogger("VoiceSpeechNoticeTest");
         var permissions = new LuckPermsHook(Fakes.proxy(LuckPerms.class,
                 (p, m, args) -> { throw new AssertionError("Unexpected LuckPerms call"); }));
-        mutes = new MuteService(() -> config, () -> messages, permissions, new OnlinePlayers(), Runnable::run, logger, Fakes.database(folder));
+        var database = Fakes.database(folder);
+        mutes = new MuteService(() -> config, () -> messages, permissions, new OnlinePlayers(), Runnable::run, logger, database);
+        consent = new ConsentService(() -> config.consent(), database, () -> now, logger);
         Plugin plugin = Fakes.proxy(Plugin.class, (p, m, args) -> { throw new AssertionError(m); });
         EntityScheduler scheduler = Fakes.proxy(EntityScheduler.class, (p, m, args) -> {
             assertSame(plugin, args[0]);
@@ -98,7 +102,19 @@ class VoiceSpeechNoticeTest {
             case "sendMessage" -> { chat.add((Component) args[0]); yield null; }
             default -> throw new AssertionError(m);
         });
-        notice = new VoiceSpeechNotice(plugin, () -> config, () -> messages, mutes, () -> now, logger);
+        notice = new VoiceSpeechNotice(plugin, () -> config, () -> messages, mutes, consent, () -> now, logger);
+    }
+
+    @Test void playerWhoHasNotAcceptedIsToldHowToAcceptEvenWithMuteNoticesOff() {
+        mute("notifyPlayer", false);
+        config = Fakes.with(config, "consent", Fakes.with(config.consent(), "mode", PluginConfig.ConsentMode.CONFIRM));
+        assertTrue(notice.onDeniedSpeech(player));
+        drain();
+        assertEquals(1, actionBars.size());
+        assertTrue(text(actionBars).contains("/voiceconsent"));
+        consent.answer(id, true);
+        now = 5_000;
+        assertFalse(notice.onDeniedSpeech(player));
     }
 
     @Test void externalPermissionDenialUsesCustomActionBarOnPlayerScheduler() {
