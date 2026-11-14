@@ -233,10 +233,10 @@ public final class PlayerData {
         return events.thenCombine(files, (eventCount, f) -> {
             Pruned pruned = new Pruned(offenceCount, reportCount, consentCount, eventCount, f[0], f[1]);
             if (pruned.total() > 0) {
-                logger.info("Deleted old records under privacy.retention: " + pruned.reports() + " report(s), "
-                        + pruned.muteEvents() + " mute history entr(ies), " + pruned.offences() + " reset offence count(s), "
-                        + pruned.consents() + " consent answer(s), " + pruned.transcriptLogs() + " transcript log(s), "
-                        + pruned.exports() + " export(s)");
+                logger.info("Deleted old records under privacy.retention: reports " + pruned.reports()
+                        + ", mute history entries " + pruned.muteEvents() + ", reset offence counts " + pruned.offences()
+                        + ", consent answers " + pruned.consents() + ", transcript logs " + pruned.transcriptLogs()
+                        + ", exports " + pruned.exports() + ".");
             }
             return pruned;
         });

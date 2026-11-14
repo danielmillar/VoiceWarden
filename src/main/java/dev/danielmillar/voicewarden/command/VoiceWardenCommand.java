@@ -441,7 +441,7 @@ final class VoiceWardenCommand {
                     return null;
                 }
                 // The UUID only: the console log is not erased, so it must not keep the name.
-                plugin.getLogger().info(sender.getName() + " erased the VoiceWarden data of player " + t.id());
+                plugin.getLogger().info(sender.getName() + " erased the VoiceWarden data of player " + t.id() + ".");
                 sender.sendMessage(msg().render("command.forgotten", player,
                         Messages.text("lifted", f.wasMuted() ? "yes" : "no"),
                         Messages.text("history", Integer.toString(f.muteEvents())),
@@ -453,6 +453,7 @@ final class VoiceWardenCommand {
                         Messages.text("logged", Integer.toString(f.logLines())),
                         Messages.text("exports", Integer.toString(f.exports()))));
                 sender.sendMessage(msg().render("command.forgotten-elsewhere"));
+                sender.sendMessage(net.kyori.adventure.text.Component.empty());
                 Player online = plugin.players().get(t.id());
                 if (online != null) {
                     plugin.consentPrompt().askOnline(List.of(online));

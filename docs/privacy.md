@@ -75,7 +75,7 @@ other player's speech. Read the file before you send it, and delete it afterward
 
 ### Erasing their data
 
-`/vw forget <player>` explains what will happen. `/vw forget <player> confirm` (or the button) then:
+`/vw forget <player>` explains what will happen. `/vw forget <player> confirm` (or clicking ▸ ᴇʀᴀѕᴇ) then:
 
 - lifts any voice mute, without announcing it, and removes its LuckPerms deny nodes
 - deletes their mute, mute history, offence count and consent answer
