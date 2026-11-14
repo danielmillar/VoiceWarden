@@ -113,8 +113,8 @@ moderation:
   # Auto-mute length when the mute ladder is disabled.
   mute-duration: 60m
 
-  # Escalating auto-mute durations for repeat offenders. The offense count is stored in LuckPerms meta, so it
-  # follows the player across restarts and across servers that share LuckPerms storage.
+  # Escalating auto-mute durations for repeat offenders. The offense count is stored in VoiceWarden's own database
+  # (data/voicewarden.db), so it survives restarts, but it is per server and is not shared across a network.
   mute-ladder:
     enabled: true
     tiers:
@@ -141,8 +141,8 @@ mute:
   # Muted players also cannot hear anyone else (full voice mute).
   disable-listening: false
   luckperms:
-    # Also deny the Simple Voice Chat speak permission with a temporary LuckPerms node. The mute then survives
-    # restarts and applies on every server sharing your LuckPerms storage.
+    # Also mirror mutes as temporary LuckPerms deny nodes, so they apply on every server sharing your LuckPerms
+    # storage. Needs LuckPerms; ignored without it. Mutes survive restarts either way (VoiceWarden's own database).
     enabled: true
     speak-permission: voicechat.speak
     listen-permission: voicechat.listen

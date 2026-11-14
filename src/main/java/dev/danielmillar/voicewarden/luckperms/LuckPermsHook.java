@@ -1,5 +1,7 @@
 package dev.danielmillar.voicewarden.luckperms;
 
+import dev.danielmillar.voicewarden.mute.VoiceMute;
+import dev.danielmillar.voicewarden.mute.VoiceMuteMirror;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.context.DefaultContextKeys;
 import net.luckperms.api.event.EventSubscription;
@@ -7,13 +9,10 @@ import net.luckperms.api.event.user.UserDataRecalculateEvent;
 import net.luckperms.api.model.data.TemporaryNodeMergeStrategy;
 import net.luckperms.api.model.user.User;
 import net.luckperms.api.node.Node;
-import net.luckperms.api.node.NodeType;
-import net.luckperms.api.node.types.MetaNode;
 import net.luckperms.api.node.types.PermissionNode;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
-import java.util.Optional;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
@@ -21,13 +20,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
- * Everything VoiceWarden stores in LuckPerms. All writes are asynchronous ({@code modifyUser} loads, edits and saves
- * the user off-thread). Reads of online players use LuckPerms' thread-safe cached data and never hit storage.
+ * Optional LuckPerms integration: the voice-mute mirror, offline permission checks and name lookups. Only this package
+ * may name LuckPerms types, and only after {@link #connect} found the plugin, so VoiceWarden starts without it. All
+ * writes are asynchronous ({@code modifyUser} loads, edits and saves the user off-thread).
  */
-public final class LuckPermsHook {
-
-    private static final String OFFENSES_KEY = "voicewarden-offenses";
-    private static final String LAST_OFFENSE_KEY = "voicewarden-last-offense";
+public final class LuckPermsHook implements VoiceMuteMirror {
 
     private final LuckPerms luckPerms;
     private final ConcurrentHashMap<UUID, CompletableFuture<Void>> changes = new ConcurrentHashMap<>();
@@ -35,6 +32,12 @@ public final class LuckPermsHook {
 
     public LuckPermsHook(LuckPerms luckPerms) {
         this.luckPerms = luckPerms;
+    }
+
+    /** The hook, or null when the LuckPerms API service is not registered. Call only when LuckPerms is installed. */
+    public static @Nullable LuckPermsHook connect(org.bukkit.Server server) {
+        LuckPerms api = server.getServicesManager().load(LuckPerms.class);
+        return api == null ? null : new LuckPermsHook(api);
     }
 
     /**
@@ -53,8 +56,7 @@ public final class LuckPermsHook {
         return replaceVoiceMute(player, List.of(new VoiceMute(speakPermission, listenPermission, serverContext)), null, null);
     }
 
-    public record VoiceMute(String speakPermission, String listenPermission, String serverContext) { }
-
+    @Override
     public CompletableFuture<Void> replaceVoiceMute(UUID player, List<VoiceMute> previous,
                                                      @Nullable VoiceMute next, @Nullable Duration duration) {
         if (previous.isEmpty() && next == null) {
@@ -117,41 +119,6 @@ public final class LuckPermsHook {
                 && (serverContext.isBlank()
                 ? p.getContexts().getAnyValue(DefaultContextKeys.SERVER_KEY).isEmpty()
                 : p.getContexts().contains(DefaultContextKeys.SERVER_KEY, serverContext)));
-    }
-
-    /** Auto-mute offense history, stored as meta so it follows the player across servers. */
-    public record Offenses(int count, long lastEpochMillis) {
-        public static final Offenses NONE = new Offenses(0, 0);
-    }
-
-    /** Reads offenses from cached data when the user is loaded (online), else loads them from storage. */
-    public CompletableFuture<Offenses> offenses(UUID player) {
-        CompletableFuture<Void> pending = changes.getOrDefault(player, CompletableFuture.completedFuture(null));
-        return pending.handle((ignored, error) -> null).thenCompose(ignored -> user(player)).thenApply(LuckPermsHook::readOffenses);
-    }
-
-    /** Synchronous read for an online player; empty if LuckPerms has not loaded the user. Thread-safe and fast. */
-    public Optional<Offenses> cachedOffenses(UUID player) {
-        User loaded = luckPerms.getUserManager().getUser(player);
-        return loaded == null ? Optional.empty() : Optional.of(readOffenses(loaded));
-    }
-
-    private static Offenses readOffenses(User user) {
-        var meta = user.getCachedData().getMetaData();
-        int count = meta.getMetaValue(OFFENSES_KEY, Integer::parseInt).orElse(0);
-        long last = meta.getMetaValue(LAST_OFFENSE_KEY, Long::parseLong).orElse(0L);
-        return new Offenses(count, last);
-    }
-
-    public CompletableFuture<Void> storeOffenses(UUID player, Offenses offenses) {
-        return modify(player, user -> {
-            user.data().clear(NodeType.META.predicate(m -> m.getMetaKey().equals(OFFENSES_KEY)
-                    || m.getMetaKey().equals(LAST_OFFENSE_KEY)));
-            if (offenses.count() > 0) {
-                user.data().add(MetaNode.builder(OFFENSES_KEY, Integer.toString(offenses.count())).build());
-                user.data().add(MetaNode.builder(LAST_OFFENSE_KEY, Long.toString(offenses.lastEpochMillis())).build());
-            }
-        });
     }
 
     /** Resolves a (possibly offline) player name to a UUID without blocking. */

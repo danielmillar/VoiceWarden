@@ -14,8 +14,9 @@ in [configuration.md](configuration.md).
   point. Quiet speech is boosted with `speech-to-text.input-gain` (target −20 dBFS, maximum +40 dB). The capture
   floor is `audio.min-level-dbfs: -65`.
   `audio.ignore-whispers` refers to the voice chat whisper key, not physical whispering.
-- Mute enforcement is instant in-process and mirrored as temporary LuckPerms `voicechat.speak` deny nodes. Offence
-  history is stored in LuckPerms meta.
+- Mute enforcement is instant in-process and does not need LuckPerms. When LuckPerms is present, mutes are also
+  mirrored as temporary `voicechat.speak` deny nodes. Mutes, offence counts and reports are stored in a SQLite
+  database (`data/voicewarden.db`).
 
 ## Simple Voice Chat adapter
 
@@ -33,7 +34,7 @@ SVC packet thread ── O(1) ──▶ per-player lock-free inbox ──▶ dec
                                                                      ▼
                      STT workers: gain → Silero VAD gate → batched recognition on ONE shared model
                                                                      ▼
-                     rules → flags/ladder → mute map (+ async LuckPerms) → alerts / Discord / evidence (IO threads)
+                     rules → flags/ladder → mute map (+ async LuckPerms mirror, if installed) → alerts / Discord / evidence (IO threads)
 ```
 
 - The server thread only handles join/quit bookkeeping, command parsing and any console commands you configure.

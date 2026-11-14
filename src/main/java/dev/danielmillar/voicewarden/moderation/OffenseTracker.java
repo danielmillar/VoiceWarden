@@ -1,79 +1,77 @@
 package dev.danielmillar.voicewarden.moderation;
 
-import dev.danielmillar.voicewarden.luckperms.LuckPermsHook;
-import dev.danielmillar.voicewarden.luckperms.LuckPermsHook.Offenses;
+import dev.danielmillar.voicewarden.storage.Database;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Auto-mute offense counts for the mute ladder. LuckPerms meta is the durable, network-wide store; this class keeps an
- * in-memory copy so concurrent incidents for one player are counted atomically, and writes through asynchronously.
+ * Auto-mute offence counts for the mute ladder. Every count is held in memory (loaded by {@link #load()}) so incidents
+ * never wait on storage; changes are written to the {@code offenses} table from inside the same atomic update.
  */
 public final class OffenseTracker {
 
-    private final ConcurrentHashMap<UUID, Offenses> cache = new ConcurrentHashMap<>();
-    private final LuckPermsHook luckPerms;
+    private final ConcurrentHashMap<UUID, Offenses> counts = new ConcurrentHashMap<>();
+    private final Database database;
     private final Logger logger;
 
-    public OffenseTracker(LuckPermsHook luckPerms, Logger logger) {
-        this.luckPerms = luckPerms;
+    public OffenseTracker(Database database, Logger logger) {
+        this.database = database;
         this.logger = logger;
     }
 
-    /** The offense number the next auto-mute would be (1-based), without recording it. */
+    /** Reads every stored count. Startup only. */
+    public void load() {
+        try {
+            counts.putAll(database.read(OffenseTracker::loadAll));
+        } catch (SQLException e) {
+            logger.log(Level.SEVERE, "Could not load offence counts from the database; the mute ladder starts from zero", e);
+        }
+    }
+
+    /** The offence number the next auto-mute would be (1-based), without recording it. */
     public int peekNext(UUID player, int resetAfterDays) {
-        return peekNext(player, resetAfterDays, current(player));
+        return effective(current(player), resetAfterDays, System.currentTimeMillis()).count() + 1;
     }
 
-    /** Records an auto-mute and returns its offense number (1-based). */
+    /** Records an auto-mute and returns its offence number (1-based). */
     public int recordNext(UUID player, int resetAfterDays) {
-        return recordNext(player, resetAfterDays, current(player));
-    }
-
-    int peekNext(UUID player, int resetAfterDays, Offenses stored) {
-        Offenses cached = cache.get(player);
-        return effective(cached != null ? cached : stored, resetAfterDays, System.currentTimeMillis()).count() + 1;
-    }
-
-    int recordNext(UUID player, int resetAfterDays, Offenses stored) {
         long now = System.currentTimeMillis();
-        Offenses updated = cache.compute(player, (k, v) -> {
-            Offenses base = effective(v != null ? v : stored, resetAfterDays, now);
+        return counts.compute(player, (id, stored) -> {
+            Offenses base = effective(stored == null ? Offenses.NONE : stored, resetAfterDays, now);
             Offenses next = new Offenses(base.count() + 1, now);
-            persist(player, next);
+            database.write("an offence count", c -> save(c, id, next));
             return next;
-        });
-        return updated.count();
+        }).count();
     }
 
     public CompletableFuture<Offenses> lookup(UUID player, int resetAfterDays) {
-        Offenses cached = cache.get(player);
-        CompletableFuture<Offenses> source = cached != null ? CompletableFuture.completedFuture(cached) : luckPerms.offenses(player);
-        return source.thenApply(o -> effective(o, resetAfterDays, System.currentTimeMillis()));
+        return CompletableFuture.completedFuture(effective(current(player), resetAfterDays, System.currentTimeMillis()));
     }
 
+    /** Clears the player's count. The future completes once the change has been written. */
     public CompletableFuture<Void> reset(UUID player) {
-        var result = new java.util.concurrent.atomic.AtomicReference<CompletableFuture<Void>>();
-        cache.compute(player, (id, previous) -> {
-            result.set(luckPerms.storeOffenses(player, Offenses.NONE));
-            return Offenses.NONE;
+        var written = new AtomicReference<CompletableFuture<Void>>(CompletableFuture.completedFuture(null));
+        counts.compute(player, (id, stored) -> {
+            written.set(database.write("an offence reset", c -> delete(c, id)));
+            return null;
         });
-        return result.get();
-    }
-
-    /** Forget the in-memory copy (player left) so the next lookup sees changes made on other servers. */
-    public void forget(UUID player) {
-        cache.remove(player);
+        return written.get();
     }
 
     private Offenses current(UUID player) {
-        Offenses cached = cache.get(player);
-        return cached != null ? cached : luckPerms.offenses(player).join();
+        return counts.getOrDefault(player, Offenses.NONE);
     }
 
     private static Offenses effective(Offenses o, int resetAfterDays, long now) {
@@ -83,10 +81,33 @@ public final class OffenseTracker {
         return o;
     }
 
-    private void persist(UUID player, Offenses offenses) {
-        luckPerms.storeOffenses(player, offenses).exceptionally(error -> {
-            logger.log(Level.WARNING, "Could not store offense count in LuckPerms", error);
-            return null;
-        });
+    private static Map<UUID, Offenses> loadAll(Connection c) throws SQLException {
+        Map<UUID, Offenses> loaded = new HashMap<>();
+        try (PreparedStatement s = c.prepareStatement("SELECT player_id, count, last_offense_at FROM offenses");
+             ResultSet r = s.executeQuery()) {
+            while (r.next()) {
+                loaded.put(UUID.fromString(r.getString(1)), new Offenses(r.getInt(2), r.getLong(3)));
+            }
+        }
+        return loaded;
+    }
+
+    private static void save(Connection c, UUID player, Offenses offenses) throws SQLException {
+        try (PreparedStatement s = c.prepareStatement("""
+                INSERT INTO offenses (player_id, count, last_offense_at) VALUES (?, ?, ?)
+                ON CONFLICT (player_id) DO UPDATE SET count = excluded.count,
+                    last_offense_at = excluded.last_offense_at""")) {
+            s.setString(1, player.toString());
+            s.setInt(2, offenses.count());
+            s.setLong(3, offenses.lastEpochMillis());
+            s.executeUpdate();
+        }
+    }
+
+    private static void delete(Connection c, UUID player) throws SQLException {
+        try (PreparedStatement s = c.prepareStatement("DELETE FROM offenses WHERE player_id = ?")) {
+            s.setString(1, player.toString());
+            s.executeUpdate();
+        }
     }
 }

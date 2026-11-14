@@ -18,12 +18,14 @@ import dev.danielmillar.voicewarden.moderation.TranscriptBuffer;
 import dev.danielmillar.voicewarden.moderation.TranscriptLog;
 import dev.danielmillar.voicewarden.moderation.rules.RuleEngine;
 import dev.danielmillar.voicewarden.mute.MuteService;
+import dev.danielmillar.voicewarden.mute.VoiceMuteMirror;
 import dev.danielmillar.voicewarden.notify.StaffAlertService;
 import dev.danielmillar.voicewarden.notify.discord.DiscordWebhookService;
 import dev.danielmillar.voicewarden.player.OnlinePlayers;
 import dev.danielmillar.voicewarden.player.PlayerListener;
 import dev.danielmillar.voicewarden.report.ReportService;
 import dev.danielmillar.voicewarden.report.ReportStore;
+import dev.danielmillar.voicewarden.storage.Database;
 import dev.danielmillar.voicewarden.stt.Downloader;
 import dev.danielmillar.voicewarden.stt.TranscriptionService;
 import dev.danielmillar.voicewarden.voice.AudioIngestService;
@@ -32,13 +34,13 @@ import dev.danielmillar.voicewarden.voice.VoicePermissionMessageHook;
 import dev.danielmillar.voicewarden.voice.VoiceSpeechNotice;
 import de.maxhenkel.voicechat.api.BukkitVoicechatService;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
-import net.luckperms.api.LuckPerms;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -67,7 +69,8 @@ public final class VoiceWardenPlugin extends JavaPlugin {
     private PluginExecutors executors;
     private Metrics metrics;
     private HttpClient http;
-    private LuckPermsHook luckPerms;
+    private @Nullable LuckPermsHook luckPerms;
+    private @Nullable Database database;
     private OnlinePlayers players;
     private TranscriptBuffer transcriptBuffer;
     private MuteService mutes;
@@ -114,12 +117,24 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         messages = bundle.messages();
         rules = bundle.rules();
 
-        LuckPerms luckPermsApi = getServer().getServicesManager().load(LuckPerms.class);
         BukkitVoicechatService voicechat = getServer().getServicesManager().load(BukkitVoicechatService.class);
-        if (luckPermsApi == null || voicechat == null) {
-            getLogger().severe("LuckPerms and Simple Voice Chat are required; VoiceWarden is disabled");
+        if (voicechat == null) {
+            getLogger().severe("Simple Voice Chat is required; VoiceWarden is disabled");
             getServer().getPluginManager().disablePlugin(this);
             return;
+        }
+        try {
+            database = Database.open(dataFolder.resolve("data").resolve("voicewarden.db"), getLogger());
+        } catch (IOException | SQLException | RuntimeException e) {
+            getLogger().log(Level.SEVERE, "Could not open the VoiceWarden database; VoiceWarden is disabled", e);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        // LuckPerms is optional. Its classes may be missing, so LuckPermsHook is only touched when the plugin is present.
+        luckPerms = getServer().getPluginManager().getPlugin("LuckPerms") != null ? LuckPermsHook.connect(getServer()) : null;
+        if (luckPerms == null && config.mute().luckPerms()) {
+            getLogger().info("LuckPerms is not installed, so mute.luckperms is ignored. Voice mutes are still enforced"
+                    + " by VoiceWarden on this server.");
         }
 
         int decodeThreads = config.audio().decodeThreads() > 0 ? config.audio().decodeThreads() : PluginExecutors.autoDecodeThreads();
@@ -130,12 +145,12 @@ public final class VoiceWardenPlugin extends JavaPlugin {
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .executor(Executors.newVirtualThreadPerTaskExecutor())
                 .build();
-        luckPerms = new LuckPermsHook(luckPermsApi);
         players = new OnlinePlayers();
         getServer().getOnlinePlayers().forEach(players::add);
 
         transcriptBuffer = new TranscriptBuffer(bufferLimits(config));
-        mutes = new MuteService(this::config, this::messages, luckPerms, players, executors.io(), getLogger(), dataFolder);
+        mutes = new MuteService(this::config, this::messages, luckPerms != null ? luckPerms : VoiceMuteMirror.NONE, players,
+                executors.io(), getLogger(), database);
         alerts = new StaffAlertService(this::config, this::messages, players, getLogger());
         discord = new DiscordWebhookService(() -> config.discord(), http, getLogger());
         staffModeration = new StaffModerationService(mutes, this::isBypassed, action -> {
@@ -145,10 +160,11 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         evidence = new EvidenceStore(() -> config.recordings(),
                 PluginExecutors.bounded(executors.io(), 64, getLogger(), "Evidence storage"), getLogger());
         transcriptLog = new TranscriptLog(dataFolder.resolve("logs"), executors.io(), getLogger());
+        OffenseTracker offenses = new OffenseTracker(database, getLogger());
         moderation = new ModerationService(this::config, this::messages, this::rules, transcriptBuffer,
-                new OffenseTracker(luckPerms, getLogger()), mutes, alerts, discord, evidence,
+                offenses, mutes, alerts, discord, evidence,
                 new CustomCommandRunner(this, getLogger()), transcriptLog, players, metrics, getLogger());
-        reportStore = new ReportStore(dataFolder, executors.io(), getLogger());
+        reportStore = new ReportStore(database, getLogger());
         reports = new ReportService(this::config, transcriptBuffer, reportStore, alerts, discord, evidence, executors.io(), getLogger());
 
         ingest = new AudioIngestService(this::config, metrics, executors.decode(), segment -> transcription.submit(segment),
@@ -168,13 +184,15 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerListener(players, this::config, this::messages, id -> {
             speechNotice.onDisconnect(id);
             ingest.onDisconnect(id);
-            moderation.onQuit(id);
         }), this);
-        luckPerms.onUserRecalculate(this, id -> ingest.refreshBypass(id));
+        if (luckPerms != null) {
+            luckPerms.onUserRecalculate(this, id -> ingest.refreshBypass(id));
+        }
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS,
                 event -> CommandRegistrar.register(event.registrar(), this));
 
         reportStore.load();
+        offenses.load();
         mutes.start(executors.timer());
         ingest.start(executors.timer());
         transcriptLog.start(executors.timer());
@@ -202,6 +220,10 @@ public final class VoiceWardenPlugin extends JavaPlugin {
             speechNotice.close();
         }
         if (!started) {
+            if (database != null) {
+                database.close();
+                database = null;
+            }
             return;
         }
         if (bridge != null) {
@@ -213,17 +235,19 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         CompletableFuture<Void> workers = transcription.closeAsync();
         health.close();
         discord.close();
-        luckPerms.close();
+        if (luckPerms != null) {
+            luckPerms.close();
+        }
         http.shutdownNow();
         executors.shutdownAfter(workers, () -> {
-            CompletableFuture.allOf(mutes.flushMirrors(), luckPerms.flush()).handle((ignored, error) -> {
+            CompletableFuture.allOf(mutes.flushMirrors(), luckPerms != null ? luckPerms.flush() : CompletableFuture.completedFuture(null)).handle((ignored, error) -> {
                 if (error != null) {
                     getLogger().log(Level.WARNING, "Could not update the LuckPerms mirror during shutdown", error);
                 }
                 return null;
             }).join();
             mutes.close();
-            reportStore.saveNow();
+            database.close();
             transcriptLog.close();
         });
     }
@@ -305,7 +329,8 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         return players;
     }
 
-    public LuckPermsHook luckPerms() {
+    /** Null when LuckPerms is not installed. */
+    public @Nullable LuckPermsHook luckPerms() {
         return luckPerms;
     }
 
@@ -351,7 +376,11 @@ public final class VoiceWardenPlugin extends JavaPlugin {
 
     public CompletableFuture<Boolean> isBypassed(UUID id) {
         Player online = players.get(id);
-        return online == null ? luckPerms.hasPermission(id, AudioIngestService.BYPASS_PERMISSION)
-                : CompletableFuture.completedFuture(online.hasPermission(AudioIngestService.BYPASS_PERMISSION));
+        if (online != null) {
+            return CompletableFuture.completedFuture(online.hasPermission(AudioIngestService.BYPASS_PERMISSION));
+        }
+        // Bukkit cannot check an offline player's permissions; without LuckPerms they are treated as not bypassed.
+        return luckPerms != null ? luckPerms.hasPermission(id, AudioIngestService.BYPASS_PERMISSION)
+                : CompletableFuture.completedFuture(false);
     }
 }

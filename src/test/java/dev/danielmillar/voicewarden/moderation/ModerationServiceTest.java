@@ -58,7 +58,8 @@ class ModerationServiceTest {
         var messages = Messages.load(folder.resolve("messages.yml"));
         var players = new OnlinePlayers();
         var hook = hook();
-        var mutes = new MuteService(() -> settings, () -> messages, hook, players, Runnable::run, log, folder);
+        var database = Fakes.database(folder);
+        var mutes = new MuteService(() -> settings, () -> messages, hook, players, Runnable::run, log, database);
         var rules = RuleEngine.compile(List.of(new RuleDefinition("test", "test", RuleAction.MUTE, 1, true,
                 List.of("badword"), List.of(), List.of(), List.of())), Set.of());
         var metrics = new Metrics();
@@ -68,7 +69,7 @@ class ModerationServiceTest {
         try (var http = HttpClient.newHttpClient()) {
             var discord = new DiscordWebhookService(DiscordSettings::disabled, http, log);
             var moderation = new ModerationService(() -> settings, () -> messages, () -> rules, buffer,
-                    new OffenseTracker(hook, log), mutes, alerts, discord, evidence,
+                    new OffenseTracker(database, log), mutes, alerts, discord, evidence,
                     new CustomCommandRunner(null, log), new TranscriptLog(folder.resolve("logs"), Runnable::run, log),
                     players, metrics, log);
             var segment = new AudioSegment(player, "Alex", TestFixtures.AUDIO, 16000, Instant.now(), System.nanoTime(), null, false);
@@ -79,53 +80,4 @@ class ModerationServiceTest {
             assertTrue(buffer.recentLines(player, 10).isEmpty());
         }
     }
-    @Test void disablingDuringOfflineHistoryLoadPreventsPunishment() throws Exception {
-        var cfg = config();
-        cfg = Fakes.with(cfg, "alerts", new PluginConfig.Alerts(false, false));
-        cfg = Fakes.with(cfg, "recordings", new EvidenceSettings(EvidenceSettings.Mode.NONE, folder, false, 0, 0));
-        var settings = new AtomicReference<>(cfg);
-        var historyLoaded = new CompletableFuture<net.luckperms.api.model.user.User>();
-        var entered = new CountDownLatch(1);
-        var meta = Fakes.proxy(net.luckperms.api.cacheddata.CachedMetaData.class, (p, m, a) ->
-                a[0].equals("voicewarden-offenses") ? Optional.of(4) : Optional.of(System.currentTimeMillis()));
-        var cached = Fakes.proxy(net.luckperms.api.cacheddata.CachedDataManager.class, (p, m, a) -> meta);
-        var user = Fakes.proxy(net.luckperms.api.model.user.User.class, (p, m, a) -> cached);
-        var users = Fakes.proxy(UserManager.class, (p, m, a) -> switch (m.getName()) {
-            case "getUser" -> null;
-            case "loadUser" -> { entered.countDown(); yield historyLoaded; }
-            case "modifyUser" -> { writes.incrementAndGet(); yield CompletableFuture.completedFuture(null); }
-            default -> throw new AssertionError(m);
-        });
-        var hook = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, a) -> users));
-        var messages = Messages.load(folder.resolve("messages.yml"));
-        var players = new OnlinePlayers();
-        var mutes = new MuteService(settings::get, () -> messages, hook, players, Runnable::run, log, folder);
-        var rules = RuleEngine.compile(List.of(new RuleDefinition("test", "test", RuleAction.MUTE, 1, true,
-                List.of("badword"), List.of(), List.of(), List.of())), Set.of());
-        var metrics = new Metrics();
-        var buffer = new TranscriptBuffer(new TranscriptBuffer.Limits(Duration.ofHours(1), 10, 0));
-        var alerts = new StaffAlertService(settings::get, () -> messages, players, log);
-        var evidence = new EvidenceStore(() -> settings.get().recordings(), Runnable::run, log);
-        try (var http = HttpClient.newHttpClient(); var worker = Executors.newVirtualThreadPerTaskExecutor()) {
-            var discord = new DiscordWebhookService(DiscordSettings::disabled, http, log);
-            var moderation = new ModerationService(settings::get, () -> messages, () -> rules, buffer,
-                    new OffenseTracker(hook, log), mutes, alerts, discord, evidence,
-                    new CustomCommandRunner(null, log), new TranscriptLog(folder.resolve("logs"), Runnable::run, log),
-                    players, metrics, log);
-            var segment = new AudioSegment(player, "Alex", TestFixtures.AUDIO, 16000, Instant.now(), System.nanoTime(), null, false);
-            var done = worker.submit(() -> moderation.onTranscript(new Transcript(segment, "badword", 0)));
-            try {
-                assertTrue(entered.await(3, TimeUnit.SECONDS));
-                settings.set(Fakes.with(settings.get(), "enabled", false));
-            } finally {
-                historyLoaded.complete(user);
-            }
-            done.get(3, TimeUnit.SECONDS);
-            assertFalse(mutes.isMuted(player));
-            assertEquals(0, writes.get());
-            assertEquals(0, metrics.autoMutes.sum());
-            assertEquals(0, metrics.incidents.sum());
-        }
-    }
-
 }

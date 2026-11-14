@@ -44,7 +44,7 @@ class VoiceChatBridgeTest {
         Logger log = Logger.getLogger("VoiceChatBridgeTest");
         var permissions = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, args) -> { throw new AssertionError(m); }));
         var messages = Messages.load(folder.resolve("messages.yml"));
-        mutes = new MuteService(() -> config, () -> messages, permissions, new OnlinePlayers(), Runnable::run, log, folder);
+        mutes = new MuteService(() -> config, () -> messages, permissions, new OnlinePlayers(), Runnable::run, log, Fakes.database(folder));
         var ingest = new AudioIngestService(() -> config, metrics, new Fakes.Executor(true), s -> { },
                 key -> null, p -> false, log);
         ingest.setAccepting(true);

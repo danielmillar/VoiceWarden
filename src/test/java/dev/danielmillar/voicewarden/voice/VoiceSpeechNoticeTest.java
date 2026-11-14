@@ -45,7 +45,7 @@ class VoiceSpeechNoticeTest {
         Logger logger = Logger.getLogger("VoiceSpeechNoticeTest");
         var permissions = new LuckPermsHook(Fakes.proxy(LuckPerms.class,
                 (p, m, args) -> { throw new AssertionError("Unexpected LuckPerms call"); }));
-        mutes = new MuteService(() -> config, () -> messages, permissions, new OnlinePlayers(), Runnable::run, logger, folder);
+        mutes = new MuteService(() -> config, () -> messages, permissions, new OnlinePlayers(), Runnable::run, logger, Fakes.database(folder));
         Plugin plugin = Fakes.proxy(Plugin.class, (p, m, args) -> { throw new AssertionError(m); });
         EntityScheduler scheduler = Fakes.proxy(EntityScheduler.class, (p, m, args) -> {
             assertEquals("run", m.getName());

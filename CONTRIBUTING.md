@@ -38,8 +38,11 @@ by Git, and CI rejects tracked files covered by `.gitignore`.
 
 ## Releasing
 
-Set `version` in `build.gradle.kts` through a normal pull request. Once it has merged, tag that commit on `main` with
-`v<version>` and push the tag:
+Between releases, `main` carries the next version with a `-SNAPSHOT` suffix, for example `2.0.0-SNAPSHOT`. Follow
+semantic versioning when choosing it: a major bump when upgrading needs operator action or loses data, minor for new
+features, patch for fixes only. To release, remove the suffix in a normal pull request (adjusting the number if the
+changes since the last release call for it). Once it has merged, tag that commit on `main` with `v<version>` and push
+the tag:
 
 ```
 git tag v1.0.0 && git push origin v1.0.0
@@ -47,7 +50,7 @@ git tag v1.0.0 && git push origin v1.0.0
 
 The Release workflow checks that the tag matches the Gradle version, runs `./gradlew build`, and publishes a GitHub
 release with the JAR, a SHA-256 checksum file and notes generated from the merged pull requests. You can edit the notes
-afterwards.
+afterwards. Then set `version` to the next `-SNAPSHOT` in a follow-up pull request.
 
 ## Pull requests
 

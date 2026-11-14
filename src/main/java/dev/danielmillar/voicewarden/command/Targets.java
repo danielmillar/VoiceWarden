@@ -40,7 +40,11 @@ final class Targets {
             String cachedName = cached.getName() != null ? cached.getName() : name;
             return CompletableFuture.completedFuture(Optional.of(new Target(cached.getUniqueId(), cachedName)));
         }
-        return plugin.luckPerms().lookupUuid(name)
+        var luckPerms = plugin.luckPerms();
+        if (luckPerms == null) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        return luckPerms.lookupUuid(name)
                 .thenApply(id -> id == null ? Optional.<Target>empty() : Optional.of(new Target(id, name)))
                 .exceptionally(e -> Optional.empty());
     }

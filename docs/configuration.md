@@ -12,11 +12,16 @@ For operators. Setup, commands and permissions are in the [README](../README.md)
    a first offence gets a short mute and repeat offences get longer ones. If they are below the limit, they get a
    warning instead when `moderation.warn-below-threshold` is on.
 4. Staff are alerted either way, and the mute is remembered even if the player leaves or the server restarts.
-   New mutes store the identity of their LuckPerms mirror, so they can still be cleaned up after a config change.
-   Mutes saved by an older version have no stored identity, so cleanup assumes your current config. If you changed the
-   mute permission or context before upgrading, remove the old LuckPerms entry by hand.
+   VoiceWarden always enforces the mute itself. If LuckPerms is installed and `mute.luckperms.enabled` is true, the
+   mute is also mirrored as a temporary LuckPerms deny node, so it applies on other servers sharing your LuckPerms
+   storage. Without LuckPerms that setting is ignored and one line is logged at startup.
+   Mutes store the identity of their LuckPerms mirror, so they can still be cleaned up after a config change.
    An unmute completes only after that cleanup succeeds. An expired mute is no longer enforced, but its record is kept
    until cleanup succeeds; a failed cleanup is retried on the expiry sweep and at startup, or by unmuting.
+
+Without LuckPerms, two limits apply. Commands can only target players who have joined this server before. And an
+offline player's `voicewarden.bypass` permission can't be checked, so staff can voice-mute an offline player who has
+bypass.
 
 You choose how many mute-rule hits within a time window trigger a mute (`moderation.flag-threshold` and
 `moderation.flag-window`). The default threshold is 1, so the first hit mutes. A muted player can also be stopped from
@@ -41,7 +46,7 @@ All files are in `plugins/VoiceWarden/`.
 | `wordlist.txt` | Your list of swear words and words that cause a mute. Wildcards such as `word*` are allowed. |
 | `rules.yml` | More advanced rules, such as phrases and an "always allowed" list. |
 | `recordings/` | Saved recordings used as evidence. Old ones are deleted automatically based on age and size. |
-| `data/` | Active mutes and reports. If a mutes or reports file is corrupt, it is moved next to the original with a `.corrupt-<UUID>` suffix before fresh state is started. If it can't be preserved, writes are suspended. |
+| `data/voicewarden.db` | A SQLite database holding voice mutes (and their LuckPerms mirror records), offence counts for the mute ladder, and voice reports. Nothing extra needs installing. Offence counts are per server. If the file is unreadable, it is moved aside as `voicewarden.db.corrupt-<UUID>` and a fresh one is created. |
 | `models/` and `natives/` | The downloaded speech recognition files. |
 
 ## Updating
@@ -50,6 +55,18 @@ VoiceWarden never overwrites your `wordlist.txt` or `rules.yml` when you install
 default rules automatically. Back them up before comparing them with the newest defaults. Use `/vw reload` after
 editing files. Restart the server after changing the plugin file itself. Changing `audio.decode-threads` needs a
 server restart to apply, and `/vw reload` tells you so.
+
+### Upgrading from the JSON storage version
+
+- Existing voice mutes and reports are not carried over: VoiceWarden starts with no mutes and an empty report inbox.
+  The old JSON files in `data/` are ignored and can be deleted.
+- If you mirrored mutes to LuckPerms, the old deny entries stay in LuckPerms and still silence those players.
+  While the mirror is on with the same permission and context settings, `/vw unmute <player>` removes them, even
+  though it replies that the player is not muted. Otherwise remove them in LuckPerms.
+- Offence counts are no longer kept in LuckPerms meta (`voicewarden-offenses`, `voicewarden-last-offense`), and old
+  counts are not imported. The mute ladder starts from zero after upgrading, and counts are now per server rather than
+  shared across a network.
+- Evidence recordings and transcript logs are unchanged.
 
 ## Disabling and shutdown
 

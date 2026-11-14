@@ -4,6 +4,7 @@ import dev.danielmillar.voicewarden.config.Messages;
 import dev.danielmillar.voicewarden.config.PluginConfig;
 import dev.danielmillar.voicewarden.luckperms.LuckPermsHook;
 import dev.danielmillar.voicewarden.player.OnlinePlayers;
+import dev.danielmillar.voicewarden.storage.Database;
 import dev.danielmillar.voicewarden.testutil.Fakes;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.model.user.UserManager;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.UUID;
@@ -33,6 +33,7 @@ class MuteServiceTest {
     private Messages messages;
     private LuckPermsHook hook;
     private ScheduledThreadPoolExecutor timer;
+    private Database database;
 
     @BeforeEach void setup() throws Exception {
         config = Fakes.config(folder);
@@ -52,6 +53,7 @@ class MuteServiceTest {
             if (m.getName().equals("getUserManager")) return users;
             throw new AssertionError(m);
         }));
+        database = Fakes.database(folder);
         timer = new ScheduledThreadPoolExecutor(1);
         timer.setRemoveOnCancelPolicy(true);
     }
@@ -59,6 +61,7 @@ class MuteServiceTest {
     @AfterEach void cleanup() throws Exception {
         timer.shutdownNow();
         assertTrue(timer.awaitTermination(2, TimeUnit.SECONDS));
+        database.close();
     }
 
     @Test void expiryIsEffectiveImmediatelyAndPermanentMuteDoesNotExpire() {
@@ -93,7 +96,8 @@ class MuteServiceTest {
         original.mute(bob, "Bob", Duration.ZERO, "expired", "staff", false).join();
         var expected = original.get(alice).orElseThrow();
         original.close();
-        assertTrue(Files.exists(folder.resolve("data/mutes.json")));
+        database.close();
+        database = Fakes.database(folder);
         MuteService reloaded = service();
         reloaded.start(timer);
         try {
@@ -212,28 +216,20 @@ class MuteServiceTest {
         assertEquals("replacement", service.get(alice).orElseThrow().reason());
     }
 
-    @Test void unreadableMuteStateIsPreservedBeforeFreshSave() throws Exception {
-        Path file = folder.resolve("data/mutes.json");
-        Files.createDirectories(file.getParent());
-        String original = "[unreadable original state";
-        Files.writeString(file, original);
+    @Test void unmuteRemovesTheStoredMute() {
         MuteService service = service();
         service.start(timer);
-        service.mute(alice, "Alice", null, "new", "staff", false).join();
+        service.mute(alice, "Alice", null, "reason", "staff", false).join();
+        assertTrue(service.unmute(alice).join());
         service.close();
-        try (var files = Files.list(file.getParent())) {
-            var preserved = files.filter(path -> path.getFileName().toString().startsWith("mutes.json.corrupt-")).toList();
-            assertEquals(1, preserved.size());
-            assertEquals(original, Files.readString(preserved.getFirst()));
-        }
         MuteService reloaded = service();
         reloaded.start(timer);
-        assertEquals("new", reloaded.get(alice).orElseThrow().reason());
+        assertFalse(reloaded.isMuted(alice));
         reloaded.close();
     }
 
     private MuteService service() { return service(Runnable::run); }
     private MuteService service(java.util.concurrent.Executor io) {
-        return new MuteService(() -> config, () -> messages, hook, new OnlinePlayers(), io, Logger.getLogger("MuteServiceTest"), folder);
+        return new MuteService(() -> config, () -> messages, hook, new OnlinePlayers(), io, Logger.getLogger("MuteServiceTest"), database);
     }
 }

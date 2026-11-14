@@ -2,6 +2,7 @@ package dev.danielmillar.voicewarden.testutil;
 
 import dev.danielmillar.voicewarden.config.ConfigLoader;
 import dev.danielmillar.voicewarden.config.PluginConfig;
+import dev.danielmillar.voicewarden.storage.Database;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
@@ -34,6 +35,15 @@ public final class Fakes {
         try (var in = Fakes.class.getClassLoader().getResourceAsStream(name)) {
             if (in == null) throw new AssertionError("Missing " + name);
             Files.copy(in, folder.resolve(name));
+        }
+    }
+
+    /** A real SQLite database in {@code folder/data}, as the plugin opens it. */
+    public static Database database(Path folder) {
+        try {
+            return Database.open(folder.resolve("data").resolve("voicewarden.db"), java.util.logging.Logger.getAnonymousLogger());
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
     }
 

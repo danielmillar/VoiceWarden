@@ -1,0 +1,7 @@
+{
+  "paper": {
+    "plugins": ["build/libs/VoiceWarden-*[!n].jar"],
+    "modrinth": ["simple-voice-chat:bukkit-2.6.25"],
+    "properties": {"online-mode": "false"}
+  }
+}
