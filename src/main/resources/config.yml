@@ -249,7 +249,7 @@ discord:
     title: ""
     footer: ""
 
-  # Auto-mutes, staff mutes and unmutes. If this uses the same URL as 'flags', auto-mutes are posted once.
+  # Auto-mutes, staff mutes, unmutes and pardons. If this uses the same URL as 'flags', auto-mutes are posted once.
   mutes:
     enabled: false
     webhook-url: ""

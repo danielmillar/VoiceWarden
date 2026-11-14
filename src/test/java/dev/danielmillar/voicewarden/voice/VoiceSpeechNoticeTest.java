@@ -159,7 +159,7 @@ class VoiceSpeechNoticeTest {
         mutes.mute(id, "Alice", Duration.ofMinutes(5), "reason", "staff", false).join();
         notice.show(player);
         tick();
-        mutes.unmute(id).join();
+        mutes.unmute(id, "staff").join();
         tick();
         assertTrue(repeating.getFirst().cancelled);
         assertEquals("", text(actionBars));
@@ -219,7 +219,8 @@ class VoiceSpeechNoticeTest {
     @Test void unmuteBeforeTheScheduledReminderPreventsAStaleReminder() {
         mutes.mute(id, "Alice", null, "reason", "staff", false).join();
         notice.onDeniedSpeech(player);
-        mutes.unmute(id).join();
+        mutes.unmute(id, "staff").join();
+        canSpeak = true;
         drain();
         assertTrue(chat.isEmpty());
     }

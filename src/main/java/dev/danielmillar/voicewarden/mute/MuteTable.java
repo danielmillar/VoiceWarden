@@ -9,10 +9,11 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
-/** SQL for the {@code mutes} and {@code mute_mirrors} tables. Call only on the database thread. */
+/** SQL for the {@code mutes}, {@code mute_mirrors} and {@code mute_events} tables. Call only on the database thread. */
 final class MuteTable {
 
     private MuteTable() {
@@ -89,5 +90,54 @@ final class MuteTable {
             s.setString(1, player.toString());
             s.executeUpdate();
         }
+    }
+
+    static void record(Connection c, MuteEvent event) throws SQLException {
+        try (PreparedStatement s = c.prepareStatement("""
+                INSERT INTO mute_events (player_id, player_name, type, at, actor, reason, expires_at, automatic)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""")) {
+            s.setString(1, event.playerId().toString());
+            s.setString(2, event.playerName());
+            s.setString(3, event.type().key());
+            s.setLong(4, event.at());
+            s.setString(5, event.actor());
+            s.setString(6, event.reason());
+            if (event.expiresAt() == null) {
+                s.setNull(7, java.sql.Types.INTEGER);
+            } else {
+                s.setLong(7, event.expiresAt());
+            }
+            s.setBoolean(8, event.automatic());
+            s.executeUpdate();
+        }
+    }
+
+    /** Newest first. Insertion order breaks ties, since several events can share a millisecond. */
+    static MuteEvent.Page history(Connection c, UUID player, int page, int perPage) throws SQLException {
+        int total;
+        try (PreparedStatement s = c.prepareStatement("SELECT COUNT(*) FROM mute_events WHERE player_id = ?")) {
+            s.setString(1, player.toString());
+            try (ResultSet r = s.executeQuery()) {
+                total = r.next() ? r.getInt(1) : 0;
+            }
+        }
+        List<MuteEvent> events = new ArrayList<>();
+        try (PreparedStatement s = c.prepareStatement("""
+                SELECT player_name, type, at, actor, reason, expires_at, automatic FROM mute_events
+                WHERE player_id = ? ORDER BY id DESC LIMIT ? OFFSET ?""")) {
+            s.setString(1, player.toString());
+            s.setInt(2, perPage);
+            s.setLong(3, (long) (page - 1) * perPage);
+            try (ResultSet r = s.executeQuery()) {
+                while (r.next()) {
+                    long expires = r.getLong(6);
+                    Long expiresAt = r.wasNull() ? null : expires;
+                    events.add(new MuteEvent(player, r.getString(1),
+                            MuteEvent.Type.valueOf(r.getString(2).toUpperCase(Locale.ROOT)), r.getLong(3),
+                            r.getString(4), r.getString(5), expiresAt, r.getBoolean(7)));
+                }
+            }
+        }
+        return new MuteEvent.Page(List.copyOf(events), page, (total + perPage - 1) / perPage);
     }
 }

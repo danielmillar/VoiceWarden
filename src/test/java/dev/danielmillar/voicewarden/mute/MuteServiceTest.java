@@ -112,9 +112,9 @@ class MuteServiceTest {
         MuteService service = service();
         service.mute(alice, "Alice", Duration.ofHours(1), "reason", "staff", false).join();
         assertTrue(service.isMuted(alice));
-        assertTrue(service.unmute(alice).join());
+        assertTrue(service.unmute(alice, "staff").join());
         assertFalse(service.isMuted(alice));
-        assertFalse(service.unmute(alice).join());
+        assertFalse(service.unmute(alice, "staff").join());
         assertEquals(3, luckPermsCalls.get());
     }
 
@@ -123,7 +123,7 @@ class MuteServiceTest {
         hook = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, a) -> { throw new AssertionError("LuckPerms touched: " + m); }));
         MuteService service = service();
         service.mute(alice, "Alice", Duration.ofHours(1), "reason", "staff", false).join();
-        assertTrue(service.unmute(alice).join());
+        assertTrue(service.unmute(alice, "staff").join());
         service.mute(alice, "Alice", Duration.ZERO, "reason", "staff", false).join();
         assertFalse(service.isMuted(alice));
         assertEquals(0, luckPermsCalls.get());
@@ -151,7 +151,7 @@ class MuteServiceTest {
         reloaded.start(timer);
         int before = luckPermsCalls.get();
         assertEquals(known, reloaded.get(alice).orElseThrow().mirrors());
-        assertTrue(reloaded.unmute(alice).join());
+        assertTrue(reloaded.unmute(alice, "staff").join());
         assertEquals(before + 1, luckPermsCalls.get());
         assertFalse(reloaded.isMuted(alice));
         reloaded.close();
@@ -170,7 +170,7 @@ class MuteServiceTest {
         config = Fakes.with(config, "mute", Fakes.with(config.mute(), "speakPermission", "custom.speak"));
         service.mute(alice, "Alice", Duration.ofMinutes(1), "replacement", "staff", false).join();
         assertEquals(3, service.get(alice).orElseThrow().mirrors().size());
-        assertTrue(service.unmute(alice).join());
+        assertTrue(service.unmute(alice, "staff").join());
     }
 
     @Test void failedCleanupRetainsLocalMuteForRetry() {
@@ -182,7 +182,7 @@ class MuteServiceTest {
         hook = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, a) -> users));
         MuteService pending = service();
         pending.mute(alice, "Alice", null, "reason", "staff", false);
-        var removal = pending.unmute(alice);
+        var removal = pending.unmute(alice, "staff");
         failed.completeExceptionally(new IllegalStateException("storage unavailable"));
         assertThrows(java.util.concurrent.CompletionException.class, removal::join);
         assertTrue(pending.isMuted(alice));
@@ -195,7 +195,7 @@ class MuteServiceTest {
         hook = new LuckPermsHook(Fakes.proxy(LuckPerms.class, (p, m, a) -> users));
         MuteService service = service();
         service.mute(alice, "Alice", null, "reason", "staff", false);
-        var unmute = service.unmute(alice);
+        var unmute = service.unmute(alice, "staff");
         var flush = service.flushMirrors();
         assertFalse(flush.isDone());
         assertTrue(service.isMuted(alice));
@@ -220,12 +220,49 @@ class MuteServiceTest {
         MuteService service = service();
         service.start(timer);
         service.mute(alice, "Alice", null, "reason", "staff", false).join();
-        assertTrue(service.unmute(alice).join());
+        assertTrue(service.unmute(alice, "staff").join());
         service.close();
         MuteService reloaded = service();
         reloaded.start(timer);
         assertFalse(reloaded.isMuted(alice));
         reloaded.close();
+    }
+
+    @Test void historyIsNewestFirstPagedAndSurvivesRestart() throws Exception {
+        MuteService service = service();
+        service.mute(alice, "Alice", Duration.ofHours(1), "first", "staff", false).join();
+        assertTrue(service.unmute(alice, "mod").join());
+        service.mute(alice, "Alice", Duration.ZERO, "short", "VoiceWarden", true).join();
+        assertFalse(service.isMuted(alice)); // expires on the direct io executor
+        assertFalse(service.pardon(alice, "Alice", "mod", "wrong call").join());
+        service.mute(bob, "Bob", null, "other player", "staff", false).join();
+        database.close();
+        database = Fakes.database(folder);
+        MuteService reloaded = service();
+
+        var first = reloaded.history(alice, 1, 2).join();
+        assertEquals(java.util.List.of(MuteEvent.Type.PARDON, MuteEvent.Type.EXPIRE), types(first));
+        assertEquals("wrong call", first.events().getFirst().reason());
+        assertTrue(first.more());
+        var second = reloaded.history(alice, 2, 2).join();
+        assertEquals(java.util.List.of(MuteEvent.Type.MUTE, MuteEvent.Type.UNMUTE), types(second));
+        assertEquals(Duration.ZERO, second.events().getFirst().duration());
+        assertEquals(second.events().getFirst().expiresAt(), first.events().getLast().at()); // dated when it ran out
+        assertEquals("mod", second.events().getLast().actor());
+        var third = reloaded.history(alice, 3, 2).join();
+        assertEquals(java.util.List.of(MuteEvent.Type.MUTE), types(third));
+        assertEquals(Duration.ofHours(1), third.events().getFirst().duration());
+        assertFalse(third.more());
+        var beyond = reloaded.history(alice, 9, 2).join();
+        assertTrue(beyond.events().isEmpty());
+        assertEquals(3, beyond.pages());
+        assertEquals(3, beyond.newer());
+        assertEquals(1, second.newer());
+        assertNull(reloaded.history(bob, 1, 10).join().events().getFirst().duration());
+    }
+
+    private static java.util.List<MuteEvent.Type> types(MuteEvent.Page page) {
+        return page.events().stream().map(MuteEvent::type).toList();
     }
 
     @Test void partialScopeMirrorsNoSpeakDenialAndReloadRemovesTheOldOne() {

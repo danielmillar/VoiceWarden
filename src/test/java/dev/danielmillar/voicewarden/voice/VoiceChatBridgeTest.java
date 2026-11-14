@@ -159,7 +159,7 @@ class VoiceChatBridgeTest {
     }
 
     @Test void mutedListenerHearsOthersUnlessListeningIsDisabled() {
-        mutes.unmute(id).join();
+        mutes.unmute(id, "staff").join();
         mutes.mute(listenerId, "Bob", null, "reason", "staff", false).join();
         assertFalse(sound(EntitySoundPacketEvent.class, SoundPacketEvent.SOURCE_PROXIMITY, false));
         settings = Fakes.with(settings, "disableListening", true);

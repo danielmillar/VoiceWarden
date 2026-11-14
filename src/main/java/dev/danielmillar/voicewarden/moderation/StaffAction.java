@@ -7,7 +7,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A mute or unmute that did not come from automatic detection: a staff command, the console, or a mute expiring.
+ * A mute, unmute or pardon that did not come from automatic detection: a staff command, the console, or a mute
+ * expiring.
  *
  * @param actor    staff name, "Console", or "System" for expiries
  * @param duration non-null only for {@link Type#MUTE}
@@ -24,6 +25,8 @@ public record StaffAction(
 ) {
     public enum Type {
         MUTE,
-        UNMUTE
+        UNMUTE,
+        /** Unmuted (if muted) and offences and flags cleared. */
+        PARDON
     }
 }

@@ -151,7 +151,10 @@ public final class MuteService implements AutoCloseable {
             }
             result.set(mirror.replaceVoiceMute(playerId, known, next, duration));
             Mute mute = new Mute(playerId, playerName, now, expires, reason, actor, automatic, List.copyOf(known));
-            save(mute);
+            database.write("the voice mute of " + playerName, c -> {
+                MuteTable.save(c, mute);
+                MuteTable.record(c, MuteEvent.muted(mute));
+            });
             return mute;
         });
         Player online = players.get(playerId);
@@ -169,11 +172,36 @@ public final class MuteService implements AutoCloseable {
         }));
     }
 
-    public CompletableFuture<Boolean> unmute(UUID playerId) {
-        return unmute(playerId, null);
+    /** Lifts the player's mute. Completes with {@code false} if they were not muted. */
+    public CompletableFuture<Boolean> unmute(UUID playerId, String actor) {
+        return unmute(playerId, null, MuteEvent.Type.UNMUTE, actor, "");
     }
 
-    private CompletableFuture<Boolean> unmute(UUID playerId, @Nullable Mute expected) {
+    /**
+     * Lifts any mute and records a pardon in the player's history, even when they were not muted. Completes with
+     * whether a mute was lifted.
+     */
+    public CompletableFuture<Boolean> pardon(UUID playerId, String playerName, String actor, String reason) {
+        return unmute(playerId, null, MuteEvent.Type.PARDON, actor, reason).thenApply(removed -> {
+            if (!removed) {
+                MuteEvent event = new MuteEvent(playerId, playerName, MuteEvent.Type.PARDON, System.currentTimeMillis(),
+                        actor, reason, null, false);
+                mutes.compute(playerId, (id, current) -> {
+                    database.write("the pardon of " + playerName, c -> MuteTable.record(c, event));
+                    return current;
+                });
+            }
+            return removed;
+        });
+    }
+
+    /** A page (1-based) of the player's mute history, newest first, read on the database thread. */
+    public CompletableFuture<MuteEvent.Page> history(UUID playerId, int page, int perPage) {
+        return database.query(c -> MuteTable.history(c, playerId, page, perPage));
+    }
+
+    private CompletableFuture<Boolean> unmute(UUID playerId, @Nullable Mute expected, MuteEvent.Type type,
+                                              String actor, String reason) {
         var found = new AtomicReference<Mute>();
         var result = new AtomicReference<CompletableFuture<Void>>();
         mutes.compute(playerId, (id, current) -> {
@@ -188,7 +216,7 @@ public final class MuteService implements AutoCloseable {
         });
         Mute original = found.get();
         return track(result.get().thenApply(ignored -> {
-            boolean removed = original != null && remove(original);
+            boolean removed = original != null && remove(original, type, actor, reason);
             if (removed) {
                 if (config.get().mute().notifyPlayer()) {
                     Player online = players.get(playerId);
@@ -285,7 +313,7 @@ public final class MuteService implements AutoCloseable {
             return;
         }
         try {
-            io.execute(() -> unmute(mute.playerId(), mute).whenComplete((removed, error) -> {
+            io.execute(() -> unmute(mute.playerId(), mute, MuteEvent.Type.EXPIRE, "System", "").whenComplete((removed, error) -> {
                 expiring.remove(mute.playerId());
                 if (Boolean.TRUE.equals(removed)) {
                     expiryListener.accept(new StaffAction(StaffAction.Type.UNMUTE, mute.playerId(), mute.playerName(),
@@ -302,15 +330,24 @@ public final class MuteService implements AutoCloseable {
         database.write("the voice mute of " + mute.playerName(), c -> MuteTable.save(c, mute));
     }
 
-    /** Removes {@code mute} only if it is still the current one, deleting it from the database in the same step. */
-    private boolean remove(Mute mute) {
+    /**
+     * Removes {@code mute} only if it is still the current one, deleting it from the database and recording why in the
+     * same step.
+     */
+    private boolean remove(Mute mute, MuteEvent.Type type, String actor, String reason) {
         var removed = new AtomicBoolean();
         mutes.computeIfPresent(mute.playerId(), (id, current) -> {
             if (current != mute) {
                 return current;
             }
             removed.set(true);
-            database.write("the removal of " + mute.playerName() + "'s voice mute", c -> MuteTable.delete(c, id));
+            // An expiry is dated when the mute ran out, not when the sweeper noticed (possibly after a restart).
+            long at = type == MuteEvent.Type.EXPIRE ? mute.expiresAt() : System.currentTimeMillis();
+            MuteEvent event = new MuteEvent(id, mute.playerName(), type, at, actor, reason, null, false);
+            database.write("the removal of " + mute.playerName() + "'s voice mute", c -> {
+                MuteTable.delete(c, id);
+                MuteTable.record(c, event);
+            });
             return null;
         });
         return removed.get();

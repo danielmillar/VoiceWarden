@@ -104,6 +104,17 @@ tasks.build {
     dependsOn(tasks.shadowJar)
 }
 
+// paper-mcp.json loads every VoiceWarden jar in build/libs, so jars left by an earlier version would load twice.
+val currentJars = setOf("VoiceWarden-$version.jar", "VoiceWarden-$version-plain.jar")
+tasks.withType<Jar>().configureEach {
+    val libs = destinationDirectory
+    doFirst {
+        libs.get().asFile.listFiles { file ->
+            file.name.startsWith("VoiceWarden-") && file.name.endsWith(".jar") && file.name !in currentJars
+        }?.forEach { it.delete() }
+    }
+}
+
 tasks.runServer {
     minecraftVersion(minecraftVersion)
 }
