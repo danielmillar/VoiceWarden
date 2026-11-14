@@ -1,6 +1,7 @@
 package dev.danielmillar.voicewarden.config;
 
 import dev.danielmillar.voicewarden.evidence.EvidenceSettings;
+import dev.danielmillar.voicewarden.mute.MuteScope;
 import dev.danielmillar.voicewarden.notify.discord.DiscordSettings;
 import dev.danielmillar.voicewarden.notify.discord.WebhookSettings;
 import org.bukkit.configuration.ConfigurationSection;
@@ -177,13 +178,22 @@ public final class ConfigLoader {
     }
 
     private PluginConfig.Mute mute(YamlConfiguration c) {
+        List<String> allowedGroups = c.getStringList("mute.allowed-groups").stream()
+                .map(String::trim).filter(name -> !name.isEmpty()).toList();
         return new PluginConfig.Mute(
+                new MuteScope(
+                        c.getBoolean("mute.blocks.proximity"),
+                        c.getBoolean("mute.blocks.whisper"),
+                        choice(c, "mute.blocks.groups", MuteScope.Groups.class, MuteScope.Groups.ALL),
+                        allowedGroups),
                 c.getBoolean("mute.disable-listening"),
                 c.getBoolean("mute.luckperms.enabled"),
                 c.getString("mute.luckperms.speak-permission", "voicechat.speak").trim(),
                 c.getString("mute.luckperms.listen-permission", "voicechat.listen").trim(),
                 c.getString("mute.luckperms.server-context", "").trim(),
-                c.getBoolean("mute.notify-player"));
+                c.getBoolean("mute.notify-player"),
+                choice(c, "mute.feedback.display", PluginConfig.MuteDisplay.class, PluginConfig.MuteDisplay.ACTION_BAR),
+                duration(c, "mute.feedback.reminder-interval", Duration.ZERO, Duration.ofDays(1)));
     }
 
     private PluginConfig.TranscriptBuffer transcriptBuffer(YamlConfiguration c) {
@@ -290,6 +300,26 @@ public final class ConfigLoader {
             warnings.add(key + " '" + raw + "' is not a valid duration; using " + Durations.format(fallback));
             return fallback;
         }
+    }
+
+    /** Reads a lowercase, dash-separated enum name such as {@code open-only}. */
+    private <E extends Enum<E>> E choice(YamlConfiguration c, String key, Class<E> type, E fallback) {
+        // YAML reads an unquoted "off" as false.
+        String raw = Boolean.FALSE.equals(c.get(key)) ? "off" : c.getString(key, name(fallback)).trim();
+        try {
+            return Enum.valueOf(type, raw.toUpperCase(Locale.ROOT).replace('-', '_'));
+        } catch (IllegalArgumentException e) {
+            List<String> names = new ArrayList<>();
+            for (E value : type.getEnumConstants()) {
+                names.add(name(value));
+            }
+            warnings.add(key + " '" + raw + "' is invalid (" + String.join(", ", names) + "); using " + name(fallback));
+            return fallback;
+        }
+    }
+
+    private static String name(Enum<?> value) {
+        return value.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 
     private int intIn(YamlConfiguration c, String key, int min, int max) {

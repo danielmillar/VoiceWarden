@@ -1,5 +1,6 @@
 package dev.danielmillar.voicewarden.config;
 
+import dev.danielmillar.voicewarden.mute.MuteScope;
 import dev.danielmillar.voicewarden.testutil.Fakes;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,36 @@ class ConfigLoaderTest {
         assertEquals(Duration.ofMillis(160), loaded.config().audio().minUtterance());
         assertEquals(-65, loaded.config().audio().minLevelDbfs());
         assertEquals(new PluginConfig.InputGain(true, -20, 40), loaded.config().speechToText().inputGain());
+        assertEquals(MuteScope.EVERYTHING, loaded.config().mute().scope());
+        assertEquals(PluginConfig.MuteDisplay.ACTION_BAR, loaded.config().mute().display());
+        assertEquals(Duration.ofSeconds(30), loaded.config().mute().reminderInterval());
+    }
+
+    @Test void existingMuteConfigKeepsBlockingEverythingAndItsListeningChoice() throws Exception {
+        var file = folder.resolve("config.yml");
+        java.nio.file.Files.writeString(file, "mute:\n  disable-listening: true\n");
+        var mute = ConfigLoader.load(folder, file).config().mute();
+        assertEquals(MuteScope.EVERYTHING, mute.scope());
+        assertTrue(mute.disableListening());
+        java.nio.file.Files.writeString(file, """
+                mute:
+                  blocks: {proximity: false, groups: open-only}
+                  allowed-groups: [" staff-appeal ", ""]
+                  feedback: {display: chat, reminder-interval: 0}
+                """);
+        mute = ConfigLoader.load(folder, file).config().mute();
+        assertEquals(new MuteScope(false, true, MuteScope.Groups.OPEN_ONLY, java.util.List.of("staff-appeal")), mute.scope());
+        assertEquals(PluginConfig.MuteDisplay.CHAT, mute.display());
+        assertEquals(Duration.ZERO, mute.reminderInterval());
+        java.nio.file.Files.writeString(file, "mute:\n  feedback:\n    display: off\n");
+        var loaded = ConfigLoader.load(folder, file);
+        assertEquals(PluginConfig.MuteDisplay.OFF, loaded.config().mute().display());
+        assertEquals(java.util.List.of(), loaded.warnings());
+        java.nio.file.Files.writeString(file, "mute:\n  feedback:\n    display: boss-bar\n");
+        loaded = ConfigLoader.load(folder, file);
+        assertEquals(PluginConfig.MuteDisplay.ACTION_BAR, loaded.config().mute().display());
+        assertEquals(1, loaded.warnings().size());
+        assertTrue(loaded.warnings().getFirst().contains("mute.feedback.display"));
     }
 
     @Test void existingConfigUsesGainDefaultsAndExplicitOptOutIsRespected() throws Exception {
@@ -73,14 +104,19 @@ class ConfigLoaderTest {
         yaml.set("audio.max-buffered-frames", -1);
         yaml.set("audio.min-level-dbfs", 4);
         yaml.set("recordings.mode", "garbage");
+        yaml.set("mute.blocks.groups", "private");
+        yaml.set("mute.feedback.display", "title");
         yaml.save(file.toFile());
         var loaded = ConfigLoader.load(folder, file);
-        assertEquals(4, loaded.warnings().size());
+        assertEquals(6, loaded.warnings().size());
+        assertEquals(MuteScope.Groups.ALL, loaded.config().mute().scope().groups());
+        assertEquals(PluginConfig.MuteDisplay.ACTION_BAR, loaded.config().mute().display());
         assertEquals(defaults.audio().silenceTimeout(), loaded.config().audio().silenceTimeout());
         assertEquals(defaults.audio().maxBufferedFrames(), loaded.config().audio().maxBufferedFrames());
         assertEquals(defaults.audio().minLevelDbfs(), loaded.config().audio().minLevelDbfs());
         assertEquals(defaults.recordings().mode(), loaded.config().recordings().mode());
-        for (String key : java.util.List.of("audio.silence-timeout", "audio.max-buffered-frames", "audio.min-level-dbfs", "recordings.mode")) {
+        for (String key : java.util.List.of("audio.silence-timeout", "audio.max-buffered-frames", "audio.min-level-dbfs", "recordings.mode",
+                "mute.blocks.groups", "mute.feedback.display")) {
             assertTrue(loaded.warnings().stream().anyMatch(w -> w.contains(key)), key);
         }
     }

@@ -15,15 +15,21 @@ in [configuration.md](configuration.md).
   floor is `audio.min-level-dbfs: -65`.
   `audio.ignore-whispers` refers to the voice chat whisper key, not physical whispering.
 - Mute enforcement is instant in-process and does not need LuckPerms. When LuckPerms is present, mutes are also
-  mirrored as temporary `voicechat.speak` deny nodes. Mutes, offence counts and reports are stored in a SQLite
+  mirrored as temporary deny nodes. Mutes, offence counts and reports are stored in a SQLite
   database (`data/voicewarden.db`).
 
 ## Simple Voice Chat adapter
 
-Muted-player messages use `player.muted-actionbar`, `player.muted-permanent-actionbar` and
-`player.no-speak-permission-actionbar` in `messages.yml`; `mute.notify-player` toggles them. Simple Voice Chat
-checks `voicechat.speak` before firing `MicrophonePacketEvent`, so VoiceWarden replaces only its no-speak status
-message through an adapter tested against SVC 2.6.24. If that interface changes, the plugin logs it and keeps the
+`MicrophonePacketEvent` fires before SVC routes the audio. With no group it goes to proximity (or whisper range), in
+a normal or isolated group only to the group, and in an open group to both. `mute.blocks` is applied to that routing:
+the microphone packet is cancelled when every destination is blocked, and only an open group with one side allowed
+is filtered per receiver by the sound event's source. Audio that is not cancelled is transcribed; flagged speech
+from a muted player alerts staff as already muted, without adding an offence.
+
+Simple Voice Chat checks `voicechat.speak` before firing `MicrophonePacketEvent`, so a speak denial overrides any
+partial `mute.blocks`. The LuckPerms mirror therefore adds the speak node only while a mute blocks everything. For
+the same reason, VoiceWarden replaces only SVC's no-speak status message, through an adapter tested against SVC
+2.6.24, so mirrored mutes still get VoiceWarden's reminder. If that interface changes, the plugin logs it and keeps the
 original message and mute enforcement.
 
 ## Performance and threading

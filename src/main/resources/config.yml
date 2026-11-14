@@ -138,19 +138,38 @@ moderation:
 
 # ── Muting ───────────────────────────────────────────────────────────────────
 mute:
+  # Where a muted player's voice is blocked. By default a mute blocks everything.
+  blocks:
+    # Talking to nearby players without a group.
+    proximity: true
+    # Whispering to nearby players.
+    whisper: true
+    # Groups the mute blocks: all, open-only (open groups, which nearby players also hear; normal and isolated
+    # groups still work) or none. In an open group, the nearby audio follows proximity and whisper above.
+    groups: all
+  # Groups a muted player can always talk in, by name (not case sensitive), e.g. [staff-appeal]. Players choose group
+  # names, so a muted player can make a group with one of these names; keep the list empty unless staff watch it.
+  allowed-groups: []
   # Muted players also cannot hear anyone else (full voice mute).
   disable-listening: false
   luckperms:
     # Also mirror mutes as temporary LuckPerms deny nodes, so they apply on every server sharing your LuckPerms
     # storage. Needs LuckPerms; ignored without it. Mutes survive restarts either way (VoiceWarden's own database).
+    # The speak node blocks all speech, so it is only added while mute.blocks blocks everything and allowed-groups is
+    # empty. With anything allowed, other servers no longer block speech; this server still enforces the mute.
     enabled: true
     speak-permission: voicechat.speak
     listen-permission: voicechat.listen
     # Only mute on this LuckPerms 'server' context (e.g. "survival"). Empty = all servers.
     server-context: ""
-  # Tell players when muted/warned/unmuted, and show a custom action bar when they attempt blocked speech.
-  # Action-bar text is configurable under player.*-actionbar in messages.yml.
+  # Tell players when muted/warned/unmuted, and show the feedback below. Text is under player.* in messages.yml.
   notify-player: true
+  feedback:
+    # Where a muted player sees their mute: action-bar (the time left, shown for the whole mute and updated every
+    # second), chat (only the reminder below) or off.
+    display: action-bar
+    # When a muted player talks and nobody can hear them, remind them in chat at most this often. 0 turns it off.
+    reminder-interval: 30s
 
 # ── Staff alerts ─────────────────────────────────────────────────────────────
 alerts:

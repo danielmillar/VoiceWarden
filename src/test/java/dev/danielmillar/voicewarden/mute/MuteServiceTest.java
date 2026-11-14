@@ -265,6 +265,29 @@ class MuteServiceTest {
         return page.events().stream().map(MuteEvent::type).toList();
     }
 
+    @Test void partialScopeMirrorsNoSpeakDenialAndReloadRemovesTheOldOne() {
+        var applied = new java.util.ArrayList<VoiceMute>();
+        var removed = new java.util.ArrayList<VoiceMute>();
+        VoiceMuteMirror mirror = (player, previous, next, duration) -> {
+            removed.addAll(previous);
+            applied.add(next);
+            return CompletableFuture.completedFuture(null);
+        };
+        MuteService service = new MuteService(() -> config, () -> messages, mirror, new OnlinePlayers(), Runnable::run,
+                Logger.getLogger("MuteServiceTest"), database);
+        service.mute(alice, "Alice", null, "reason", "staff", false).join();
+        assertEquals("voicechat.speak", applied.getLast().speakPermission());
+        config = Fakes.with(config, "mute", Fakes.with(config.mute(), "scope",
+                new MuteScope(true, true, MuteScope.Groups.ALL, java.util.List.of("staff-appeal"))));
+        service.reconcileMirrors();
+        assertNull(applied.getLast());
+        assertEquals("voicechat.speak", removed.getLast().speakPermission());
+        config = Fakes.with(config, "mute", Fakes.with(config.mute(), "disableListening", true));
+        service.mute(bob, "Bob", null, "reason", "staff", false).join();
+        assertEquals(new VoiceMute("", "voicechat.listen", ""), applied.getLast());
+        assertTrue(service.isMuted(alice));
+    }
+
     private MuteService service() { return service(Runnable::run); }
     private MuteService service(java.util.concurrent.Executor io) {
         return new MuteService(() -> config, () -> messages, hook, new OnlinePlayers(), io, Logger.getLogger("MuteServiceTest"), database);

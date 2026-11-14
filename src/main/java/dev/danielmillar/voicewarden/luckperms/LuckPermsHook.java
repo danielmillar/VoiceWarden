@@ -64,17 +64,18 @@ public final class LuckPermsHook implements VoiceMuteMirror {
         }
         return modify(player, user -> {
             for (VoiceMute mirror : previous) {
-                clearDenied(user, mirror.speakPermission(), mirror.serverContext());
-                if (!mirror.listenPermission().isBlank()) {
-                    clearDenied(user, mirror.listenPermission(), mirror.serverContext());
+                for (String permission : List.of(mirror.speakPermission(), mirror.listenPermission())) {
+                    if (!permission.isBlank()) {
+                        clearDenied(user, permission, mirror.serverContext());
+                    }
                 }
             }
             if (next != null) {
-                user.data().add(denyNode(next.speakPermission(), duration, next.serverContext()),
-                        TemporaryNodeMergeStrategy.REPLACE_EXISTING_IF_DURATION_LONGER);
-                if (!next.listenPermission().isBlank()) {
-                    user.data().add(denyNode(next.listenPermission(), duration, next.serverContext()),
-                            TemporaryNodeMergeStrategy.REPLACE_EXISTING_IF_DURATION_LONGER);
+                for (String permission : List.of(next.speakPermission(), next.listenPermission())) {
+                    if (!permission.isBlank()) {
+                        user.data().add(denyNode(permission, duration, next.serverContext()),
+                                TemporaryNodeMergeStrategy.REPLACE_EXISTING_IF_DURATION_LONGER);
+                    }
                 }
             }
         });

@@ -24,16 +24,24 @@ offline player's `voicewarden.bypass` permission can't be checked, so staff can 
 bypass.
 
 You choose how many mute-rule hits within a time window trigger a mute (`moderation.flag-threshold` and
-`moderation.flag-window`). The default threshold is 1, so the first hit mutes. A muted player can also be stopped from
-hearing others if you want.
+`moderation.flag-window`). The default threshold is 1, so the first hit mutes.
+
+By default a mute blocks all of a player's voice. Under `mute.blocks` you can instead let muted players keep talking
+nearby, whisper, or talk in some voice chat groups, and `mute.allowed-groups` names groups they can always talk in
+(for example a `staff-appeal` group). A muted player can also be stopped from hearing others.
 
 A few things to know:
 
 - Neutral words are not blocked, and everyday words that merely contain a bad word, such as "cocktail", are allowed.
 - Rules look at the words, not the meaning. They can't tell a quote or a joke from a real insult, so staff should
   check the context in alerts.
-- Muted players see a message above their hotbar telling them how long the mute lasts. You can change this text in
-  `messages.yml`.
+- Muted players see how long their mute lasts above their hotbar for the whole mute, and a chat
+  reminder at most every 30 seconds when they talk and nobody hears them. Choose this with `mute.feedback` and
+  change the text in `messages.yml`.
+- If a mute lets the player talk anywhere, the LuckPerms mirror no longer denies `voicechat.speak`, because that
+  permission blocks all speech. The mute still applies on this server, but not on other servers.
+- Players name their own voice chat groups, so a muted player can create a group with an allowed name. Only list
+  groups that staff watch.
 
 ## Customising
 
