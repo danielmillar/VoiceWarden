@@ -97,6 +97,16 @@ public final class NativeLibraries {
         return dir;
     }
 
+    /** Read-only: whether {@link #ensure} would find the libraries without downloading. */
+    public static boolean present(Path dataFolder, String overrideDir) {
+        String jni = System.mapLibraryName("sherpa-onnx-jni");
+        if (!overrideDir.isBlank()) {
+            return Files.isRegularFile(Path.of(overrideDir).resolve(jni));
+        }
+        Path dir = dataFolder.resolve("natives").resolve("sherpa-onnx-" + VERSION).resolve(platform());
+        return Files.isRegularFile(dir.resolve(jni)) && Files.isRegularFile(dir.resolve(System.mapLibraryName("onnxruntime")));
+    }
+
     /** Points sherpa-onnx's own loader at {@code dir}; libraries load on first engine construction. */
     public static void use(Path dir) {
         System.setProperty(PATH_PROPERTY, dir.toAbsolutePath().toString());

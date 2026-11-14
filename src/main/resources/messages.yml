@@ -101,6 +101,19 @@ command:
   discordtest-sent: "<prefix><muted>Sending Discord test payloads…"
   discordtest-line: "<prefix>Discord <muted><line>"
 
+# /vw check: one line per finding. <area> <finding> <fix> (the check.fix line, or empty when OK)
+check:
+  start: "<prefix><muted>Checking the setup…"
+  ok: " <success>OK</success> <accent><area></accent><dark_gray>:</dark_gray> <muted><finding>"
+  warn: " <accent>WARN</accent> <accent><area></accent><dark_gray>:</dark_gray> <body><finding><fix>"
+  fail: " <error>FAIL</error> <accent><area></accent><dark_gray>:</dark_gray> <body><finding><fix>"
+  # <fix>
+  fix: " <dark_gray>→</dark_gray> <muted><fix>"
+  # <ok> <warn> <fail> counts
+  summary: "<prefix><success><ok> OK</success> <dark_gray>•</dark_gray> <accent><warn> WARN</accent> <dark_gray>•</dark_gray> <error><fail> FAIL</error>"
+  # <reason>
+  error: "<prefix><error>The check could not finish<dark_gray>:</dark_gray> <reason></error>"
+
 stats:
   - "<prefix>Engine<dark_gray>:</dark_gray> <accent><state></accent> <dark_gray>(<muted><model></muted>)</dark_gray>"
   - " <dark_gray>▪</dark_gray> <muted>Active speakers <accent><speakers></accent> <dark_gray>•</dark_gray> Queue <accent><queue></accent> <dark_gray>•</dark_gray> Workers <accent><workers></accent>"

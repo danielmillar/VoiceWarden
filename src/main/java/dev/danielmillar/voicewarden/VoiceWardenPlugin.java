@@ -9,6 +9,7 @@ import dev.danielmillar.voicewarden.config.TurboModelActivation;
 import dev.danielmillar.voicewarden.evidence.EvidenceStore;
 import dev.danielmillar.voicewarden.health.HealthMonitor;
 import dev.danielmillar.voicewarden.health.Metrics;
+import dev.danielmillar.voicewarden.health.SetupCheck;
 import dev.danielmillar.voicewarden.luckperms.LuckPermsHook;
 import dev.danielmillar.voicewarden.moderation.CustomCommandRunner;
 import dev.danielmillar.voicewarden.moderation.ModerationService;
@@ -27,6 +28,8 @@ import dev.danielmillar.voicewarden.report.ReportService;
 import dev.danielmillar.voicewarden.report.ReportStore;
 import dev.danielmillar.voicewarden.storage.Database;
 import dev.danielmillar.voicewarden.stt.Downloader;
+import dev.danielmillar.voicewarden.stt.ModelManager;
+import dev.danielmillar.voicewarden.stt.NativeLibraries;
 import dev.danielmillar.voicewarden.stt.TranscriptionService;
 import dev.danielmillar.voicewarden.voice.AudioIngestService;
 import dev.danielmillar.voicewarden.voice.VoiceChatBridge;
@@ -65,6 +68,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
     private volatile PluginConfig config;
     private volatile Messages messages;
     private volatile RuleEngine rules;
+    private volatile List<String> configWarnings = List.of();
 
     private PluginExecutors executors;
     private Metrics metrics;
@@ -113,6 +117,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
             return;
         }
         bundle.warnings().forEach(w -> getLogger().warning(w));
+        configWarnings = bundle.warnings();
         config = bundle.config();
         messages = bundle.messages();
         rules = bundle.rules();
@@ -299,9 +304,55 @@ public final class VoiceWardenPlugin extends JavaPlugin {
                 engineNote += " (audio.decode-threads applies after a restart)";
             }
             bundle.warnings().forEach(w -> getLogger().warning(w));
+            configWarnings = bundle.warnings();
             return new ReloadResult(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0), bundle.summary() + engineNote,
                     bundle.warnings());
         }, executors.io());
+    }
+
+    /**
+     * Facts for {@code /vw check}. Cheap state is read here; model sizes, the recordings folder and a database read
+     * run on IO threads, so this never blocks the caller.
+     */
+    public CompletableFuture<List<SetupCheck.Finding>> checkSetup() {
+        PluginConfig c = config;
+        var voicechat = getServer().getPluginManager().getPlugin("voicechat");
+        var voice = new SetupCheck.Voice(voicechat == null ? "" : voicechat.getPluginMeta().getVersion(),
+                bridge != null && bridge.initialized(), permissionMessageHook != null);
+        var lp = new SetupCheck.LuckPerms(getServer().getPluginManager().getPlugin("LuckPerms") != null,
+                luckPerms != null, c.mute().luckPerms());
+        var discordFacts = new SetupCheck.Discord(c.discord(), discord.sentCount(), discord.failedCount(), discord.droppedCount());
+        var configFacts = new SetupCheck.Config(c.moderation().dryRun(), rules.ruleCount(), configWarnings);
+        CompletableFuture<SetupCheck.Store> store = SetupCheck.readDatabase(database, Duration.ofSeconds(5));
+        Path dataFolder = getDataFolder().toPath();
+        return CompletableFuture.supplyAsync(() -> {
+            var stt = c.speechToText();
+            String platform;
+            boolean natives;
+            try {
+                platform = NativeLibraries.platform();
+                natives = NativeLibraries.present(dataFolder, stt.nativeLibraryPath());
+            } catch (IllegalStateException e) {
+                platform = e.getMessage();
+                natives = false;
+            }
+            long[] latency = metrics.latencySummary();
+            var engine = new SetupCheck.Engine(c.enabled(), transcription.state(), transcription.stateDetail(), stt.model(),
+                    transcription.lastFailure(), stt.doubleCheck(), transcription.doubleCheckLoaded(),
+                    transcription.workers(), transcription.aliveWorkers(), transcription.queueSize(), stt.queueMaxSize(),
+                    metrics.queueDropped.sum() + metrics.staleDropped.sum() + metrics.packetsDropped.sum(),
+                    metrics.transcriptionErrors.sum(), latency[1], metrics.speedFactor(),
+                    natives, NativeLibraries.VERSION, platform, stt.autoDownload());
+            TranscriptionService.Loaded loaded = transcription.loaded();
+            var models = new SetupCheck.Models(ModelManager.inspect(stt, dataFolder), stt.autoDownload(),
+                    loaded != null && loaded.settings().equals(stt) ? loaded.at() : null);
+            var recordings = SetupCheck.inspectRecordings(c.recordings());
+            return new DiskFacts(engine, models, recordings);
+        }, executors.io()).thenCombine(store, (disk, db) -> SetupCheck.evaluate(new SetupCheck.Facts(voice,
+                disk.engine(), disk.models(), db, lp, discordFacts, configFacts, disk.recordings())));
+    }
+
+    private record DiskFacts(SetupCheck.Engine engine, SetupCheck.Models models, SetupCheck.Recordings recordings) {
     }
 
     private static TranscriptBuffer.Limits bufferLimits(PluginConfig config) {

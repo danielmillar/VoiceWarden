@@ -352,13 +352,13 @@ public final class DiscordWebhookService implements AutoCloseable {
         return previous == null ? valid : previous;
     }
 
-    static boolean validDiscordUrl(URI uri) {
+    public static boolean validDiscordUrl(URI uri) {
         return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
                 && HOSTS.contains(uri.getHost().toLowerCase(Locale.ROOT)) && uri.getUserInfo() == null
                 && uri.getPath() != null && uri.getPath().startsWith("/api/webhooks/");
     }
 
-    static String mask(String value) { return TOKEN.matcher(value).replaceAll("$1***"); }
+    public static String mask(String value) { return TOKEN.matcher(value).replaceAll("$1***"); }
 
     private void notices() {
         String url;

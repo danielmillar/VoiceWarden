@@ -77,6 +77,10 @@ public final class TranscriptionService implements AutoCloseable {
     private final List<Runtime> liveRuntimes = new ArrayList<>();
     private @Nullable Runtime runtime; // guarded by swapLock
     private volatile int workerCount;
+    /** Why the last load failed, cleared by a successful one. Set even when a previous engine keeps running. */
+    private volatile @Nullable String lastFailure;
+    /** When the running engine loaded; its model files were hashed against their pins just before. */
+    private volatile @Nullable Loaded loaded;
     private volatile boolean closed;
 
     public TranscriptionService(Path dataFolder, Downloader downloader, Executor io, Supplier<PluginConfig> config,
@@ -153,6 +157,8 @@ public final class TranscriptionService implements AutoCloseable {
             if (previous != null) {
                 previous.retire();
             }
+            lastFailure = null;
+            loaded = new Loaded(settings, java.time.Instant.now());
             setState(State.READY, model.description());
             readyListener.accept(true);
             logger.info("Speech engine ready: " + model.description() + " (" + settings.workers() + " worker(s), "
@@ -187,6 +193,7 @@ public final class TranscriptionService implements AutoCloseable {
         if (closed) {
             return;
         }
+        lastFailure = reason;
         if (hasRuntime()) {
             logger.log(Level.SEVERE, "Could not load the new speech engine; keeping the previous one: " + reason, error);
             return;
@@ -288,6 +295,34 @@ public final class TranscriptionService implements AutoCloseable {
 
     public int workers() {
         return workerCount;
+    }
+
+    /** The settings the running engine loaded with and when. Null when no engine is running. */
+    public record Loaded(PluginConfig.SpeechToText settings, java.time.Instant at) {
+    }
+
+    public @Nullable Loaded loaded() {
+        synchronized (swapLock) {
+            return runtime == null ? null : loaded;
+        }
+    }
+
+    public @Nullable String lastFailure() {
+        return lastFailure;
+    }
+
+    /** Worker threads of the running engine that are still alive; fewer than {@link #workers()} means one crashed. */
+    public int aliveWorkers() {
+        synchronized (swapLock) {
+            return runtime == null ? 0 : (int) runtime.threads.subList(0, runtime.settings.workers()).stream()
+                    .filter(Thread::isAlive).count();
+        }
+    }
+
+    public boolean doubleCheckLoaded() {
+        synchronized (swapLock) {
+            return runtime != null && runtime.checker != null;
+        }
     }
 
     private void setState(State state, String detail) {

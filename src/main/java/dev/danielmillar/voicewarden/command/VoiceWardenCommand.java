@@ -12,6 +12,7 @@ import dev.danielmillar.voicewarden.config.Durations;
 import dev.danielmillar.voicewarden.config.Messages;
 import dev.danielmillar.voicewarden.config.PluginConfig;
 import dev.danielmillar.voicewarden.health.Metrics;
+import dev.danielmillar.voicewarden.health.SetupCheck;
 import dev.danielmillar.voicewarden.moderation.StaffModerationService;
 import dev.danielmillar.voicewarden.moderation.TranscriptLine;
 import dev.danielmillar.voicewarden.moderation.rules.RuleMatch;
@@ -94,6 +95,7 @@ final class VoiceWardenCommand {
                                         .executes(c -> transcript(c, IntegerArgumentType.getInteger(c, "lines"))))))
                 .then(Commands.literal("test").requires(perm("voicewarden.admin"))
                         .then(Commands.argument("text", StringArgumentType.greedyString()).executes(this::test)))
+                .then(Commands.literal("check").requires(perm("voicewarden.admin")).executes(this::check))
                 .then(Commands.literal("discordtest").requires(perm("voicewarden.admin"))
                         .executes(c -> discordTest(c, WebhookTestTarget.ALL))
                         .then(Commands.literal("all").executes(c -> discordTest(c, WebhookTestTarget.ALL)))
@@ -361,6 +363,33 @@ final class VoiceWardenCommand {
                     Messages.text("categories", StaffAlertService.categories(matches))));
         }
         return Command.SINGLE_SUCCESS;
+    }
+
+    private int check(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        sender.sendMessage(msg().render("check.start"));
+        plugin.checkSetup().whenComplete((findings, error) -> {
+            if (error != null) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "Setup check failed", error);
+                sender.sendMessage(msg().render("check.error", Messages.text("reason", String.valueOf(error.getMessage()))));
+                return;
+            }
+            for (SetupCheck.Finding f : findings) {
+                var fix = f.fix().isEmpty() ? net.kyori.adventure.text.Component.empty()
+                        : msg().render("check.fix", Messages.text("fix", f.fix()));
+                sender.sendMessage(msg().render("check." + f.status().name().toLowerCase(Locale.ROOT),
+                        Messages.text("area", f.area()), Messages.text("finding", f.text()), Messages.component("fix", fix)));
+            }
+            sender.sendMessage(msg().render("check.summary",
+                    Messages.text("ok", Long.toString(count(findings, SetupCheck.Status.OK))),
+                    Messages.text("warn", Long.toString(count(findings, SetupCheck.Status.WARN))),
+                    Messages.text("fail", Long.toString(count(findings, SetupCheck.Status.FAIL)))));
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static long count(List<SetupCheck.Finding> findings, SetupCheck.Status status) {
+        return findings.stream().filter(f -> f.status() == status).count();
     }
 
     private int discordTest(CommandContext<CommandSourceStack> ctx, WebhookTestTarget target) {
