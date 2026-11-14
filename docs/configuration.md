@@ -54,13 +54,16 @@ Players see their answer and change it with `/voiceconsent`, and staff see it in
 
 - **Denied or not answered yet.** By default (`consent.speak-without-consent: false`) the player can listen but
   nobody hears them, so denying is not a way to speak unmoderated. Set it to `true` to let them be heard while
-  VoiceWarden ignores their voice. A voice mute still applies either way.
+  VoiceWarden ignores their voice. A voice mute still applies either way. A blocked player sees an action bar
+  pointing to `/voiceconsent`, even when `mute.notify-player` is false.
+- **Reminder.** Under `stay`, a player who denied gets a chat reminder each time they join.
 - **`consent.on-deny`.** With `stay` the player keeps playing and isn't asked again on join. With `kick` they are
   disconnected and asked again next time they join.
 - **`consent.rules-version`.** Raise it when your rules change. Players are asked again on their next join, and
   online players are asked straight away after `/vw reload`. Until they accept the new version, their voice is
   treated as not consented.
-- Everyone is asked, including players with `voicewarden.bypass`.
+- Everyone is asked, including players with `voicewarden.bypass`. Until they accept, they are blocked like anyone
+  else.
 - Withdrawing consent stops processing from that moment. What was transcribed or recorded before stays until it ages
   out as usual.
 

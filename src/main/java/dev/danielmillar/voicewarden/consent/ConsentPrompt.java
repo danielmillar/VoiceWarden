@@ -30,7 +30,7 @@ public final class ConsentPrompt implements Listener {
 
     static final Key ACCEPT = Key.key("voicewarden", "consent/accept");
     static final Key DENY = Key.key("voicewarden", "consent/deny");
-    /** The client is still on the loading screen during the join event and would drop the dialog. */
+    /** The client is still on the loading screen during the join event and would drop the dialog or a chat line. */
     private static final long JOIN_DELAY_TICKS = 20;
 
     private final Plugin plugin;
@@ -53,7 +53,11 @@ public final class ConsentPrompt implements Listener {
         if (consent.shouldAsk(player.getUniqueId())) {
             run(player, this::show, JOIN_DELAY_TICKS);
         } else if (consent.status(player.getUniqueId()) == ConsentService.Status.DENIED) {
-            player.sendMessage(messages.get().render(deniedKey()));
+            run(player, p -> {
+                if (p.isOnline() && consent.status(p.getUniqueId()) == ConsentService.Status.DENIED) {
+                    p.sendMessage(messages.get().render(deniedKey()));
+                }
+            }, JOIN_DELAY_TICKS);
         }
     }
 
