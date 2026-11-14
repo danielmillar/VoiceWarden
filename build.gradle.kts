@@ -19,6 +19,10 @@ repositories {
     maven("https://maven.maxhenkel.de/repository/public") {
         name = "maxhenkel"
     }
+    maven("https://repo.extendedclip.com/releases/") {
+        name = "placeholderapi"
+        content { includeGroup("me.clip") }
+    }
     // sherpa-onnx does not publish its JVM bindings to Maven; resolve the release jar straight from GitHub.
     ivy("https://github.com/k2-fsa/sherpa-onnx/releases/download") {
         name = "sherpa-onnx-releases"
@@ -40,6 +44,7 @@ dependencies {
     compileOnly(paperApi)
     compileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.24")
     compileOnly("net.luckperms:api:5.5")
+    compileOnly("me.clip:placeholderapi:2.12.3")
     // Paper ships sqlite-jdbc on the server classpath (checked on 26.1.2 and 26.3), so it is not shaded.
     compileOnly("org.xerial:sqlite-jdbc:3.49.1.0")
 

@@ -37,6 +37,8 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 - Optional: [LuckPerms](https://luckperms.net) (version 5.5 or newer). VoiceWarden enforces mutes itself, so it works
   without it. With LuckPerms, mutes also apply on other servers sharing your LuckPerms storage, and commands can find
   players who have never joined this server.
+- Optional: [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi), to show a player's voice mute on
+  scoreboards, tab lists, chat formats and holograms. See [Placeholders](#placeholders).
 - Linux, Windows or macOS.
 - About **3 GB of spare memory (RAM)** for the best-quality speech model, plus free disk space for the model
   (between about 400 MB and 1 GB, depending on which you choose).
@@ -112,6 +114,18 @@ The main command is `/voicewarden`, or `/vw` for short.
 | `voicewarden.vcmute` | Operators | Using `/vw vcmute`, `unvcmute`, `pardon`, `mutes`, `offenses` and `history`. |
 | `voicewarden.report` | Everyone | Using `/reportvoice`. |
 | `voicewarden.consent` | Everyone | Using `/voiceconsent`. |
+
+## Placeholders
+
+With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, VoiceWarden adds these:
+
+| Placeholder | Shows |
+|---|---|
+| `%voicewarden_muted%` | `true` or `false`. |
+| `%voicewarden_mute_remaining%` | Time left on the voice mute, such as `9m 47s`, or `permanent`. Empty when not muted. |
+| `%voicewarden_mute_reason%` | The mute's reason. Empty when not muted. |
+| `%voicewarden_offenses%` | The player's offence count on the mute ladder. |
+| `%voicewarden_next_mute%` | How long their next automatic mute would last, such as `15m`. |
 | `voicewarden.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/vw transcript`. |
 
 ## Troubleshooting

@@ -20,6 +20,8 @@ import dev.danielmillar.voicewarden.moderation.TranscriptBuffer;
 import dev.danielmillar.voicewarden.moderation.TranscriptLog;
 import dev.danielmillar.voicewarden.moderation.rules.RuleEngine;
 import dev.danielmillar.voicewarden.mute.MuteService;
+import dev.danielmillar.voicewarden.placeholderapi.VoiceStatus;
+import dev.danielmillar.voicewarden.placeholderapi.VoiceWardenExpansion;
 import dev.danielmillar.voicewarden.mute.VoiceMuteMirror;
 import dev.danielmillar.voicewarden.notify.StaffAlertService;
 import dev.danielmillar.voicewarden.notify.discord.DiscordWebhookService;
@@ -72,6 +74,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
     private Metrics metrics;
     private HttpClient http;
     private @Nullable LuckPermsHook luckPerms;
+    private Runnable unregisterPlaceholders = () -> { };
     private @Nullable Database database;
     private OnlinePlayers players;
     private TranscriptBuffer transcriptBuffer;
@@ -217,6 +220,11 @@ public final class VoiceWardenPlugin extends JavaPlugin {
         reportStore.load();
         offenses.load();
         mutes.start(executors.timer());
+        // PlaceholderAPI is optional. Its classes may be missing, so the expansion is only touched when it is present.
+        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            unregisterPlaceholders = VoiceWardenExpansion.register(this,
+                    new VoiceStatus(mutes, offenses, this::config, System::currentTimeMillis));
+        }
         players.all().forEach(speechNotice::show);
         consentPrompt.askOnline(players.all());
         ingest.start(executors.timer());
@@ -237,6 +245,7 @@ public final class VoiceWardenPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        unregisterPlaceholders.run();
         if (permissionMessageHook != null) {
             permissionMessageHook.close();
             permissionMessageHook = null;

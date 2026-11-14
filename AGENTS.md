@@ -162,6 +162,7 @@ All under `src/main/java/dev/danielmillar/voicewarden/`:
 - `stt/` - sherpa-onnx engine, model and native downloads, the transcription queue.
 - `moderation/` - rules (`rules/`), flags, offences, incidents, staff actions, transcript buffer and log.
 - `mute/` - mute state, enforcement and the mirror interface. `luckperms/` - the only code that names LuckPerms.
+- `placeholderapi/` - the optional PlaceholderAPI expansion, the only code that names PlaceholderAPI.
 - `report/` - `/reportvoice` and the report inbox. `evidence/` - recordings on disk.
 - `notify/` - in-game staff alerts and Discord webhooks. `command/` - Brigadier commands.
 - `storage/` - the SQLite database. `config/` - config, messages and durations. `concurrent/`, `health/`, `player/`,
