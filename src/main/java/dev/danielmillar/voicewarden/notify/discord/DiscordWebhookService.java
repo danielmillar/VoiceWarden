@@ -231,8 +231,16 @@ public final class DiscordWebhookService implements AutoCloseable {
             if (warnedRoles.add(role)) warn("Ignoring invalid Discord ping role id");
             role = "";
         }
-        DiscordPayload.Body body = DiscordPayload.build(event, current, webhook, role);
-        Delivery result = deliver(webhook.url(), body, current);
+        List<DiscordPayload.Body> bodies = DiscordPayload.build(event, current, webhook, role);
+        Delivery result = deliver(webhook.url(), bodies.getFirst(), current);
+        if (result.success() && bodies.size() > 1) {
+            // Posted straight after the card by this one consumer, so the recording sits directly under it.
+            Delivery recording = deliver(webhook.url(), bodies.get(1), current);
+            if (!recording.success()) {
+                warn("Discord " + name + " recording to " + mask(webhook.url()) + " failed: "
+                        + (recording.status() == 0 ? "" : recording.status() + " ") + recording.detail());
+            }
+        }
         if (result.success()) sent.incrementAndGet();
         else {
             failed.incrementAndGet();

@@ -17,7 +17,8 @@ import java.util.function.IntFunction;
 
 /**
  * Consumer-thread-only payload construction. Each event is one Components V2 message: a container in the event's
- * colour holding a {@code ##} title, parts between dividers, the recording as a file and a {@code -#} footer.
+ * colour holding a {@code ##} title, parts between dividers and a {@code -#} footer. The recording follows as its own
+ * plain message.
  */
 final class DiscordPayload {
     record Body(byte[] bytes, String contentType) {}
@@ -25,11 +26,16 @@ final class DiscordPayload {
     /** Discord's limit on the text of all text displays in one message. */
     static final int TEXT_LIMIT = 4000;
     static final int COMPONENTS_V2 = 1 << 15;
-    private static final int TEXT = 10, SEPARATOR = 14, FILE = 13, CONTAINER = 17;
+    private static final int TEXT = 10, SEPARATOR = 14, CONTAINER = 17;
     private static final int TITLE_LIMIT = 300, FOOTER_LIMIT = 300, DETAILS_LIMIT = 1500, CONTEXT_SHARE = 3;
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneOffset.UTC);
 
-    static Body build(Object event, DiscordSettings settings, WebhookSettings webhook, String validRole) {
+    /**
+     * The messages to post, in order: the Components V2 card, then the recording as a plain message when audio is on.
+     * Discord shows an audio player only for an attachment on a plain message; inside a Components V2 card a WAV is a
+     * download, so the clip cannot be part of the card.
+     */
+    static List<Body> build(Object event, DiscordSettings settings, WebhookSettings webhook, String validRole) {
         Message message;
         short[] audio;
         int sampleRate;
@@ -66,12 +72,26 @@ final class DiscordPayload {
         payload.add("allowed_mentions", mentions);
         if (!webhook.username().isBlank()) payload.addProperty("username", webhook.username());
         if (!webhook.avatarUrl().isBlank()) payload.addProperty("avatar_url", webhook.avatarUrl());
-        payload.addProperty("flags", COMPONENTS_V2);
-        payload.add("components", message.json(ping, attach ? filename : null));
+        JsonObject card = payload.deepCopy();
+        card.addProperty("flags", COMPONENTS_V2);
+        card.add("components", message.json(ping));
+        Body cardBody = new Body(card.toString().getBytes(StandardCharsets.UTF_8), "application/json");
         if (!attach) {
-            return new Body(payload.toString().getBytes(StandardCharsets.UTF_8), "application/json");
+            return List.of(cardBody);
         }
+        // The recording carries no mentions, so the role is pinged once, by the card.
+        payload.add("allowed_mentions", noMentions());
+        payload.addProperty("content", "-# Recording · " + shortId);
+        return List.of(cardBody, recording(payload, filename, audio, sampleRate));
+    }
 
+    private static JsonObject noMentions() {
+        JsonObject mentions = new JsonObject();
+        mentions.add("parse", new JsonArray());
+        return mentions;
+    }
+
+    private static Body recording(JsonObject payload, String filename, short[] audio, int sampleRate) {
         JsonObject attachment = new JsonObject();
         attachment.addProperty("id", 0);
         attachment.addProperty("filename", filename);
@@ -250,7 +270,7 @@ final class DiscordPayload {
         void fixed(String heading, DiscordText body, int cap) { parts.add(new Part(heading, body::render, cap)); }
         void flexible(String heading, IntFunction<String> body) { parts.add(new Part(heading, body, -1)); }
 
-        JsonArray json(String ping, String attachment) {
+        JsonArray json(String ping) {
             String head = "## " + title + "\n" + summary;
             String foot = "-# " + footer;
             int budget = TEXT_LIMIT - ping.length() - head.length() - foot.length();
@@ -279,15 +299,6 @@ final class DiscordPayload {
                 if (body == null || body.isEmpty()) continue;
                 inside.add(separator(true));
                 inside.add(text(part.heading() + body));
-            }
-            if (attachment != null) {
-                JsonObject file = new JsonObject();
-                file.addProperty("type", FILE);
-                JsonObject media = new JsonObject();
-                media.addProperty("url", "attachment://" + attachment);
-                file.add("file", media);
-                inside.add(separator(true));
-                inside.add(file);
             }
             inside.add(separator(false));
             inside.add(text(foot));
