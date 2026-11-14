@@ -64,8 +64,9 @@ Players see their answer and change it with `/voiceconsent`, and staff see it in
   treated as not consented.
 - Everyone is asked, including players with `voicewarden.bypass`. Until they accept, they are blocked like anyone
   else.
-- Withdrawing consent stops processing from that moment. What was transcribed or recorded before stays until it ages
-  out as usual.
+- Withdrawing consent stops processing from that moment and deletes the player's recent speech held in memory.
+  Recordings, reports and history from before stay until they age out (see [Privacy](privacy.md)), or until
+  `/vw forget` erases them.
 
 ## Placeholders
 
@@ -86,7 +87,9 @@ All files are in `plugins/VoiceWarden/`.
 | `wordlist.txt` | Your list of swear words and words that cause a mute. Wildcards such as `word*` are allowed. |
 | `rules.yml` | More advanced rules, such as phrases and an "always allowed" list. |
 | `recordings/` | Saved recordings used as evidence. Old ones are deleted automatically based on age and size. |
-| `data/voicewarden.db` | A SQLite database holding voice mutes (and their LuckPerms mirror records), offence counts for the mute ladder, voice reports, and each player's consent answer. Nothing extra needs installing. Offence counts are per server. If the file is unreadable, it is moved aside as `voicewarden.db.corrupt-<UUID>` and a fresh one is created. |
+| `logs/` | Daily transcript logs, only when `logging.transcripts` is true. Deleted after `privacy.retention.transcript-logs-days`. |
+| `exports/` | Files written by `/vw export`. Deleted after `privacy.retention.exports-days`. |
+| `data/voicewarden.db` | A SQLite database holding voice mutes (and their LuckPerms mirror records), mute history, offence counts for the mute ladder, voice reports, and each player's consent answer. Old records are deleted under `privacy.retention` (see [Privacy](privacy.md)). Nothing extra needs installing. Offence counts are per server. If the file is unreadable, it is moved aside as `voicewarden.db.corrupt-<UUID>` and a fresh one is created. |
 | `models/` and `natives/` | The downloaded speech recognition files. |
 
 ## Updating
@@ -95,6 +98,15 @@ VoiceWarden never overwrites your `wordlist.txt` or `rules.yml` when you install
 default rules automatically. Back them up before comparing them with the newest defaults. Use `/vw reload` after
 editing files. Restart the server after changing the plugin file itself. Changing `audio.decode-threads` needs a
 server restart to apply, and `/vw reload` tells you so.
+
+### Upgrading to retention
+
+- Old records are now deleted automatically under `privacy.retention` in `config.yml`. A `config.yml` from an older
+  version doesn't have that section, so the defaults apply: within minutes of the first start, reports older than
+  90 days, mute history older than 365 days (except for players still muted) and transcript logs older than 30 days
+  are deleted. To keep them, add the section first and set those to `0` (keep forever). See [Privacy](privacy.md).
+- The database moves to schema 4, so an older VoiceWarden can't open it afterwards. Back up `data/voicewarden.db`
+  before upgrading if you might go back.
 
 ### Upgrading from the JSON storage version
 

@@ -23,6 +23,7 @@ class ConsentServiceTest {
     private final UUID player = UUID.randomUUID();
     private PluginConfig.Consent settings = new PluginConfig.Consent(ConsentMode.CONFIRM, 1, OnDeny.STAY, false);
     private Database database;
+    private long now = 1_000L;
     private ConsentService consent;
 
     @BeforeEach void open() {
@@ -116,8 +117,51 @@ class ConsentServiceTest {
         assertEquals(Status.ACCEPTED, consent.status(player));
     }
 
+    @Test void answersOfPlayersNotSeenForTheRetentionAreDeletedUnlessOnline() {
+        UUID returning = UUID.randomUUID();
+        UUID online = UUID.randomUUID();
+        for (UUID id : new UUID[]{player, returning, online}) {
+            consent.answer(id, true);
+        }
+        long day = java.util.concurrent.TimeUnit.DAYS.toMillis(1);
+        now += 20 * day;
+        consent.seen(returning);
+        now += 20 * day;
+        assertEquals(1, consent.prune(now, 30, online::equals));
+        restart();
+        assertTrue(consent.answer(player).isEmpty());
+        assertEquals(Status.PENDING, consent.status(player));
+        assertEquals(Status.ACCEPTED, consent.status(returning));
+        assertEquals(Status.ACCEPTED, consent.status(online));
+        assertEquals(0, consent.prune(now, 0, id -> false));
+    }
+
+    @Test void forgetDeletesOnlyThatPlayersAnswer() {
+        UUID other = UUID.randomUUID();
+        consent.answer(player, true);
+        consent.answer(other, true);
+        assertTrue(consent.forget(player));
+        restart();
+        assertTrue(consent.answer(player).isEmpty());
+        assertEquals(Status.ACCEPTED, consent.status(other));
+    }
+
+    @Test void withdrawingConsentClearsTheBufferedTranscript() {
+        var buffer = new dev.danielmillar.voicewarden.moderation.TranscriptBuffer(
+                new dev.danielmillar.voicewarden.moderation.TranscriptBuffer.Limits(java.time.Duration.ofHours(1), 10, 1_000));
+        consent.onDenied(buffer::forget);
+        UUID other = UUID.randomUUID();
+        consent.answer(player, true);
+        buffer.add(player, "Alice", java.time.Instant.EPOCH, "hello", new short[10]);
+        buffer.add(other, "Bob", java.time.Instant.EPOCH, "hi", new short[10]);
+        consent.answer(player, false);
+        assertTrue(buffer.recentLines(player, 10).isEmpty());
+        assertEquals(1, buffer.recentLines(other, 10).size());
+        assertEquals(20, buffer.audioBytes());
+    }
+
     private ConsentService service() {
-        var service = new ConsentService(() -> settings, database, () -> 1_000L, Logger.getAnonymousLogger());
+        var service = new ConsentService(() -> settings, database, () -> now, Logger.getAnonymousLogger());
         service.load();
         return service;
     }

@@ -106,18 +106,45 @@ class DatabaseTest {
             s.execute("PRAGMA user_version = 2");
         }
         try (Database db = Database.open(file, Logger.getAnonymousLogger())) {
-            assertEquals(3, (int) db.<Integer>read(c -> single(c, "PRAGMA user_version")));
+            assertEquals(Database.SCHEMA_VERSION, (int) db.<Integer>read(c -> single(c, "PRAGMA user_version")));
             assertEquals(0, (int) db.<Integer>read(c -> single(c, "SELECT COUNT(*) FROM consents")));
             assertEquals(2, (int) db.<Integer>read(c -> single(c, "SELECT count FROM offenses")));
             assertEquals(1, (int) db.<Integer>read(c -> single(c, "SELECT COUNT(*) FROM mute_events")));
             db.write("a consent", c -> {
                 try (Statement s = c.createStatement()) {
-                    s.execute("INSERT INTO consents VALUES ('00000000-0000-0000-0000-000000000001', 1, 1, 1000)");
+                    s.execute("INSERT INTO consents (player_id, accepted, rules_version, decided_at)"
+                            + " VALUES ('00000000-0000-0000-0000-000000000001', 1, 1, 1000)");
                 }
             });
         }
         try (Database reopened = Database.open(file, Logger.getAnonymousLogger())) {
             assertEquals(1, (int) reopened.<Integer>read(c -> single(c, "SELECT COUNT(*) FROM consents")));
+        }
+    }
+
+    @Test void versionThreeConsentsCountAsSeenAtTheUpgrade() throws Exception {
+        Path file = folder.resolve("data/voicewarden.db");
+        Files.createDirectories(file.getParent());
+        try (Database db = Database.open(file, Logger.getAnonymousLogger())) {
+            db.write("a version 3 database", c -> {
+                try (Statement s = c.createStatement()) {
+                    s.execute("ALTER TABLE consents DROP COLUMN last_seen_at");
+                    s.execute("INSERT INTO consents VALUES ('00000000-0000-0000-0000-000000000001', 1, 1, 1000)");
+                    s.execute("PRAGMA user_version = 3");
+                }
+            }).join();
+        }
+        long before = System.currentTimeMillis() / 1000 * 1000;
+        try (Database db = Database.open(file, Logger.getAnonymousLogger())) {
+            assertEquals(4, (int) db.<Integer>read(c -> single(c, "PRAGMA user_version")));
+            long seen = db.read(c -> {
+                try (Statement s = c.createStatement(); var r = s.executeQuery("SELECT last_seen_at, decided_at FROM consents")) {
+                    assertTrue(r.next());
+                    assertEquals(1000, r.getLong(2));
+                    return r.getLong(1);
+                }
+            });
+            assertTrue(seen >= before, "seen " + seen + " before " + before);
         }
     }
 

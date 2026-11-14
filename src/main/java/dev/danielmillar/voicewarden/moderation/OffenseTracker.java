@@ -70,6 +70,30 @@ public final class OffenseTracker {
         return written.get();
     }
 
+    /** The stored count, ignoring the ladder reset. */
+    public Offenses stored(UUID player) {
+        return current(player);
+    }
+
+    /** Deletes counts the ladder has already reset. Returns how many. */
+    public int prune(long now, int resetAfterDays) {
+        if (resetAfterDays <= 0) {
+            return 0;
+        }
+        int[] pruned = {0};
+        for (UUID player : counts.keySet()) {
+            counts.computeIfPresent(player, (id, stored) -> {
+                if (effective(stored, resetAfterDays, now).count() > 0) {
+                    return stored;
+                }
+                pruned[0]++;
+                database.write("the removal of a reset offence count", c -> delete(c, id));
+                return null;
+            });
+        }
+        return pruned[0];
+    }
+
     private Offenses current(UUID player) {
         return counts.getOrDefault(player, Offenses.NONE);
     }

@@ -174,6 +174,21 @@ public final class TranscriptBuffer {
         audioOrder.removeIf(e -> e.audio.get() == null);
     }
 
+    /** Drops every line and clip held for the player. Returns how many lines were dropped. */
+    public int forget(UUID player) {
+        int[] dropped = {0};
+        histories.computeIfPresent(player, (k, history) -> {
+            synchronized (history.entries) {
+                dropped[0] = history.entries.size();
+                history.entries.forEach(this::release);
+                history.entries.clear();
+            }
+            return null;
+        });
+        audioOrder.removeIf(e -> e.audio.get() == null);
+        return dropped[0];
+    }
+
     public long audioBytes() {
         return audioBytes.get();
     }

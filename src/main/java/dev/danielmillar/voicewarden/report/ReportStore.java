@@ -94,6 +94,45 @@ public final class ReportStore {
         return updated != null;
     }
 
+    /** Deletes reports older than {@code days} days, reviewed or not. Returns how many. */
+    public int prune(Instant now, int days) {
+        if (days <= 0) {
+            return 0;
+        }
+        Instant cutoff = now.minus(java.time.Duration.ofDays(days));
+        return remove(r -> r.createdAt().isBefore(cutoff));
+    }
+
+    /** Reports the player filed or was reported in, newest first. */
+    public List<StoredReport> involving(UUID player) {
+        return reports.values().stream().filter(r -> involves(r, player))
+                .sorted(Comparator.comparing(StoredReport::createdAt).reversed()).toList();
+    }
+
+    /** Deletes every report the player filed or was reported in. Returns how many. */
+    public int forget(UUID player) {
+        return remove(r -> involves(r, player));
+    }
+
+    private static boolean involves(StoredReport r, UUID player) {
+        return player.equals(r.reporterId()) || player.equals(r.targetId());
+    }
+
+    private int remove(java.util.function.Predicate<StoredReport> condition) {
+        int[] removed = {0};
+        for (UUID id : reports.keySet()) {
+            reports.computeIfPresent(id, (k, current) -> {
+                if (!condition.test(current)) {
+                    return current;
+                }
+                removed[0]++;
+                database.write("the removal of voice report " + current.shortId(), c -> delete(c, k));
+                return null;
+            });
+        }
+        return removed[0];
+    }
+
     /** Keeps the newest {@value #MAX_STORED} reports, dropping reviewed ones first. */
     private void trim() {
         if (reports.size() <= MAX_STORED) {

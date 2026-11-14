@@ -62,6 +62,29 @@ class OffenseTrackerTest {
         assertEquals(1, storedCount());
     }
 
+    @Test void countsTheLadderHasResetAreDeletedAndRecentOnesKept() {
+        var tracker = tracker();
+        UUID recent = UUID.randomUUID();
+        tracker.recordNext(player, 30);
+        tracker.recordNext(recent, 30);
+        long later = System.currentTimeMillis() + java.util.concurrent.TimeUnit.DAYS.toMillis(31);
+        assertEquals(0, tracker.prune(later, 0));
+        database.write("an older offence", c -> {
+            try (PreparedStatement s = c.prepareStatement("UPDATE offenses SET last_offense_at = ? WHERE player_id = ?")) {
+                s.setLong(1, later - java.util.concurrent.TimeUnit.DAYS.toMillis(1));
+                s.setString(2, recent.toString());
+                s.executeUpdate();
+            }
+        }).join();
+        restart();
+        tracker = tracker();
+        assertEquals(1, tracker.prune(later, 30));
+        assertEquals(0, storedCount());
+        restart();
+        assertEquals(0, tracker().stored(player).count());
+        assertEquals(1, tracker().stored(recent).count());
+    }
+
     private OffenseTracker tracker() {
         var tracker = new OffenseTracker(database, Logger.getAnonymousLogger());
         tracker.load();

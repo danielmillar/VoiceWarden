@@ -97,6 +97,15 @@ final class VoiceWardenCommand {
                 .then(Commands.literal("test").requires(perm("voicewarden.admin"))
                         .then(Commands.argument("text", StringArgumentType.greedyString()).executes(this::test)))
                 .then(Commands.literal("check").requires(perm("voicewarden.admin")).executes(this::check))
+                .then(Commands.literal("forget").requires(perm("voicewarden.admin"))
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .suggests((c, b) -> suggestMutedAndOnline(b))
+                                .executes(c -> forget(c, false))
+                                .then(Commands.literal("confirm").executes(c -> forget(c, true)))))
+                .then(Commands.literal("export").requires(perm("voicewarden.admin"))
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .suggests((c, b) -> suggestMutedAndOnline(b))
+                                .executes(this::export)))
                 .then(Commands.literal("discordtest").requires(perm("voicewarden.admin"))
                         .executes(c -> discordTest(c, WebhookTestTarget.ALL))
                         .then(Commands.literal("all").executes(c -> discordTest(c, WebhookTestTarget.ALL)))
@@ -407,6 +416,98 @@ final class VoiceWardenCommand {
                     Messages.text("fail", Long.toString(count(findings, SetupCheck.Status.FAIL)))));
         });
         return Command.SINGLE_SUCCESS;
+    }
+
+    private int forget(CommandContext<CommandSourceStack> ctx, boolean confirmed) {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "player");
+        resolveAnyone(name).thenCompose(target -> {
+            if (target.isEmpty()) {
+                sender.sendMessage(msg().render("command.unknown-player", Messages.text("name", name)));
+                return CompletableFuture.completedFuture(null);
+            }
+            Targets.Target t = target.get();
+            var player = Messages.text("player", t.name());
+            if (!confirmed) {
+                sender.sendMessage(msg().renderWithLiterals("command.forget-confirm", java.util.Map.of("target", name), player));
+                return CompletableFuture.completedFuture(null);
+            }
+            return plugin.playerData().forget(t.id()).handle((f, error) -> {
+                if (error != null) {
+                    Throwable cause = error.getCause() != null ? error.getCause() : error;
+                    plugin.getLogger().log(java.util.logging.Level.WARNING, "Could not erase the VoiceWarden data of player " + t.id(), cause);
+                    sender.sendMessage(msg().render("command.forget-failed", player,
+                            Messages.text("reason", String.valueOf(cause.getMessage()))));
+                    return null;
+                }
+                // The UUID only: the console log is not erased, so it must not keep the name.
+                plugin.getLogger().info(sender.getName() + " erased the VoiceWarden data of player " + t.id() + ".");
+                sender.sendMessage(msg().render("command.forgotten", player,
+                        Messages.text("lifted", f.wasMuted() ? "yes" : "no"),
+                        Messages.text("history", Integer.toString(f.muteEvents())),
+                        Messages.text("offenses", Integer.toString(f.offences())),
+                        Messages.text("consent", f.consent() ? "yes" : "no"),
+                        Messages.text("reports", Integer.toString(f.reports())),
+                        Messages.text("evidence", Integer.toString(f.evidenceFiles())),
+                        Messages.text("buffered", Integer.toString(f.bufferedLines())),
+                        Messages.text("logged", Integer.toString(f.logLines())),
+                        Messages.text("exports", Integer.toString(f.exports()))));
+                sender.sendMessage(msg().render("command.forgotten-elsewhere"));
+                sender.sendMessage(net.kyori.adventure.text.Component.empty());
+                Player online = plugin.players().get(t.id());
+                if (online != null) {
+                    plugin.consentPrompt().askOnline(List.of(online));
+                }
+                return null;
+            });
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int export(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = ctx.getSource().getSender();
+        String name = StringArgumentType.getString(ctx, "player");
+        resolveAnyone(name).thenCompose(target -> {
+            if (target.isEmpty()) {
+                sender.sendMessage(msg().render("command.unknown-player", Messages.text("name", name)));
+                return CompletableFuture.completedFuture(null);
+            }
+            Targets.Target t = target.get();
+            var player = Messages.text("player", t.name());
+            return plugin.playerData().export(t.id(), t.name()).handle((path, error) -> {
+                if (error != null) {
+                    Throwable cause = error.getCause() != null ? error.getCause() : error;
+                    plugin.getLogger().log(java.util.logging.Level.WARNING, "Could not export " + t.name() + " (" + t.id() + ")", cause);
+                    sender.sendMessage(msg().render("command.export-failed", player,
+                            Messages.text("reason", String.valueOf(cause.getMessage()))));
+                    return null;
+                }
+                // Shown from the plugins folder's parent, e.g. plugins/VoiceWarden/exports/<uuid>-<time>.json
+                java.nio.file.Path root = plugin.getDataFolder().toPath().toAbsolutePath().normalize().getParent().getParent();
+                String shown = root.relativize(path.toAbsolutePath().normalize()).toString();
+                sender.sendMessage(msg().render("command.exported", player, Messages.text("path", shown)));
+                return null;
+            });
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** A UUID, for players long gone; otherwise a muted or known player's name. */
+    private CompletableFuture<Optional<Targets.Target>> resolveAnyone(String input) {
+        java.util.UUID id;
+        try {
+            id = input.length() == 36 ? java.util.UUID.fromString(input) : null;
+        } catch (IllegalArgumentException e) {
+            id = null;
+        }
+        if (id == null) {
+            return resolveMutedFirst(input);
+        }
+        java.util.UUID uuid = id;
+        String known = plugin.mutes().get(uuid).map(MuteService.Mute::playerName)
+                .or(() -> plugin.transcriptBuffer().lastKnownName(uuid))
+                .orElse(input);
+        return CompletableFuture.completedFuture(Optional.of(new Targets.Target(uuid, known)));
     }
 
     private static long count(List<SetupCheck.Finding> findings, SetupCheck.Status status) {

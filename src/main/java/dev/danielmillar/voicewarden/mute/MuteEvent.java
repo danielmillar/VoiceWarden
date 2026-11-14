@@ -19,7 +19,7 @@ public record MuteEvent(UUID playerId, String playerName, Type type, long at, St
     public enum Type {
         MUTE, UNMUTE, EXPIRE, PARDON;
 
-        String key() {
+        public String key() {
             return name().toLowerCase(Locale.ROOT);
         }
     }

@@ -29,7 +29,8 @@ class MessagesTest {
                 "details", "next", "line", "state", "model", "speakers", "queue", "workers", "transcribed",
                 "no-speech", "dropped", "latency-avg", "latency-p95", "rtf", "incidents", "automutes", "mutes", "discord-sent",
                 "discord-queue", "discord-failed", "reporter", "lines", "window", "minutes", "page", "newer", "older", "pages", "click-hint", "version",
-                "heard", "category", "rule", "area", "finding", "fix", "ok", "warn", "fail", "webhook", "status"};
+                "heard", "category", "rule", "area", "finding", "fix", "ok", "warn", "fail", "webhook", "status",
+                "lifted", "history", "offenses", "consent", "reports", "evidence", "buffered", "logged", "exports", "path"};
         TagResolver[] resolvers = java.util.Arrays.stream(placeholders).map(k -> Messages.text(k, "test")).toArray(TagResolver[]::new);
         int rendered = 0;
         for (String key : yaml.getKeys(true)) {
