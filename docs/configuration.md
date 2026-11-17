@@ -164,8 +164,7 @@ stays off unless `moderation.languages` is exactly `[en]`. Offline servers need 
 ### Offline servers
 
 Set `speech-to-text.auto-download: false` to disable all automatic downloads, both the speech model and the native
-libraries. Once you have put the required files for your platform in place, the console gives the paths and download
-links for anything still missing.
+libraries. If something is still missing, the console gives its path and the download link.
 
 ### Staging Turbo with a code update
 

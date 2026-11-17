@@ -2,6 +2,19 @@
 
 [![Build and test](https://github.com/danielmillar/VoiceWarden/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/danielmillar/VoiceWarden/actions/workflows/build.yml) [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](https://github.com/danielmillar/VoiceWarden/blob/main/LICENSE) ![Paper 26.1+](https://img.shields.io/badge/Paper-26.1%2B-informational) ![Java 25](https://img.shields.io/badge/Java-25%2B-orange)
 
+## At a glance
+
+- Moderates [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) on the server. Speech is turned into
+  text locally with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), checked against rules you control, and the
+  player is warned or muted. No cloud speech service, account or API key.
+- Rules and word lists, longer mutes for repeat offenders, in-game and optional Discord alerts with a recording,
+  and player reports. Players are told on join that voice is moderated, or asked to accept before their voice is
+  processed.
+- Java 25 or newer, Paper 26.1 or newer (Folia supported), sherpa-onnx 1.13.8, JUnit and GitHub Actions. CI tests
+  Paper 26.1, 26.2 and 26.3, then builds the jar.
+- Latest release: [v1.0.0](https://github.com/danielmillar/VoiceWarden/releases/tag/v1.0.0) (12 November 2026).
+  `main` is `2.0.0-SNAPSHOT`.
+
 VoiceWarden is a Paper plugin that listens to voice chat and helps you deal with players who swear, harass others or
 break your rules. It turns speech into text, checks the text against rules you control, and warns or mutes the player
 automatically. Your staff get an alert and can listen to a recording.
@@ -73,8 +86,8 @@ player speaks → local speech-to-text → your rules → warn or mute → staff
 staff but never mute anyone. Switch it back when you're happy with how it behaves.
 
 **Server with no internet?** Set `speech-to-text.auto-download: false`. This disables all automatic downloads, both
-the speech model and the native libraries. Once you have put the required files for your platform in place, the console
-gives the paths and download links for anything still missing.
+the speech model and the native libraries. If something is still missing, the console gives its path and the download
+link.
 
 ## Commands
 
@@ -124,6 +137,7 @@ The main command is `/voicewarden`, or `/vw` for short.
 | `voicewarden.reload` | Operators | Using `/vw reload`. |
 | `voicewarden.stats` | Operators | Using `/vw stats`. |
 | `voicewarden.vcmute` | Operators | Using `/vw vcmute`, `unvcmute`, `pardon`, `mutes`, `offenses` and `history`. |
+| `voicewarden.report.review` | Operators | Receiving voice report alerts and using `/viewreport`, `/reportinbox` and `/vw transcript`. |
 | `voicewarden.report` | Everyone | Using `/reportvoice`. |
 | `voicewarden.consent` | Everyone | Using `/voiceconsent`. |
 
@@ -138,7 +152,6 @@ With [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) installed, Voi
 | `%voicewarden_mute_reason%` | The mute's reason. Empty when not muted. |
 | `%voicewarden_offenses%` | The player's offence count on the mute ladder. |
 | `%voicewarden_next_mute%` | How long their next automatic mute would last, such as `15m`. |
-| `voicewarden.report.review` | Operators | Seeing reports, `/viewreport`, `/reportinbox` and `/vw transcript`. |
 
 ## Troubleshooting
 
