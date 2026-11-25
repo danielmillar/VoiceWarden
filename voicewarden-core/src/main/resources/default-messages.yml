@@ -1,0 +1,169 @@
+# VoiceWarden messages: MiniMessage format (https://docs.advntr.dev/minimessage/format.html)
+# Every message can use the theme colours as tags (<accent>text</accent>) and the prefixes, such as <prefix>.
+# Player-provided text (names, transcripts) is always inserted as plain text, so it can never inject formatting or click events.
+# Placeholders such as <player> are filled in by the plugin. Keep their names as written.
+# A message can be several chat lines joined by <newline>.
+# New messages are added here automatically on upgrade. Your edits are kept.
+
+# Schema version of this file. VoiceWarden manages it. Do not edit.
+config-version: 2
+
+# Colour palette available in every message as tags. Values are hex (#RRGGBB) or named colours.
+# Change these to re-theme the whole plugin.
+theme:
+  # VoiceWarden's own colour: labels, card titles and actions.
+  primary: "#3DD6C6"
+  body: "#E4E4EC"
+  muted: "#9FA4B8"
+  # Separators, debug tags and times.
+  dim: "#6E7385"
+  # The value that matters in a line: a name, a duration, a count.
+  accent: "#FFFFFF"
+  # Positive or lifted states: unmuted, pardoned, accepted.
+  success: "#4BE38B"
+  # Flags, warnings and matched words.
+  warning: "#FFB454"
+  # Active restrictions, refusals and failures: muted, hold up, oops.
+  error: "#FF5C5C"
+
+# Reusable MiniMessage snippets available as tags, e.g. <prefix>. Their styles carry into the text after them.
+prefixes:
+  prefix: "<primary><b>VOICE</b></primary> <body>"
+  # A normal refusal: no permission, an unknown player, a cooldown.
+  hold-up: "<error><b>HOLD UP!</b></error> <body>"
+  # Something went wrong.
+  oops: "<error><b>OOPS!</b></error> <body>"
+
+# Sent to a player when their speech earns a warning. <words>: matched words (optional).
+warn_message: "<newline><warning><b>WARNING!</b></warning> <body>Keep voice chat respectful.<newline>   <muted>If it happens again, you will be muted in voice chat.<newline>"
+
+# Sent to a player when audio.mic_spam catches sustained clipped or ear-splitting audio and the action is WARN.
+mic_spam:
+  warning: "<newline><warning><b>TOO LOUD!</b></warning> <body>Your microphone is clipping or far too loud.<newline>   <muted>Turn it down or you will be muted in voice chat.<newline>"
+
+# Shown after a mute when moderation.appeal_url is set. <appeal_url>: the link.
+appeal_message: "<primary><b>APPEAL</b></primary> <body>Think this was a mistake?<newline>   <click:open_url:'<appeal_url>'><hover:show_text:'<body>Open the appeal page.'><primary>▸ ᴀᴘᴘᴇᴀʟ</primary></hover></click>"
+
+# Shown on join while consent.mode is NOTICE.
+privacy-join-msg: "<primary><b>NOTICE</b></primary> <body>Voice chat here is transcribed and moderated on this server.<newline>   <muted>Type <accent>/voiceconsent deny</accent> to opt out and disable voice chat."
+
+# Shown by /voiceconsent.
+privacy-msg: "<primary><b>PRIVACY</b></primary> <body>Your voice is transcribed on this server only and audio never leaves it.<newline>   <muted>Transcripts are kept for up to 12 hours for player reports."
+
+# Consent prompts.
+consent:
+  # Java chest menu.
+  gui:
+    title: "<primary>Voice chat moderation"
+    accept_name: "<accent>Accept"
+    accept_lore: "<body>Allow voice transcription and use voice chat."
+    rules_name: "<body>Rules"
+    rules_lore: "<muted>Read how your voice is handled."
+    deny_name: "<body>Deny"
+    deny_lore: "<muted>Disable voice chat and do not transcribe my voice."
+  # Bedrock form shown through Floodgate.
+  bedrock:
+    title: "Voice chat moderation"
+    content: "Voice chat on this server is transcribed on this server to enforce the rules. Audio never leaves the server."
+    accept_button: "Accept"
+    rules_button: "Rules"
+    deny_button: "Deny"
+  accepted: "<success><b>THANKS!</b></success> <body>Your voice chat is on.<newline>   <muted>Change your answer with /voiceconsent."
+  denied: "<warning><b>VOICE OFF</b></warning> <body>Voice chat is now disabled for you.<newline>   <muted>Run <accent>/voiceconsent accept</accent> whenever you want to turn it back on."
+  voice_disabled: "<hold-up>Voice chat is disabled until you accept voice moderation.<newline>   <muted>Run <accent>/voiceconsent accept</accent> to turn it on."
+  # Kick screen when consent.on_deny is KICK.
+  kick_message: "<error>You declined voice chat moderation.</error>\n\n<body>Rejoin and accept to play on this server."
+  # <status>: accepted, denied, pending or outdated.
+  status: "<primary><b>CONSENT</b></primary> <body>Your voice consent is <accent><status></accent>."
+  # Sent when consent.rules_version is raised.
+  rules_updated: "<warning><b>WARNING!</b></warning> <body>The voice chat rules have changed.<newline>   <muted>Please review them again."
+
+# Mutes. <duration>: length such as 5m or Permanent. <reason>: why. <staff>: who.
+mute:
+  muted: "<newline><error><b>MUTED!</b></error> <body>You are muted in voice chat for <accent><duration></accent>.<newline>   <muted>Reason: <reason><newline>"
+  muted_permanent: "<newline><error><b>MUTED!</b></error> <body>You are muted in voice chat <accent>for good</accent>.<newline>   <muted>Reason: <reason><newline>"
+  unmuted: "<success><b>UNMUTED!</b></success> <body>You can use voice chat again."
+  pardoned: "<success><b>PARDONED!</b></success> <body>Your voice chat strikes have been cleared."
+  # <remaining>: time left on the mute.
+  attempt_while_muted: "<error><b>MUTED!</b></error> <body>Nobody hears you. <accent><remaining></accent> left."
+  # Shown in the action bar, boss bar or chat while muted.
+  indicator: "<error><b>MUTED</b></error> <dim>·</dim> <accent><remaining></accent> <body>left"
+  indicator_permanent: "<error><b>MUTED</b></error> <dim>·</dim> <body>for good"
+  expired: "<success><b>UNMUTED!</b></success> <body>Your voice mute has ended."
+  staff_muted: "<error><b>MUTED!</b></error> <body>Voice-muted <accent><player></accent> for <accent><duration></accent>."
+  staff_unmuted: "<success><b>UNMUTED!</b></success> <body>Removed the voice mute from <accent><player></accent>."
+  staff_pardoned: "<success><b>PARDONED!</b></success> <body>Pardoned <accent><player></accent> and cleared their voice strikes."
+  already_muted: "<hold-up><accent><player></accent> is already voice-muted."
+  not_muted: "<hold-up><accent><player></accent> is not voice-muted."
+
+# Staff alerts, sent to players with voicewarden.alerts.
+# <player>, <words>, <severity>, <action>, <strikes>, <transcript>, <server>.
+alerts:
+  flagged: "<newline><hover:show_text:'<warning><b>Voice flag</b></warning>\n<muted>Severity: <body><severity></body>\nStrikes: <body><strikes></body>\nAction: <body><action></body></muted>\n\n<body>Click to prepare a voice mute.'><click:suggest_command:'/vw vcmute <player> '><warning><b>FLAGGED!</b></warning> <accent><player></accent> <dim>·</dim> <muted><severity></muted> <dim>·</dim> <muted>strike #<strikes></muted> <dim>·</dim> <warning><action></warning><newline>   <body>\"<transcript>\"</body> <dim>—</dim> <warning><u><words></u></warning></click></hover><newline>"
+  flagged_unconfirmed: "<newline><hover:show_text:'<muted><b>Unconfirmed flag</b></muted>\n<muted>Severity: <body><severity></body></muted>\n\n<body>No action was taken.'><muted><b>FLAGGED?</b></muted> <accent><player></accent> <dim>·</dim> <muted>unconfirmed, no action</muted><newline>   <muted>\"<transcript>\"</muted> <dim>—</dim> <warning><words></warning></hover><newline>"
+  muted: "<muted><b>STAFF</b></muted> <error><b>MUTED</b></error> <accent><player></accent> <body>for <accent><duration></accent>.</body>"
+  # Mic spam caught by audio.mic_spam. <kind>: clipping or loudness, <peak> and <clipping>: percentages,
+  # <duration>: how long it lasted, <action>: report, warn or mute.
+  mic_spam: "<hover:show_text:'<primary><b>Mic spam</b></primary>\n<muted>Kind: <body><kind></body>\nPeak loudness: <body><peak></body>\nClipped samples: <body><clipping></body>\nLasted: <body><duration></body>\nAction: <body><action></body></muted>\n\n<body>Click to prepare a voice mute.'><click:suggest_command:'/vw vcmute <player> '><warning><b>MIC SPAM!</b></warning> <accent><player></accent> <body>is clipping or too loud.</body> <dim>·</dim> <muted><kind></muted> <dim>·</dim> <warning><action></warning></click></hover>"
+
+# Voice reports. <reporter>, <player>, <minutes>, <seconds>, <id>.
+report:
+  submitted: "<success><b>THANKS!</b></success> <body>Your report about <accent><player></accent> went to staff with the last <accent><minutes>m</accent> of speech."
+  cooldown: "<hold-up>Wait <accent><seconds>s</accent> before you report again."
+  too_many: "<hold-up>You already have the maximum number of open voice reports."
+  no_transcript: "<hold-up>There is no recent speech from <accent><player></accent> to report."
+  self_report: "<hold-up>You can't report yourself."
+  disabled: "<hold-up>Voice reports are turned off on this server."
+  save_failed: "<oops>Your voice report could not be saved.<newline>   <muted>Try again in a moment."
+  staff_alert: "<newline><primary><b>REPORT!</b></primary> <body><accent><reporter></accent> reported <accent><player></accent>'s voice chat.</body> <muted>(last <minutes>m)</muted><newline>   <click:run_command:'/viewreport #<id>'><hover:show_text:'<body>Open the report.'><primary>▸ ᴠɪᴇᴡ</primary></hover></click><newline>"
+  gui_title: "<primary>Report <player>"
+  gui_preset_name: "<accent>Last <minutes> minutes"
+  # Written book opened by /viewreport.
+  book:
+    title: "Voice report: <player>"
+    author: "VoiceWarden"
+    header: "<primary><b><player></b></primary>\n<muted>Last <minutes> minutes</muted>\n\n"
+    # <time>: when the line was spoken.
+    line: "<dim><time></dim> <body><text></body>"
+    flagged_line: "<dim><time></dim> <error><text></error>"
+    # A line another player said nearby. <player>: who said it.
+    nearby_line: "<dim><time></dim> <muted>[<player>]</muted> <body><text></body>"
+    empty: "<muted>No voice chat in this window."
+  # /reportinbox: a card.
+  inbox:
+    header: "<newline> <primary><b>Voice reports</b></primary><newline> <dim>ɪɴʙᴏx</dim><newline><newline> <primary>|</primary> <body>Open: <accent><count></accent>"
+    entry: " <primary>|</primary> <accent><player></accent> <muted>by <reporter>, <age> ago, <minutes>m</muted><newline>   <click:run_command:'/viewreport #<id>'><hover:show_text:'<body>Open report #<id>.'><primary>▸ ᴠɪᴇᴡ</primary></hover></click>  <click:run_command:'/reportinbox review <id>'><hover:show_text:'<body>Mark report #<id> as reviewed.'><muted>▸ ʀᴇᴠɪᴇᴡᴇᴅ</muted></hover></click>"
+    empty: "<primary><b>REPORTS</b></primary> <body>No open voice reports."
+    reviewed: "<success><b>REVIEWED!</b></success> <body>Marked report <accent>#<id></accent> as reviewed."
+
+# Command feedback.
+commands:
+  no_permission: "<hold-up>You can't do that."
+  player_only: "<hold-up>Only players can use this command."
+  player_not_found: "<hold-up>No player called <accent><player></accent> was found."
+  invalid_duration: "<hold-up><accent><input></accent> is not a duration.<newline>   <muted>Try 30s, 5m, 1h30m or perm."
+  invalid_number: "<hold-up><accent><input></accent> is not a number."
+  unknown_subcommand: "<hold-up>Unknown subcommand.<newline>   <muted>Type /voicewarden help."
+  # <usage>: the expected syntax.
+  usage: "<hold-up>Usage: <accent><usage></accent>"
+  reloaded: "<success><b>RELOADED!</b></success> <body>Configuration reloaded."
+  # <error>: what went wrong.
+  reload_failed: "<oops>The reload failed, so the previous settings are still in use.<newline>   <muted><error>"
+  help:
+    - ""
+    - " <primary><b>VoiceWarden</b></primary>"
+    - " <dim>ᴄᴏᴍᴍᴀɴᴅѕ</dim>"
+    - ""
+    - " <primary>|</primary> <accent>/vw reload</accent><dim> · </dim><muted>reload config and word lists"
+    - " <primary>|</primary> <accent>/vw stats</accent><dim> · </dim><muted>engine and pipeline statistics"
+    - " <primary>|</primary> <accent>/vw vcmute (player) [duration] [reason]</accent><dim> · </dim><muted>voice mute a player"
+    - " <primary>|</primary> <accent>/vw unvcmute (player)</accent><dim> · </dim><muted>remove a voice mute"
+    - " <primary>|</primary> <accent>/vw pardon (player)</accent><dim> · </dim><muted>clear a player's strikes"
+    - " <primary>|</primary> <accent>/vw history (player)</accent><dim> · </dim><muted>mute and strike history"
+    - " <primary>|</primary> <accent>/vw mutes</accent><dim> · </dim><muted>active voice mutes"
+    - " <primary>|</primary> <accent>/vw discordtest (all|flag|mute)</accent><dim> · </dim><muted>send test webhooks"
+    - " <primary>|</primary> <accent>/vw test [webhook]</accent><dim> · </dim><muted>run a self-test"
+    - " <primary>|</primary> <accent>/vw debug (player)</accent><dim> · </dim><muted>live pipeline state for a player"
+    - " <primary>|</primary> <accent>/vw consent (player) [reset]</accent><dim> · </dim><muted>check or reset a player's voice consent"
+    - " <primary>|</primary> <accent>/vw updatecheck</accent><dim> · </dim><muted>check for a new release"
+    - ""

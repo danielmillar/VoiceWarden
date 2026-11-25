@@ -1,0 +1,440 @@
+# VoiceWarden moderation rules (phrases, regex, allowlists and contextual guards).
+#
+# Loaded alongside config/wordlist.txt and reloaded on /vw reload.
+# Every rule targets one of the three severity tiers configured in config.yml:
+#   MILD     -> moderation.escalation.mild     (default: report -> warn -> mute)
+#   MODERATE -> moderation.escalation.moderate (default: warn -> mute)
+#   SEVERE   -> moderation.escalation.severe   (default: immediate mute)
+#
+# Matching notes:
+# - Words and phrases are compiled into a single Aho-Corasick trie with wordlist.txt.
+# - Internal apostrophes are folded for phrase matching so "you're", "I'll" and "don't"
+#   match "youre", "ill" and "dont" automatically.
+# - Regex patterns run case-insensitively with Unicode case folding, fast literal prefilters,
+#   and a strict per-rule time budget to prevent backtracking stalls.
+# - exclude_regex suppresses a rule when the utterance matches a safe context (for example,
+#   reporting or condemning prohibited content).
+# - allowlist applies globally to wordlist and rule word/phrase hits; per-rule allow also
+#   suppresses regex hits for that rule.
+
+allowlist:
+  - assassin
+  - assassins
+  - assassination
+  - class
+  - classes
+  - classic
+  - classical
+  - grass
+  - grassy
+  - scunthorpe
+  - cocktail
+  - cocktails
+  - cockatoo
+  - cockatoos
+  - cockerel
+  - cockerels
+  - cockroach
+  - cockroaches
+  - cockpit
+  - cockpits
+  - dickens
+  - dickinson
+  - dickson
+  - prickle
+  - prickles
+  - prickly
+  - pakistan
+  - pakistani
+  - raccoon
+  - raccoons
+  - snigger
+  - sniggers
+  - sniggered
+  - sniggering
+  - schwarzenegger
+  - shitake
+
+rules:
+  harassment:
+    enabled: true
+    category: "Harassment"
+    severity: SEVERE
+    words:
+      - kys
+    phrases:
+      - kill yourself
+      - kill your self
+      - go kill yourself
+      - just kill yourself
+      - go and kill yourself
+      - you should kill yourself
+      - go die
+      - hope you die
+      - i hope you die
+      - you should die
+      - do us a favor and die
+      - do us a favour and die
+      - neck yourself
+      - neck your self
+      - hang yourself
+      - hang your self
+      - end your life
+      - jump off a bridge
+      - jump off the bridge
+      - slit your wrists
+      - cut your wrists
+      - drink bleach
+      - i know where you live
+      - i will find you in real life
+      - ill find you in real life
+      - i will kill you in real life
+      - ill kill you in real life
+      - im going to kill you in real life
+      - im gonna kill you in real life
+    regex: []
+    exclude_regex: []
+    allow: []
+
+  doxxing-threats:
+    enabled: true
+    category: "Doxxing threats"
+    severity: SEVERE
+    words: []
+    phrases:
+      - i will leak your address
+      - ill leak your address
+      - im going to leak your address
+      - im gonna leak your address
+      - i will post your address
+      - ill post your address
+      - i will dox you
+      - ill dox you
+      - im going to dox you
+      - im gonna dox you
+      - i will doxx you
+      - ill doxx you
+      - im going to doxx you
+      - im gonna doxx you
+      - i will swat you
+      - ill swat you
+      - im going to swat you
+      - im gonna swat you
+      - i will send the police to your house
+      - ill send the police to your house
+      - i have your ip
+      - i got your ip
+    regex: []
+    exclude_regex: []
+    allow: []
+
+  doxxing:
+    enabled: true
+    category: "Possible doxxing"
+    severity: MILD
+    words: []
+    phrases:
+      - my address is
+      - his address is
+      - her address is
+      - their address is
+      - home address is
+      - phone number is
+      - ip address is
+      - social security number
+    regex:
+      - '\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b'
+      - '\b[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+\b'
+      - '\b[\p{L}\p{N}]+\s+at\s+(?:gmail|yahoo|outlook|hotmail|icloud|protonmail)\s+dot\s+(?:com|net|org|co)\b'
+      - '(?<![\p{L}\p{N}])(?:\+?\d{1,3}[\s.-])?(?:\(\d{3}\)|\d{3})[\s.-]\d{3}[\s.-]\d{4}(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])\d{3}-\d{4}(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])\d{10,15}(?![\p{L}\p{N}])'
+      - '\b(?:(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)[\s,.-]+){6,14}(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\b'
+    exclude_regex: []
+    allow:
+      - "127.0.0.1"
+      - "0.0.0.0"
+      - "192.168.0.1"
+      - "192.168.1.1"
+
+  advertising:
+    enabled: true
+    category: "Advertising"
+    severity: MILD
+    words: []
+    phrases:
+      - join my server
+      - join our server
+      - come to my server
+      - come to our server
+      - check out my server
+      - join my discord
+      - join our discord
+      - use my referral code
+      - server ip is
+      - the server ip is
+    regex:
+      - '\bdiscord\.gg/[\p{L}\p{N}-]{2,32}\b'
+      - '\b(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?\.)+(?:com|net|org|gg|io|co|uk|me|xyz|online|games|tv|mc|pro)\b'
+      - '\b(?:[\p{L}\p{N}][\p{L}\p{N}-]*\s+dot\s+)+(?:com|net|org|gg|io|co|uk|me|xyz|online|games|tv)\b'
+    exclude_regex: []
+    allow:
+      - "minecraft.net"
+      - "minecraft dot net"
+      - "youtube.com"
+      - "youtube dot com"
+      - "youtu.be"
+      - "twitch.tv"
+      - "twitch dot tv"
+      - "github.com"
+      - "wikipedia.org"
+      - "google.com"
+      - "google dot com"
+      - "modrinth.com"
+      - "curseforge.com"
+
+  sexual-harassment:
+    enabled: true
+    category: "Sexual harassment"
+    severity: MODERATE
+    words: []
+    phrases:
+      - suck my dick
+      - suck my cock
+      - suck me off
+      - send nudes
+      - send me nudes
+      - send me a nude
+      - send naked pictures
+      - send me naked pictures
+      - show me your tits
+      - show me your boobs
+      - show me your pussy
+      - show me your dick
+      - show me your cock
+      - show me your ass
+      - show me your arse
+      - get on your knees
+      - sit on my face
+    regex: []
+    exclude_regex: []
+    allow: []
+
+  sexual-threats:
+    enabled: true
+    category: "Sexual threats"
+    severity: SEVERE
+    words: []
+    phrases:
+      - i will rape you
+      - ill rape you
+      - i am going to rape you
+      - im going to rape you
+      - im gonna rape you
+      - you deserve to be raped
+      - you should be raped
+      - i will sexually assault you
+      - ill sexually assault you
+      - im going to sexually assault you
+      - i will molest you
+      - ill molest you
+      - i will drug you
+      - ill drug you
+      - i will rape your mother
+      - ill rape your mother
+      - i will rape your sister
+      - ill rape your sister
+      - i will rape her
+      - ill rape her
+      - i will rape him
+      - ill rape him
+    regex: []
+    exclude_regex: []
+    allow: []
+
+  sexual-coercion:
+    enabled: true
+    category: "Sexual coercion"
+    severity: SEVERE
+    words: []
+    phrases: []
+    regex:
+      - '\b(?:send|show|give)\s+(?:me\s+)?(?:nudes?|naked\s+pictures|explicit\s+pictures)\s+or\s+(?:\S+\s+){0,6}(?:leak|post|share|release|expose|hurt|kill|dox|doxx)\b'
+    exclude_regex:
+      - '\b(?:don[''’]?t|do\s+not|not|never|stop|report(?:ed|ing)?|illegal|disgusting|ban(?:ned)?|against)\b'
+    allow: []
+
+  child-exploitation:
+    enabled: true
+    category: "Child exploitation solicitation"
+    severity: SEVERE
+    words: []
+    phrases: []
+    regex:
+      - '\b(?:send|share|trade|sell|buy|upload|post|distribute|download|watch|want|looking\s+for)\s+(?:(?:me|us|some|your|the|more|with\s+me)\s+){0,3}(?:child\s+porn(?:ography)?|childporn|kiddie\s+porn|underage\s+(?:porn(?:ography)?|nudes?)|minor\s+nudes?|csam|csem)\b'
+    exclude_regex:
+      - '\b(?:don[''’]?t|do\s+not|not|never|stop|report(?:ed|ing)?|illegal|disgusting|ban(?:ned)?|against)\b'
+    allow: []
+
+  child-safety:
+    enabled: true
+    category: "Child safety"
+    severity: MILD
+    words:
+      - csam
+      - csem
+      - childporn
+    phrases:
+      - underage porn
+      - underage pornography
+      - underage nudes
+      - minor nudes
+      - child sexual abuse
+      - child exploitation
+      - sexual grooming
+      - child groomer
+      - child groomers
+      - sexual groomer
+      - child sex trafficking
+    regex: []
+    exclude_regex: []
+    allow: []
+
+  hate-incitement:
+    enabled: true
+    category: "Hate incitement"
+    severity: SEVERE
+    words: []
+    phrases:
+      - kill all jews
+      - kill all the jews
+      - gas the jews
+      - gas all jews
+      - hitler was right
+      - hitler did nothing wrong
+      - bring back slavery
+      - white power forever
+      - white power white pride
+    regex:
+      - '\b(?:kill|exterminate|execute)\s+(?:all\s+)?(?:the\s+)?(?:jews|muslims|gays|lesbians|immigrants|blacks|asians|transgender\s+people|trans\s+people)\b'
+      - '\ball\s+(?:jews|muslims|gays|lesbians|immigrants|blacks|asians|transgender\s+people|trans\s+people)\s+(?:should|must|deserve\s+to)\s+die\b'
+    exclude_regex: []
+    allow: []
+
+  extremist-slogans:
+    enabled: true
+    category: "Extremist slogans"
+    severity: SEVERE
+    words: []
+    phrases:
+      - heil hitler
+      - sieg heil
+      - blood and soil
+    regex: []
+    exclude_regex: []
+    allow: []
+
+  identity-abuse:
+    enabled: true
+    category: "Identity-based harassment"
+    severity: MODERATE
+    words: []
+    phrases:
+      - thats so gay
+      - that is so gay
+      - you sound gay
+      - go back to your country
+      - go back where you came from
+      - go back to where you came from
+      - you people dont belong here
+      - your kind doesnt belong here
+      - your kind are not welcome
+      - your kind arent welcome
+      - you are not a real woman
+      - youre not a real woman
+      - you are not a real man
+      - youre not a real man
+    regex:
+      - '\b(?:dirty|filthy|disgusting|worthless)\s+(?:gay|lesbian|trans|transgender|jew|muslim|immigrant)\b'
+      - '\b(?:dirty|filthy|disgusting|worthless)\s+(?:black|asian|jewish|autistic|disabled)\s+(?:person|people|kid|man|woman|boy|girl|player)\b'
+    exclude_regex: []
+    allow: []
+
+  targeted-abuse:
+    enabled: true
+    category: "Targeted abuse"
+    severity: MILD
+    words: []
+    phrases:
+      - you are worthless
+      - youre worthless
+      - nobody likes you
+      - nobody would miss you
+      - nobody will miss you
+      - nobody wants you here
+      - you dont belong here
+    regex: []
+    exclude_regex: []
+    allow: []
+
+  threats:
+    enabled: true
+    category: "Threats"
+    severity: MILD
+    words: []
+    phrases:
+      - i will kill you
+      - ill kill you
+      - im going to kill you
+      - im gonna kill you
+      - i am going to kill you
+      - i will hurt you
+      - ill hurt you
+      - i will beat you up
+      - ill beat you up
+      - i will stab you
+      - ill stab you
+      - i will shoot you
+      - ill shoot you
+    regex: []
+    exclude_regex: []
+    allow: []
+
+  obfuscated-slurs:
+    enabled: true
+    category: "Obfuscated slurs"
+    severity: SEVERE
+    words: []
+    phrases: []
+    regex:
+      - '(?<![\p{L}\p{N}])(?!n(?:igger|igga)s?\b)n[._-]{0,2}[i1!][._-]{0,2}g[._-]{0,2}g[._-]{0,2}(?:[e3][._-]{0,2}r|[a4@])[s5]?(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])(?!faggots?\b)f[._-]{0,2}[a4@][._-]{0,2}g[._-]{0,2}g[._-]{0,2}[o0][._-]{0,2}t[s5]?(?![\p{L}\p{N}])'
+      - '(?<![\p{L}\p{N}])(?!kikes?\b)k[._-]{0,2}[i1!][._-]{0,2}k[._-]{0,2}[e3][s5]?(?![\p{L}\p{N}])'
+    exclude_regex: []
+    allow: []
+
+  recognition-variants:
+    enabled: true
+    category: "Possible slur variant"
+    severity: MILD
+    words:
+      - nibba
+      - nibbas
+      - nibber
+      - nibbers
+    phrases:
+      - nig ger
+      - nig gah
+      - nig ga
+      - fag got
+      - n word
+      - the nword
+      - f slur
+    regex: []
+    exclude_regex: []
+    allow:
+      - snigger
+      - sniggers
+      - sniggered
+      - sniggering
+      - schwarzenegger

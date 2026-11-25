@@ -1,0 +1,76 @@
+name: VoiceWarden
+version: '${version}'
+main: dev.voicewarden.plugin.VoiceWardenPlugin
+api-version: '1.21'
+folia-supported: true
+author: Daniel Millar
+website: https://danielmillar.dev
+description: On-server voice chat moderation for Simple Voice Chat and PlasmoVoice.
+softdepend: [voicechat, PlasmoVoice, floodgate, LuckPerms, PlaceholderAPI]
+
+commands:
+  voicewarden:
+    description: VoiceWarden administration.
+    usage: /voicewarden help
+    aliases: [vw]
+  voiceconsent:
+    description: Review or change your voice chat monitoring consent.
+    usage: /voiceconsent [accept|deny]
+    aliases: [vconsent]
+  reportvoice:
+    description: Report a player's recent voice chat to staff.
+    usage: /reportvoice [player] [minutes]
+    aliases: [rvoice]
+  viewreport:
+    description: Open a player's recent transcript or a saved voice report.
+    usage: '/viewreport <player> [minutes] | /viewreport #<id>'
+    aliases: [vr]
+  reportinbox:
+    description: List open voice reports and mark them reviewed.
+    usage: /reportinbox [review <id>]
+    aliases: [rinbox, vreports]
+
+permissions:
+  voicewarden.admin:
+    description: Every VoiceWarden staff command and alert. Does not grant voicewarden.bypass.
+    default: op
+    children:
+      voicewarden.alerts: true
+      voicewarden.reload: true
+      voicewarden.stats: true
+      voicewarden.vcmute: true
+      voicewarden.pardon: true
+      voicewarden.history: true
+      voicewarden.mutes: true
+      voicewarden.report: true
+      voicewarden.report.review: true
+  voicewarden.bypass:
+    description: Voice is never transcribed or moderated. Grant it explicitly.
+    default: false
+  voicewarden.alerts:
+    description: Receive flagged speech, mute and voice report alerts.
+    default: op
+  voicewarden.reload:
+    description: Use /vw reload.
+    default: op
+  voicewarden.stats:
+    description: Use /vw stats.
+    default: op
+  voicewarden.vcmute:
+    description: Use /vw vcmute and /vw unvcmute.
+    default: op
+  voicewarden.pardon:
+    description: Use /vw pardon.
+    default: op
+  voicewarden.history:
+    description: Use /vw history.
+    default: op
+  voicewarden.mutes:
+    description: Use /vw mutes.
+    default: op
+  voicewarden.report:
+    description: Use /reportvoice.
+    default: true
+  voicewarden.report.review:
+    description: Use /reportinbox and /viewreport.
+    default: op

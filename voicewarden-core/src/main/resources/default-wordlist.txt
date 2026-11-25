@@ -1,0 +1,937 @@
+# VoiceWarden default English wordlist
+#
+# Sections are [EN-PROFANITY] (mild), [EN-MODERATE], [EN-MUTE] (severe) and [EN-ALLOW].
+# VoiceWarden focuses on English by default; additional [XX-*] language sections can be added
+# here and enabled under wordlist.languages in config.yml. Headers are case-insensitive.
+# One word or phrase per line. Lines starting with # are ignored.
+# [EN-ALLOW] entries override every tier: a flagged match inside an allowed word or phrase is ignored.
+# With partial_match: false (the default) entries match whole words only.
+#
+# Curated for spoken English voice moderation from public open-source profanity and slur datasets:
+# - dsojevic/profanity-list (MIT)
+# - words/cuss (MIT)
+# - coffee-and-fun/google-profanity-words (MIT)
+# - LDNOOBW List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words (CC-BY 4.0)
+# Filtered to remove leetspeak and everyday harmless English words, with allowlist protection
+# audited against the 20,000 most common English words.
+
+[EN-PROFANITY]
+fuck
+fucks
+fucked
+fucker
+fuckers
+fucking
+fuckin
+fucken
+fucka
+fuckass
+fuckboy
+fuckface
+fuckhead
+fuckheads
+fuckwad
+fuckwads
+fuckwit
+fuckwits
+fuckwhit
+clusterfuck
+mindfuck
+buttfuck
+butt fuck
+fingerfuck
+fingerfucked
+fingerfucker
+fingerfucking
+fistfuck
+fistfucked
+fistfucker
+fistfucking
+shitfuck
+motherfuck
+motherfucked
+motherfucker
+motherfuckers
+motherfucking
+motherfuckin
+mothafuck
+mothafucka
+mothafuckas
+mothafucked
+mothafucker
+mothafuckers
+mothafuckin
+mothafucking
+shit
+shits
+shite
+shitty
+shittier
+shittiest
+shitting
+shitted
+shitter
+shitters
+shithole
+shitholes
+shithouse
+shithead
+shitheads
+shitface
+shitfaced
+shitstain
+shitstains
+shitshow
+shitfit
+shitdick
+bullshit
+bullshitting
+bullshitter
+apeshit
+ape shit
+batshit
+bat shit
+dipshit
+dipshits
+dogshit
+dog shit
+horseshit
+horse shit
+jackshit
+chickenshit
+dumbshit
+ass
+asses
+asshole
+assholes
+asshat
+asshats
+asswipe
+asswipes
+assclown
+assclowns
+assfucker
+asslick
+asslicker
+assmonkey
+assmunch
+assmuncher
+jackass
+jackasses
+dumbass
+dumbasses
+fatass
+fatasses
+lardass
+arse
+arses
+arsehole
+arseholes
+bitch
+bitches
+bitching
+bitchin
+bitchy
+bitched
+bitcher
+biatch
+dick
+dicks
+dickhead
+dickheads
+dickwad
+dickwads
+dickweed
+dickface
+cock
+cocks
+cockhead
+cockheads
+cocksuck
+cocksucked
+cocksucking
+cocksmoker
+cocksmith
+pussy
+pussies
+prick
+pricks
+twat
+twats
+clunge
+quim
+poon
+poontang
+wank
+wanks
+wanked
+wanker
+wankers
+wanking
+bollock
+bollocks
+bellend
+bellends
+tosser
+tossers
+knobhead
+knobheads
+nobhead
+knobbing
+shagging
+shaggin
+shagged
+chode
+choad
+schlong
+boner
+boners
+ballsack
+ball sack
+boob
+boobs
+tits
+titty
+titties
+juggs
+clit
+clits
+clitoris
+penis
+vagina
+vaginas
+vaginal
+vulva
+anus
+rectum
+scrotum
+pubes
+genitals
+semen
+jizz
+jism
+jizm
+cum
+cums
+cumming
+cummer
+cumshot
+cumshots
+cum shot
+cum shots
+cumbubble
+cumjockey
+spunk
+spooge
+splooge
+queef
+queaf
+douche
+douches
+douchebag
+douchebags
+douchecanoe
+skank
+skanks
+skanky
+hooker
+hookers
+horny
+horniest
+dildo
+dildos
+vibrator
+vibrators
+porn
+porno
+pornos
+pornography
+pornographic
+pornstar
+pornstars
+pornhub
+xvideos
+xhamster
+xnxx
+bangbros
+bangbus
+hentai
+ecchi
+milf
+milfs
+masturbate
+masturbating
+masturbated
+masturbation
+masterbate
+ejaculate
+ejaculating
+ejaculated
+ejaculation
+orgasm
+orgasms
+orgy
+orgies
+threesome
+threesomes
+gangbang
+gangbanged
+gang bang
+bdsm
+bondage
+dominatrix
+femdom
+jack off
+jackoff
+jerk off
+jerkoff
+circlejerk
+circle jerk
+blowjob
+blowjobs
+blow job
+blow jobs
+handjob
+handjobs
+hand job
+footjob
+foot job
+rimjob
+rim job
+rimming
+titfuck
+tit fuck
+deepthroat
+deep throat
+creampie
+cream pie
+bukkake
+fingerbang
+fingerbanging
+fisting
+anilingus
+cunnilingus
+fellatio
+felch
+felching
+pegging
+scissoring
+tribadism
+doggystyle
+doggy style
+doggie style
+reverse cowgirl
+golden shower
+golden showers
+brown shower
+brown showers
+blumpkin
+cleveland steamer
+dirty sanchez
+donkey punch
+rusty trombone
+dry hump
+strap on
+strapon
+ball gag
+ballgag
+camel toe
+booty call
+wet dream
+strip club
+phone sex
+group sex
+gay sex
+gaysex
+sodomize
+sodomise
+sodomy
+sodomist
+anal
+blow your load
+ball kicking
+ball licking
+ball sucking
+shaved pussy
+black cock
+big cock
+giant cock
+big tits
+big breasts
+big knockers
+female squirting
+male squirting
+double penetration
+upskirt
+upskirts
+voyeurweb
+futanari
+gokkun
+shibari
+omorashi
+
+[EN-MODERATE]
+fuck you
+fuck off
+go fuck yourself
+fuck yourself
+shut the fuck up
+stfu
+piece of shit
+pieces of shit
+eat shit
+eat my ass
+kiss my ass
+suck my dick
+suck my cock
+suck my balls
+lick my balls
+son of a bitch
+sons of bitches
+dumb bitch
+stupid bitch
+little bitch
+fat bitch
+ugly bitch
+bitch ass
+bitchass
+fucktard
+fucktards
+libtard
+libtards
+cocksucker
+cocksuckers
+cunt
+cunts
+cuntface
+cuntlick
+cuntlicker
+cuntlicking
+kunt
+kunts
+whore
+whores
+whorehouse
+camwhore
+slut
+sluts
+slutty
+camslut
+rape
+rapes
+raped
+raping
+rapist
+rapists
+date rape
+daterape
+molest
+molested
+molesting
+molester
+molesters
+incest
+bestiality
+beastiality
+zoophilia
+zoophile
+necrophilia
+necrophile
+coprophilia
+coprophile
+coprolagnia
+urophilia
+goregasm
+goatse
+tubgirl
+tub girl
+blue waffle
+bluewaffle
+lemon party
+lemonparty
+meatspin
+meat spin
+two girls one cup
+2girls1cup
+one man one jar
+1man1jar
+one guy one jar
+mr hands
+mrhands
+negro
+negros
+negroes
+chinaman
+chinamen
+ching chong
+honky
+honkey
+honkeys
+honkies
+wigger
+wigga
+whigger
+wog
+wogs
+kraut
+krauts
+pikey
+pikeys
+greaseball
+eyetie
+polack
+polacks
+dago
+wop
+wops
+redskin
+redskins
+squaw
+sheepshagger
+sheep shagger
+frogeater
+frog eater
+lesbo
+lesbos
+lezzie
+lezzies
+shemale
+shemales
+ladyboy
+ladyboys
+lady boy
+homo
+homos
+limp wristed
+butt pirate
+bum pirate
+ass bandit
+arse bandit
+asspirate
+fudge packer
+fudgepacker
+carpet muncher
+carpetmuncher
+muff diver
+muffdiver
+muffdiving
+batty boy
+battyboy
+bum boy
+bumboy
+butt boy
+buttboy
+bum chum
+bumchum
+bum driller
+bum robber
+butt robber
+butt rider
+pole smoker
+peter puffer
+peterpuffer
+piss pig
+pisspig
+anal assassin
+anal astronaut
+bone smuggler
+donut puncher
+swastika
+neonazi
+neo nazi
+ku klux klan
+kkk
+white supremacist
+white supremacy
+
+[EN-MUTE]
+kill yourself
+go kill yourself
+kys
+hang yourself
+neck yourself
+off yourself
+shoot yourself
+slit your wrists
+jump off a bridge
+drink bleach
+hope you die
+i hope you die
+go die
+you should die
+end your life
+commit suicide
+unalive yourself
+retard
+retards
+retarded
+spastic
+spastics
+mongoloid
+mongoloids
+nigger
+niggers
+nigga
+niggas
+niggaz
+niggah
+niglet
+niglets
+nignog
+nig nog
+sand nigger
+sandnigger
+sand niggers
+timber nigger
+timbernigger
+porch monkey
+jungle bunny
+junglebunny
+jigaboo
+jiggaboo
+jiggerboo
+coon
+coons
+dune coon
+doon coon
+spearchucker
+spear chucker
+darkie
+darkies
+darky
+darkey
+golliwog
+gollywog
+chink
+chinks
+chinky
+gook
+gooks
+gooky
+slanteye
+slant eye
+zipperhead
+zipper head
+buddhahead
+buddha head
+spic
+spics
+spick
+spicks
+wetback
+wetbacks
+wet back
+beaner
+beaners
+kike
+kikes
+kyke
+heeb
+heebs
+hymie
+heimie
+raghead
+ragheads
+rag head
+rag heads
+towelhead
+towelheads
+towel head
+camel jockey
+cameljockey
+curry muncher
+currymuncher
+paki
+pakis
+hajji
+hadji
+haji
+petrol sniffer
+swamp guinea
+wagon burner
+fag
+fags
+faggot
+faggots
+fagot
+fagots
+faggy
+fagging
+fag bomb
+dyke
+dykes
+bulldyke
+bulldykes
+tranny
+trannies
+trannie
+cuntboy
+cunt boy
+dickgirl
+dick girl
+pedophile
+pedophiles
+paedophile
+paedophiles
+pedo
+pedos
+paedo
+pedobear
+paedobear
+nambla
+child porn
+kiddie porn
+lolicon
+shotacon
+shota
+jailbait
+jail bait
+pthc
+heil hitler
+sieg heil
+white power
+whitepower
+gas the jews
+death to jews
+hitler did nothing wrong
+
+[EN-ALLOW]
+kick ass
+badass
+ambassador
+assassin
+assassins
+assassination
+assault
+assay
+assemble
+assemblies
+assembly
+assert
+assess
+assessment
+asset
+assign
+assist
+assistant
+associate
+association
+assorted
+assortment
+assume
+assuming
+assumption
+assure
+assurance
+bass
+biomass
+bluegrass
+brass
+bypass
+casserole
+cassette
+chassis
+class
+classes
+classic
+classical
+classics
+classify
+classification
+classified
+classmates
+classroom
+classy
+compass
+compasses
+compassion
+embarrass
+embassy
+encompass
+encompasses
+eyeglasses
+fiberglass
+glass
+glasses
+glassware
+grass
+grassroots
+harass
+harassment
+hassle
+hourglass
+lasso
+mass
+masses
+massachusetts
+massacre
+massage
+massive
+molasses
+morass
+nassau
+overpass
+pass
+passes
+passed
+passing
+passage
+passenger
+passion
+passionate
+passive
+passport
+password
+picasso
+potassium
+reassure
+sassy
+subclass
+sunglasses
+surpass
+surpasses
+tallahassee
+tassel
+trespass
+trespasses
+underpass
+vassal
+arsenal
+arsenic
+charset
+coarse
+hearse
+parse
+parser
+rehearse
+sparse
+analysis
+analyses
+analyst
+analysts
+analyze
+analyzed
+analyzing
+analyzes
+analyzer
+analyse
+analysed
+analytic
+analytics
+analytical
+analog
+analogue
+analogy
+analogies
+analogous
+canal
+canals
+banal
+manuscript
+manuscripts
+tetanus
+accumulate
+accumulated
+accumulating
+accumulation
+circumstance
+circumstances
+cucumber
+cucumbers
+cumberland
+cumbersome
+cumbria
+cummings
+cumulative
+document
+documents
+documented
+documenting
+documentary
+documentaries
+documentation
+incumbent
+succumb
+advertisement
+advertisements
+amusement
+basement
+easement
+endorsement
+horsemen
+reimbursement
+warehousemen
+grape
+grapes
+drape
+draper
+drapery
+therapist
+therapists
+therapeutic
+trapeze
+cockatoo
+cockpit
+cockroach
+cocktail
+hancock
+hitchcock
+peacock
+shuttlecock
+dickens
+dickinson
+dickson
+spoon
+spoons
+teaspoon
+tablespoon
+harpoon
+lampoon
+prickly
+saltwater
+wristwatch
+outwatch
+pussycat
+shitake
+scunthorpe
+spice
+spices
+spiced
+spicy
+despicable
+suspicion
+suspicious
+hospice
+auspicious
+conspicuous
+raccoon
+raccoons
+cocoon
+tycoon
+barracoon
+snigger
+sniggered
+pakistan
+pakistani
+pakistanis
+torpedo
+torpedoes
+pedometer
+retardant
+flame retardant
+fire retardant
+retardation
+homosexual
+homosexuality
+homophobia
+homophobic
+homogeneous
+sophomore
+montenegro
+sauerkraut
+polliwog
+pollywog
+gobbledegook
+gobbledygook
+van dyke
+milford

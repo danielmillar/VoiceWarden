@@ -1,0 +1,317 @@
+# VoiceWarden configuration.
+# All speech processing runs on this server. Audio never leaves the Minecraft host.
+# New options are added here automatically on upgrade. Your comments and values are kept.
+
+# Schema version of this file. VoiceWarden manages it. Do not edit.
+config-version: 2
+
+# Identifies this server in shared storage, staff alerts and Discord embeds.
+# Give each server on a network its own id when they share a MySQL/MariaDB database.
+server_id: "server-1"
+
+# Voice chat mod to hook into: AUTO | SVC | PLASMOVOICE
+# AUTO picks Simple Voice Chat or PlasmoVoice, whichever is installed.
+voice_backend: AUTO
+
+# Also listen to audio inside voice chat groups, not only proximity chat.
+monitor_groups: true
+
+# Speech recognition engine. It runs as a separate low-priority process on this machine.
+engine:
+  # Model profile: ENGLISH_ACCURATE | ENGLISH | MULTILANG | MULTILANG_GLOBAL
+  # ENGLISH_ACCURATE: default, best for noisy or accented English, about 1.3-1.6 GB RAM.
+  # ENGLISH: fastest lightweight English streaming, about 700-950 MB RAM.
+  # MULTILANG: 25 European languages, about 1.2-1.5 GB RAM.
+  # MULTILANG_GLOBAL: 99 languages, about 1.8-2.2 GB RAM.
+  profile: ENGLISH_ACCURATE
+  # CPU threads the engine may use for recognition.
+  threads: 2
+  # Memory cap for the engine process in megabytes.
+  max_memory_mb: 2048
+  # Folder for downloaded speech models, relative to the plugin folder.
+  models_dir: "models"
+  # Download missing models on startup. Turn off to install archives by hand.
+  auto_download: true
+  # OS scheduling priority for the engine process (0-19). Higher is gentler on the server.
+  nice_priority: 10
+  # A second, different model re-checks every hit before anyone is punished.
+  double_check:
+    # Run the verifier model on every hit.
+    enabled: true
+    # Hits the verifier rejects are only reported to staff as [unconfirmed].
+    # They never warn, mute, add a strike or run commands.
+    require_confirmation: true
+  # A small neural voice detector (Silero VAD) skips speech recognition for audio with no speech,
+  # such as fan hum or mic bumps. The model (about 0.6 MB) downloads with the others.
+  # If it is missing and auto_download is off, every utterance is still checked, just without this filter.
+  silero_vad:
+    # Skip recognition for audio the detector hears no speech in.
+    enabled: true
+    # Speech confidence needed to count as speech (0.05-0.95). Lower catches quieter speech.
+    threshold: 0.5
+    # Shortest burst of speech that counts, in milliseconds. Keep it low so single words still count.
+    min_speech_duration_ms: 150
+    # Pause in milliseconds that splits speech into separate parts.
+    min_silence_duration_ms: 300
+
+# Audio capture and voice activity detection.
+audio:
+  # Silence in milliseconds that ends an utterance.
+  silence_threshold_ms: 500
+  # Utterances shorter than this are ignored.
+  min_audio_duration_ms: 200
+  # Longest utterance before it is cut and checked (5-60).
+  max_utterance_seconds: 15
+  # Check speech while the player is still talking, not only at the end of a sentence.
+  live_detection: true
+  # Size of each live audio chunk in milliseconds.
+  live_chunk_ms: 200
+  # Audio kept from just before speech starts, so first syllables are not lost.
+  pre_roll_ms: 200
+  # Loudness gate for speech detection. Raise it if background noise triggers checks.
+  vad_rms_threshold: 220.0
+  # Threads decoding and slicing voice audio.
+  worker_threads: 2
+  # Catches mic spam: sustained clipped, distorted or ear-splitting audio, even when it is not speech.
+  # Normal loud speech and shouting stay below these limits.
+  mic_spam:
+    enabled: true
+    # A sample at or above this level (out of 32767) counts as clipped.
+    clipping_sample_threshold: 28000
+    # Share of clipped samples (0.01-1.0) that makes a moment of audio count as clipping.
+    clipping_ratio: 0.12
+    # Loudness (RMS, out of 32767) that makes a moment of audio count as extreme.
+    rms_threshold: 15000.0
+    # How long clipping or extreme loudness must last before VoiceWarden acts (100-10000).
+    min_duration_ms: 800
+    # Seconds before the same player can trigger again, so one blast acts once.
+    cooldown_seconds: 15
+    # Actions taken on repeat mic-spam hits inside window_minutes: report, warn, mute.
+    # With [warn, mute], the first blast warns the player and the second mutes them.
+    escalation: [warn, mute]
+    # Rolling window in minutes for counting repeat mic-spam hits (1-1440).
+    window_minutes: 5
+    # How long a MUTE action lasts.
+    mute_duration: "5m"
+    # Post an alert to the discord webhook, with the clip when discord.include_audio is on.
+    # MUTE always posts to discord_mute, like every other mute.
+    notify_discord: true
+
+# Word and rule matching. Main lists live in config/wordlist.txt and config/rules.yml.
+wordlist:
+  # Language sections of wordlist.txt to load. Defaults to English only ([en]).
+  languages: [en]
+  # Match words inside longer words. Off matches whole words only.
+  partial_match: false
+  # Treat upper and lower case as different words.
+  case_sensitive: false
+  # Extra mild words, added to the profanity tier.
+  profanity_words: []
+  # Extra severe words, which mute straight away.
+  mute-list: []
+  # Words that are never flagged, even if a list above contains them.
+  allow_words: []
+
+# Strikes, auto-warnings and auto-mutes.
+moderation:
+  # Strikes inside the window needed to move one step up an escalation ladder.
+  # The step is strikes / flag_threshold, held at the last step.
+  # With flag_threshold: 2 and the default ladders:
+  #   mild     -> strike 1 reports to staff, strikes 2-3 auto-warn, strike 4+ auto-mutes
+  #   moderate -> strike 1 auto-warns, strike 2+ auto-mutes
+  #   severe   -> strike 1 auto-mutes immediately
+  flag_threshold: 2
+  # Rolling window in minutes for counting strikes.
+  window_minutes: 10
+  # Count strikes from every server sharing the same MySQL/MariaDB database.
+  network_strikes: true
+  # Actions per severity tier, in order: report, warn, mute.
+  # The highest matched tier in a sentence decides which ladder is used.
+  escalation:
+    mild: [report, warn, mute]
+    moderate: [warn, mute]
+    severe: [mute]
+  # Link shown in the appeal message. Leave empty to hide it.
+  appeal_url: ""
+  # Send VoiceWarden's own warning message when the action is warn.
+  auto_warn_builtin: true
+  # Apply VoiceWarden's own voice mute when the action is mute.
+  # Turn off if custom commands or another plugin handle muting.
+  auto_mute_builtin: true
+
+# Mute lengths that grow with repeat offences.
+mute_ladder:
+  # Off uses mute-duration-minutes for every mute.
+  enabled: true
+  # Mute number -> length. Units: s, m, h, d, w. Offences past the last tier use the last tier.
+  tiers:
+    1: "5m"
+    2: "15m"
+    3: "30m"
+    4: "1h"
+    5: "6h"
+  # No ladder mute is longer than this.
+  max_tier_duration: "24h"
+  # Mutes older than this many days no longer count toward the ladder.
+  reset_after_days: 30
+  # Mute length in minutes when the ladder is off.
+  mute-duration-minutes: 60
+
+# How muted players are silenced.
+mutes:
+  # NATIVE blocks voice in the voice mod. LUCKPERMS removes the voice permission instead.
+  enforcement: NATIVE
+  # With NATIVE, also mirror mutes to LuckPerms.
+  mirror_luckperms: false
+  # What a muted player cannot do (Simple Voice Chat). PlasmoVoice mutes block all voice.
+  block:
+    # Talking in proximity chat.
+    proximity: true
+    # Whispering.
+    whisper: true
+    # Talking in groups: ALL | NONE | OPEN_ONLY
+    groups: ALL
+    # Group names a muted player may still talk in.
+    allowed_groups: []
+    # Also stop the muted player hearing others.
+    listen: false
+  # Where muted players see their mute: ACTION_BAR | BOSS_BAR | CHAT | NONE
+  indicator: ACTION_BAR
+  # Tell muted players when they try to talk.
+  notify_on_attempt: true
+  # Seconds between those reminders.
+  attempt_cooldown_seconds: 30
+
+# Asking players to agree to voice monitoring.
+consent:
+  # Off monitors everyone without asking.
+  enabled: true
+  # NOTICE auto-accepts on join after showing a chat notice until the player denies.
+  # GUI opens an Accept / Rules / Deny menu (a form on Bedrock) before voice chat works.
+  mode: NOTICE
+  # When a player denies: IGNORE disables voice chat until they accept, KICK removes them.
+  on_deny: IGNORE
+  # Raise this after changing your rules. Everyone is asked again, including online players.
+  rules_version: 1
+  # Ticks after joining before the consent menu opens.
+  gui_delay_ticks: 40
+
+# Rolling transcript history kept in memory for voice reports.
+transcripts:
+  # Seconds of history kept per player. 43200 is 12 hours.
+  retention_seconds: 43200
+  # Most lines kept per player.
+  max_lines_per_player: 500
+  # Lines from other nearby players added to Discord alerts and voice reports. 0 turns this off.
+  context_lines: 4
+  # Seconds before a flag or mute that nearby speech is taken from.
+  context_window_seconds: 60
+  # Blocks within which another player counts as nearby. Players in the same voice group always count.
+  context_radius_blocks: 48
+
+# /reportvoice lets players send staff a player's recent transcript.
+voice_report:
+  enabled: true
+  # How players pick the time window: command | gui
+  mode: command
+  # Minutes of transcript attached when the player gives none.
+  default_minutes: 5
+  # Smallest window a player may request.
+  min_minutes: 1
+  # Largest window a player may request.
+  max_minutes: 30
+  # Buttons shown in gui mode.
+  preset_minutes: [1, 5, 10, 15]
+  # Seconds a player must wait between reports.
+  cooldown_seconds: 60
+  # Open reports one player may have at once.
+  max_concurrent_reports: 3
+  # Print the whole transcript in staff chat instead of only the Open book link.
+  staff_chat_full_transcript: false
+  # Discord webhook for voice reports. Leave empty to disable.
+  webhook_url: ""
+  # Attach a playable clip of the reported player's recent voice to the report webhook.
+  include_audio: true
+  # Seconds of recent voice kept in memory per speaker for report clips (0 to 120). 0 turns capture off.
+  audio_buffer_seconds: 45
+
+# Discord webhook for flagged speech.
+discord:
+  enabled: false
+  webhook_url: ""
+  # Name and avatar the webhook posts as.
+  username: "VoiceWarden"
+  avatar_url: ""
+  # Embed colour as a hex code.
+  color: "#E74C3C"
+  title: "Voice chat flagged"
+  footer: "VoiceWarden"
+  # Discord role ids to mention, for example ["123456789012345678"].
+  role_pings: []
+  # Include the transcript for: flagged | muted | both | none
+  include_transcript: both
+  # Add server id, player count and TPS.
+  include_server_info: true
+  # Attach the offending audio as a WAV file.
+  include_audio: false
+  # Seconds to wait for Discord before giving up on one attempt.
+  timeout_seconds: 10
+  # Extra attempts after a failure.
+  max_retries: 3
+
+# Discord webhook for mutes and unmutes.
+discord_mute:
+  enabled: false
+  webhook_url: ""
+  username: "VoiceWarden"
+  avatar_url: ""
+  color: "#F39C12"
+  title: "Voice mute"
+  footer: "VoiceWarden"
+  role_pings: []
+  # Include the transcript for: flagged | muted | both | none
+  include_transcript: muted
+  include_server_info: true
+  include_audio: false
+  timeout_seconds: 10
+  max_retries: 3
+
+# Console commands run on moderation events.
+# Placeholders: {player}, {words}, {transcript}. Line breaks are removed from values.
+# Order: keyword_commands first. If one fires, mute_commands and profanity_commands are skipped.
+commands:
+  # Keyword -> commands. Each keyword runs at most once per player per session.
+  keyword_commands: {}
+  # Run when the action is mute.
+  mute_commands: []
+  # Run when speech is flagged and the action is report or warn.
+  profanity_commands: []
+  # Whether VoiceWarden's own warning or mute still applies after each kind of command runs.
+  # Turn one off to let those commands handle the punishment instead.
+  auto_mute_builtin:
+    on_keyword_command: true
+    on_mute_command: true
+    on_profanity_command: true
+
+# Where strikes, mutes and reports are stored.
+storage:
+  # SQLITE | MYSQL | MARIADB. Use MySQL or MariaDB to share strikes between servers.
+  type: SQLITE
+  host: "localhost"
+  port: 3306
+  database: "voicewarden"
+  username: "voicewarden"
+  password: ""
+  # Extra JDBC URL parameters, for example "useSSL=false".
+  jdbc_params: ""
+  max_pool_size: 10
+  # Milliseconds before a database query is abandoned and the in-memory fallback is used.
+  query_timeout_ms: 2000
+
+# PlaceholderAPI placeholders such as %voicewarden_muted%.
+placeholder_api:
+  enabled: true
+
+# Check for new VoiceWarden releases on startup.
+update_check:
+  enabled: true

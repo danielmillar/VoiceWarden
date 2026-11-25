@@ -1,0 +1,48 @@
+[versions]
+paper-api = "1.21.4-R0.1-SNAPSHOT"
+voicechat-api = "2.5.27"
+plasmovoice-api = "2.1.4"
+floodgate-api = "2.2.4-SNAPSHOT"
+luckperms-api = "5.4"
+placeholderapi = "2.11.6"
+concentus = "1.0.1"
+sherpa-onnx = "2.0.3"
+sqlite-jdbc = "3.49.1.0"
+mariadb-java-client = "3.5.2"
+mysql-connector-j = "9.2.0"
+hikaricp = "6.2.1"
+snakeyaml = "2.3"
+gson = "2.12.1"
+commons-compress = "1.27.1"
+slf4j = "2.0.16"
+junit-bom = "5.11.4"
+mockito = "5.15.2"
+shadow = "8.3.6"
+detekt = "1.23.8"
+
+[libraries]
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
+voicechat-api = { module = "de.maxhenkel.voicechat:voicechat-api", version.ref = "voicechat-api" }
+plasmovoice-api = { module = "su.plo.voice.api:server", version.ref = "plasmovoice-api" }
+floodgate-api = { module = "org.geysermc.floodgate:api", version.ref = "floodgate-api" }
+luckperms-api = { module = "net.luckperms:api", version.ref = "luckperms-api" }
+placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderapi" }
+concentus = { module = "io.github.jaredmdobson:concentus", version.ref = "concentus" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+mariadb-java-client = { module = "org.mariadb.jdbc:mariadb-java-client", version.ref = "mariadb-java-client" }
+mysql-connector-j = { module = "com.mysql:mysql-connector-j", version.ref = "mysql-connector-j" }
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit-bom" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
