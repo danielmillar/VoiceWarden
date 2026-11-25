@@ -261,6 +261,25 @@ class ResilientStorageManagerTest {
     }
 
     @Test
+    void reconnectImmediatelyAfterAFailedAttemptStartsAFreshAttempt() throws Exception {
+        for (int i = 0; i < 50; i++) {
+            AtomicBoolean databaseUp = new AtomicBoolean(false);
+            InMemoryFallbackStore database = new InMemoryFallbackStore("lobby");
+            ResilientStorageManager storage = manager(() -> {
+                if (!databaseUp.get()) {
+                    throw new java.sql.SQLException("Connection refused");
+                }
+                return database;
+            }, Duration.ofMinutes(1));
+            storage.start();
+            assertFalse(storage.reconnectNow().get(2, TimeUnit.SECONDS));
+            databaseUp.set(true);
+            assertTrue(storage.reconnectNow().get(2, TimeUnit.SECONDS), "iteration " + i);
+            storage.close();
+        }
+    }
+
+    @Test
     void asyncHelpersRunOnVirtualThreads() throws Exception {
         ResilientStorageManager storage = manager(() -> new SqliteStorageProvider(sqliteConfig()), Duration.ofMinutes(1));
         storage.start();

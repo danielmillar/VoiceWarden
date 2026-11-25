@@ -123,12 +123,13 @@ public final class ResilientStorageManager implements StorageProvider {
         }
         try {
             virtualThreads.execute(() -> {
+                boolean connected = false;
                 try {
-                    attempt.complete(connect());
-                } catch (RuntimeException e) {
-                    attempt.complete(false);
+                    connected = connect();
+                } catch (RuntimeException ignored) {
                 } finally {
                     connectAttempt.compareAndSet(attempt, null);
+                    attempt.complete(connected);
                 }
             });
         } catch (RuntimeException e) {
