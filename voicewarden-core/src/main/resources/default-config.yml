@@ -19,7 +19,7 @@ monitor_groups: true
 # Speech recognition engine. It runs as a separate low-priority process on this machine.
 engine:
   # Model profile: ENGLISH_ACCURATE | ENGLISH | MULTILANG | MULTILANG_GLOBAL
-  # ENGLISH_ACCURATE: default, best for noisy or accented English, about 1.3-1.6 GB RAM.
+  # ENGLISH_ACCURATE: default, best for noisy or accented English, up to 1.6 GB RAM.
   # ENGLISH: fastest lightweight English streaming, about 700-950 MB RAM.
   # MULTILANG: 25 European languages, about 1.2-1.5 GB RAM.
   # MULTILANG_GLOBAL: 99 languages, about 1.8-2.2 GB RAM.
@@ -35,6 +35,7 @@ engine:
   # OS scheduling priority for the engine process (0-19). Higher is gentler on the server.
   nice_priority: 10
   # A second, different model re-checks every hit before anyone is punished.
+  # Only the ENGLISH profile has a verifier. Other profiles ignore this section.
   double_check:
     # Run the verifier model on every hit.
     enabled: true

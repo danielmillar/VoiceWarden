@@ -108,7 +108,7 @@ public final class VoiceModerationPipeline implements AudioEventSink, EngineResu
 
         public static Settings from(VoiceWardenConfig config) {
             return new Settings(
-                    config.engine().doubleCheckEnabled() && ConfigBridges.supportsDoubleCheck(config.engine().profile()),
+                    config.engine().doubleCheckActive(),
                     config.moderation().appealUrl(),
                     config.audio().maxUtteranceSamples16k(),
                     config.serverId(),

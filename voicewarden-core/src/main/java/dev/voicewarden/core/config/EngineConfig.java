@@ -14,15 +14,29 @@ public record EngineConfig(
         SileroVadConfig sileroVad) {
 
     public enum Profile {
-        ENGLISH,
-        ENGLISH_ACCURATE,
-        MULTILANG,
-        MULTILANG_GLOBAL
+        ENGLISH(true),
+        ENGLISH_ACCURATE(false),
+        MULTILANG(false),
+        MULTILANG_GLOBAL(false);
+
+        private final boolean hasDoubleCheckVerifier;
+
+        Profile(boolean hasDoubleCheckVerifier) {
+            this.hasDoubleCheckVerifier = hasDoubleCheckVerifier;
+        }
+
+        public boolean hasDoubleCheckVerifier() {
+            return hasDoubleCheckVerifier;
+        }
     }
 
     public EngineConfig {
         Objects.requireNonNull(profile, "profile");
         Objects.requireNonNull(modelsDir, "modelsDir");
         Objects.requireNonNull(sileroVad, "sileroVad");
+    }
+
+    public boolean doubleCheckActive() {
+        return doubleCheckEnabled && profile.hasDoubleCheckVerifier();
     }
 }

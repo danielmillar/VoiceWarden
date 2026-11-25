@@ -24,7 +24,7 @@ class EngineOptionsTest {
         assertEquals(4, options.workers());
         assertEquals(9, options.maxQueuedPerLane());
         assertFalse(options.autoDownload());
-        assertTrue(options.doubleCheck());
+        assertFalse(options.doubleCheck());
     }
 
     @Test
@@ -33,8 +33,10 @@ class EngineOptionsTest {
         assertEquals(new IpcEndpoint.Unix(Path.of("/tmp/vw.sock")), defaults.endpoint());
         assertEquals(EngineProfile.ENGLISH_ACCURATE, defaults.profile());
         assertTrue(defaults.autoDownload());
-        assertTrue(defaults.doubleCheck());
-        assertFalse(EngineOptions.parse(new String[] {"--ipc-port", "1", "--no-double-check"}).doubleCheck());
+        assertFalse(defaults.doubleCheck());
+        assertTrue(EngineOptions.parse(new String[] {"--ipc-port", "1", "--profile", "ENGLISH"}).doubleCheck());
+        assertFalse(EngineOptions.parse(new String[] {"--ipc-port", "1", "--profile", "ENGLISH", "--no-double-check"})
+                .doubleCheck());
         assertFalse(EngineOptions.parse(new String[] {"--ipc-port", "1", "--profile", "MULTILANG"}).doubleCheck());
     }
 

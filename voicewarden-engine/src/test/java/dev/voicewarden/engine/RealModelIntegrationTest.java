@@ -84,7 +84,6 @@ class RealModelIntegrationTest {
         ModelDownloader models = new ModelDownloader(modelsDir, false, VerifiedDownloader.createDefault());
         EngineProfile profile = EngineProfile.ENGLISH_ACCURATE;
         Path primary = models.ensure(profile.primary());
-        Path verifier = models.ensure(profile.verifier().orElseThrow());
         Path jfkWav = models.ensure(EngineProfile.ENGLISH.primary()).resolve("test_wavs").resolve("0.wav");
         short[] full = readPcm(jfkWav);
         short[] singleWordAsk = Arrays.copyOfRange(full, 40 * 16, 420 * 16);
@@ -92,31 +91,31 @@ class RealModelIntegrationTest {
         short[] singleWordCountry = Arrays.copyOfRange(full, 3200 * 16, 3750 * 16);
         short[] loudAsk = scale(singleWordAsk, 2.5f);
 
-        try (SherpaOnnxSpeechEngine engine = SherpaOnnxSpeechEngine.create(profile, primary, verifier, 2,
+        try (SherpaOnnxSpeechEngine engine = SherpaOnnxSpeechEngine.create(profile, primary, null, 2,
                 new DoubleCheckEvaluator())) {
             assertFalse(engine.supportsStreaming());
-            assertTrue(engine.hasDoubleCheckVerifier());
+            assertFalse(engine.hasDoubleCheckVerifier());
 
             RecognitionOutput fullResult = engine.transcribeFinal(PLAYER, 9, full, true);
             assertEquals("ask not what your country can do for you ask what you can do for your country",
                     DoubleCheckEvaluator.normalize(fullResult.text()));
-            assertEquals(ConfirmationState.CONFIRMED, fullResult.confirmation());
+            assertEquals(ConfirmationState.UNCHECKED, fullResult.confirmation());
 
             RecognitionOutput askFinal = engine.transcribeFinal(PLAYER, 10, singleWordAsk, true);
             assertEquals("ask", DoubleCheckEvaluator.normalize(askFinal.text()));
-            assertEquals(ConfirmationState.CONFIRMED, askFinal.confirmation());
+            assertEquals(ConfirmationState.UNCHECKED, askFinal.confirmation());
 
             RecognitionOutput askSecondFinal = engine.transcribeFinal(PLAYER, 11, singleWordAskSecond, true);
             assertEquals("ask", DoubleCheckEvaluator.normalize(askSecondFinal.text()));
-            assertEquals(ConfirmationState.CONFIRMED, askSecondFinal.confirmation());
+            assertEquals(ConfirmationState.UNCHECKED, askSecondFinal.confirmation());
 
             RecognitionOutput countryFinal = engine.transcribeFinal(PLAYER, 12, singleWordCountry, true);
             assertEquals("country", DoubleCheckEvaluator.normalize(countryFinal.text()));
-            assertEquals(ConfirmationState.CONFIRMED, countryFinal.confirmation());
+            assertEquals(ConfirmationState.UNCHECKED, countryFinal.confirmation());
 
             RecognitionOutput loudAskFinal = engine.transcribeFinal(PLAYER, 13, loudAsk, true);
             assertEquals("ask", DoubleCheckEvaluator.normalize(loudAskFinal.text()));
-            assertEquals(ConfirmationState.CONFIRMED, loudAskFinal.confirmation());
+            assertEquals(ConfirmationState.UNCHECKED, loudAskFinal.confirmation());
         }
     }
 
