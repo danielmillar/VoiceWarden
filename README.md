@@ -70,7 +70,7 @@ Build the shaded plugin JAR (which bundles `voicewarden-engine` inside `META-INF
 ./gradlew :voicewarden-plugin:shadowJar
 ```
 
-The built plugin lands at `voicewarden-plugin/build/libs/VoiceWarden-1.0.0-SNAPSHOT.jar`.
+The built plugin lands at `voicewarden-plugin/build/libs/VoiceWarden-1.0.0.jar`.
 
 ## Repository layout
 

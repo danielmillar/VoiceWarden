@@ -1,0 +1,79 @@
+name: Release
+
+# Trigger either by pushing a matching tag (`git tag v1.0.0 && git push origin v1.0.0`)
+# or via workflow_dispatch from `main` (which tags HEAD at `v<version>` from build.gradle.kts).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish release
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Resolve and validate release version
+        id: version
+        run: |
+          version=$(./gradlew -q properties --property version --no-daemon | sed -n 's/^version: //p')
+          if [ -z "$version" ]; then
+            echo "Could not read version from Gradle"
+            exit 1
+          fi
+          case "$version" in
+            *-SNAPSHOT)
+              echo "Refusing to publish snapshot version $version"
+              exit 1
+              ;;
+          esac
+          tag="v$version"
+          tag_exists=false
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            if [ "$tag" != "$GITHUB_REF_NAME" ]; then
+              echo "Tag $GITHUB_REF_NAME does not match version $version in build.gradle.kts"
+              exit 1
+            fi
+            tag_exists=true
+          elif git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            existing_sha=$(git rev-parse "refs/tags/$tag^{commit}")
+            if [ "$existing_sha" != "$GITHUB_SHA" ]; then
+              echo "Tag $tag already exists on $existing_sha (expected $GITHUB_SHA)"
+              exit 1
+            fi
+            tag_exists=true
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "tag_exists=$tag_exists" >> "$GITHUB_OUTPUT"
+      - run: ./gradlew check :voicewarden-plugin:shadowJar --continue --no-daemon
+      - name: Tag and create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TAG_EXISTS: ${{ steps.version.outputs.tag_exists }}
+          JAR: voicewarden-plugin/build/libs/VoiceWarden-${{ steps.version.outputs.version }}.jar
+        run: |
+          sha256sum "$JAR" | sed 's#voicewarden-plugin/build/libs/##' > "$JAR.sha256"
+          cp "$JAR" voicewarden-plugin/build/libs/VoiceWarden.jar
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$TAG_EXISTS" != "true" ]; then
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$TAG"
+          fi
+          gh release create "$TAG" "$JAR" "$JAR.sha256" voicewarden-plugin/build/libs/VoiceWarden.jar \
+            --verify-tag --generate-notes --title "VoiceWarden $TAG"
