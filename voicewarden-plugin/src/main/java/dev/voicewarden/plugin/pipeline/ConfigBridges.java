@@ -124,10 +124,6 @@ public final class ConfigBridges {
         return ModerationEngine.create(config.moderationSettings(), config.muteLadder(), config.commands(), persistence);
     }
 
-    public static boolean supportsDoubleCheck(EngineConfig.Profile profile) {
-        return profile == EngineConfig.Profile.ENGLISH || profile == EngineConfig.Profile.ENGLISH_ACCURATE;
-    }
-
     public static boolean engineRestartNeeded(EngineConfig previous, EngineConfig next) {
         return previous.profile() != next.profile()
                 || previous.threads() != next.threads()
@@ -135,7 +131,7 @@ public final class ConfigBridges {
                 || !previous.modelsDir().equals(next.modelsDir())
                 || previous.autoDownload() != next.autoDownload()
                 || previous.nicePriority() != next.nicePriority()
-                || previous.doubleCheckEnabled() != next.doubleCheckEnabled()
+                || previous.doubleCheckActive() != next.doubleCheckActive()
                 || !previous.sileroVad().equals(next.sileroVad());
     }
 

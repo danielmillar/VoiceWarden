@@ -10,7 +10,7 @@ Incoming voice packets are decoded to 16 kHz mono PCM on dedicated worker thread
 
 Utterances that pass the loudness gate cross a local socket into `voicewarden-engine`, a separate low-priority JVM process scheduled at `nice_priority: 10` so speech inference cannot stall gameplay ticks or take down the server. Inside the engine, Silero VAD filters out fan hum, keyboard noise, and mic bumps, sending only utterances that contain human speech to sherpa-onnx.
 
-Single-model speech recognition makes mistakes on noisy microphones, which is why English profiles pair two distinct models. Once the primary recognizer matches a word or rule, VoiceWarden re-checks that exact clip with `whisper-distil-small.en` before warning, muting, or recording a strike. Hits the verifier rejects still alert staff as unconfirmed, leaving innocent players unpunished.
+The lighter `ENGLISH` profile runs a small streaming model, so it pairs it with a second model, Double Check. Once the streaming recognizer matches a word or rule, VoiceWarden re-checks that exact clip with `whisper-distil-small.en` before warning, muting, or recording a strike. Hits the verifier rejects still alert staff as unconfirmed, leaving innocent players unpunished. The other profiles act on their primary model alone, because a smaller verifier than the primary would reject more real hits than it catches mistakes.
 
 ## Capabilities
 
@@ -27,7 +27,7 @@ Select a profile under `engine.profile` in `config.yml`. Missing models and `sil
 
 | Profile | Primary model | Verifier (Double Check) | Typical RAM |
 |---|---|---|---|
-| `ENGLISH_ACCURATE` (default) | NeMo Parakeet TDT 0.6B v2 (INT8) | Whisper Distil-Small EN | 1.3–1.6 GB |
+| `ENGLISH_ACCURATE` (default) | NeMo Parakeet TDT 0.6B v2 (INT8) | None | Up to 1.6 GB |
 | `ENGLISH` | Streaming Zipformer Kroko EN | Whisper Distil-Small EN | 700–950 MB |
 | `MULTILANG` | NeMo Parakeet TDT 0.6B v3 (INT8, 25 European languages) | None | 1.2–1.5 GB |
 | `MULTILANG_GLOBAL` | Whisper Turbo (99 languages) | None | 1.8–2.2 GB |

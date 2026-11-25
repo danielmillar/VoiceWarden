@@ -87,19 +87,32 @@ class ConfigBridgesTest {
 
     @Test
     void engineFlagsFollowTheConfig() {
-        EngineConfig defaults = config().engine();
+        EngineConfig defaults = config("profile: ENGLISH_ACCURATE", "profile: ENGLISH").engine();
         List<String> vadDefaults = List.of(ConfigBridges.ARG_VAD_THRESHOLD, "0.5", ConfigBridges.ARG_VAD_MIN_SPEECH_MS, "150",
                 ConfigBridges.ARG_VAD_MIN_SILENCE_MS, "300");
         assertEquals(vadDefaults, ConfigBridges.engineArgs(defaults));
-        EngineConfig offline = config("auto_download: true", "auto_download: false",
+        EngineConfig offline = config("profile: ENGLISH_ACCURATE", "profile: ENGLISH",
+                "auto_download: true", "auto_download: false",
                 "    enabled: true\n    # Hits the verifier", "    enabled: false\n    # Hits the verifier").engine();
         List<String> offlineArgs = new ArrayList<>(List.of(ConfigBridges.ARG_NO_AUTO_DOWNLOAD,
                 ConfigBridges.ARG_NO_DOUBLE_CHECK));
         offlineArgs.addAll(vadDefaults);
         assertEquals(offlineArgs, ConfigBridges.engineArgs(offline));
         assertTrue(ConfigBridges.engineRestartNeeded(defaults, offline));
-        EngineConfig confirmationOnly = config("require_confirmation: true", "require_confirmation: false").engine();
+        EngineConfig confirmationOnly = config("profile: ENGLISH_ACCURATE", "profile: ENGLISH",
+                "require_confirmation: true", "require_confirmation: false").engine();
         assertFalse(ConfigBridges.engineRestartNeeded(defaults, confirmationOnly));
+    }
+
+    @Test
+    void doubleCheckToggleIsIgnoredOnProfilesWithoutAVerifier() {
+        EngineConfig accurate = config().engine();
+        EngineConfig accurateOff = config("    enabled: true\n    # Hits the verifier",
+                "    enabled: false\n    # Hits the verifier").engine();
+        assertEquals(EngineConfig.Profile.ENGLISH_ACCURATE, accurate.profile());
+        assertTrue(accurate.doubleCheckEnabled());
+        assertFalse(accurate.doubleCheckActive());
+        assertFalse(ConfigBridges.engineRestartNeeded(accurate, accurateOff));
     }
 
     @Test
@@ -150,14 +163,6 @@ class ConfigBridgesTest {
     @Test
     void windowsUsesLoopbackTcp() {
         assertInstanceOf(IpcEndpoint.Tcp.class, ConfigBridges.engineEndpoint(DATA, true, Path.of("C:/tmp")));
-    }
-
-    @Test
-    void onlyEnglishProfilesSupportDoubleCheck() {
-        assertTrue(ConfigBridges.supportsDoubleCheck(EngineConfig.Profile.ENGLISH));
-        assertTrue(ConfigBridges.supportsDoubleCheck(EngineConfig.Profile.ENGLISH_ACCURATE));
-        assertFalse(ConfigBridges.supportsDoubleCheck(EngineConfig.Profile.MULTILANG));
-        assertFalse(ConfigBridges.supportsDoubleCheck(EngineConfig.Profile.MULTILANG_GLOBAL));
     }
 
     @Test

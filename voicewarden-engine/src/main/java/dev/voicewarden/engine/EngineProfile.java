@@ -21,8 +21,8 @@ public enum EngineProfile {
                     "6fc4426b54aa549a0019b8a75b8dea59164e71790a37ac56a045ad57f915f714",
                     ModelKind.OFFLINE_TRANSDUCER,
                     "nemo_transducer"),
-            Verifiers.WHISPER_DISTIL_SMALL_EN,
-            true,
+            null,
+            false,
             "en"),
     MULTILANG(
             ModelArtifact.sherpaRelease(

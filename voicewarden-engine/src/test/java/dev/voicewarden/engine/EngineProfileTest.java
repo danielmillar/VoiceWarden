@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.voicewarden.core.config.EngineConfig;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
@@ -28,16 +29,16 @@ class EngineProfileTest {
     }
 
     @Test
-    void englishAccurateUsesParakeetV2AndWhisperDoubleCheck() {
+    void englishAccurateUsesParakeetV2WithoutVerifier() {
         EngineProfile p = EngineProfile.ENGLISH_ACCURATE;
         assertEquals("sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8", p.primary().id());
         assertEquals(BASE + "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
                 p.primary().downloadUrl().toString());
         assertEquals(ModelKind.OFFLINE_TRANSDUCER, p.primary().kind());
         assertEquals("nemo_transducer", p.primary().modelType());
-        assertEquals("sherpa-onnx-whisper-distil-small.en", p.verifier().orElseThrow().id());
+        assertTrue(p.verifier().isEmpty());
         assertFalse(p.streaming());
-        assertTrue(p.defaultDoubleCheck());
+        assertFalse(p.defaultDoubleCheck());
         assertEquals(EngineProfile.ENGLISH_ACCURATE, EngineProfile.DEFAULT);
     }
 
@@ -60,6 +61,18 @@ class EngineProfileTest {
         assertFalse(whisper.streaming());
         assertFalse(whisper.defaultDoubleCheck());
         assertTrue(whisper.verifier().isEmpty());
+    }
+
+    @Test
+    void pluginProfilesAgreeWithEngineProfilesOnWhichHaveAVerifier() {
+        assertEquals(EngineProfile.values().length, EngineConfig.Profile.values().length);
+        for (EngineProfile profile : EngineProfile.values()) {
+            EngineConfig.Profile plugin = EngineConfig.Profile.valueOf(profile.name());
+            assertEquals(profile.verifier().isPresent(), plugin.hasDoubleCheckVerifier(),
+                    profile + ": EngineConfig.Profile.hasDoubleCheckVerifier must match EngineProfile.verifier(),"
+                            + " or the plugin requests verification the engine cannot run and every hit is unconfirmed");
+            assertEquals(profile.defaultDoubleCheck(), profile.verifier().isPresent(), profile.name());
+        }
     }
 
     @Test

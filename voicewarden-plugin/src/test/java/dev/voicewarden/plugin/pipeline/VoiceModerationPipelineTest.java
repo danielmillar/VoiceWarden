@@ -98,6 +98,7 @@ class VoiceModerationPipelineTest {
 
     private static VoiceWardenConfig config(boolean doubleCheck) {
         String yaml = ConfigFiles.defaultConfigTemplate()
+                .replace("profile: ENGLISH_ACCURATE", "profile: ENGLISH")
                 .replace("appeal_url: \"\"", "appeal_url: \"https://example.org/appeal\"")
                 .replace("mute_commands: []", "mute_commands: [\"say muted {player}\"]");
         if (!doubleCheck) {
