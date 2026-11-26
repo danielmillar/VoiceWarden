@@ -1,3 +1,9 @@
+[![Available on Hangar](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/available/hangar_vector.svg)](https://hangar.papermc.io/danielmillar/VoiceWarden)
+[![Available on Modrinth](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/available/modrinth_vector.svg)](https://modrinth.com/plugin/voicewarden)
+
+[![Hangar downloads](https://img.shields.io/hangar/dt/VoiceWarden?logo=paper&label=Hangar)](https://hangar.papermc.io/danielmillar/VoiceWarden)
+[![Modrinth downloads](https://img.shields.io/modrinth/dt/minelink?logo=modrinth&label=Modrinth)](https://modrinth.com/plugin/VoiceWarden)
+
 # VoiceWarden
 
 VoiceWarden is a local voice chat moderation plugin for Paper and Folia 1.21+ servers running Simple Voice Chat or PlasmoVoice. All audio decoding, voice activity detection, and speech recognition run on the Minecraft host inside an isolated engine subprocess, so player voice never leaves your server or touches a third-party API.
