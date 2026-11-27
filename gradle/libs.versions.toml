@@ -19,6 +19,8 @@ junit-bom = "5.11.4"
 mockito = "5.15.2"
 shadow = "8.3.6"
 detekt = "1.23.8"
+minotaur = "2.10.0"
+hangar-publish = "0.1.4"
 
 [libraries]
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
@@ -46,3 +48,5 @@ mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+minotaur = { id = "com.modrinth.minotaur", version.ref = "minotaur" }
+hangar-publish = { id = "io.papermc.hangar-publish-plugin", version.ref = "hangar-publish" }

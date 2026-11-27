@@ -2,6 +2,8 @@ plugins {
     base
     alias(libs.plugins.detekt)
     alias(libs.plugins.shadow) apply false
+    alias(libs.plugins.minotaur) apply false
+    alias(libs.plugins.hangar.publish) apply false
 }
 
 allprojects {
