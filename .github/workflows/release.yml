@@ -77,3 +77,49 @@ jobs:
           fi
           gh release create "$TAG" "$JAR" "$JAR.sha256" voicewarden-plugin/build/libs/VoiceWarden.jar \
             --verify-tag --generate-notes --title "VoiceWarden $TAG"
+      - name: Collect release changelog and supported platform versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          {
+            echo "RELEASE_CHANGELOG<<EOF_VOICEWARDEN_CHANGELOG"
+            gh release view "$TAG" --json body --jq .body
+            echo "EOF_VOICEWARDEN_CHANGELOG"
+          } >> "$GITHUB_ENV"
+
+          modrinth_versions=$(curl -fsSL -A "voicewarden-release" \
+            "https://api.modrinth.com/v2/tag/game_version" \
+            | jq -r '[.[] | select(.version_type == "release") | .version] | (index("1.21") // error("1.21 not found")) as $idx | .[:$idx + 1] | join(",")')
+          if [ -z "$modrinth_versions" ]; then
+            echo "Resolved empty Modrinth game version list"
+            exit 1
+          fi
+          echo "MODRINTH_GAME_VERSIONS=$modrinth_versions" >> "$GITHUB_ENV"
+
+          hangar_versions=$(curl -fsSL -A "voicewarden-release" \
+            "https://hangar.papermc.io/api/v1/platforms/PAPER/versions" \
+            | jq -r '((map(.version) | index("1.21")) // error("1.21 not found")) as $idx | .[:$idx + 1] | map(if (.subVersions | length) > 0 then .subVersions else [.version] end) | flatten | join(",")')
+          if [ -z "$hangar_versions" ]; then
+            echo "Resolved empty Hangar Paper version list"
+            exit 1
+          fi
+          echo "HANGAR_PAPER_VERSIONS=$hangar_versions" >> "$GITHUB_ENV"
+      - name: Publish to Modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: |
+          if [ -z "$MODRINTH_TOKEN" ]; then
+            echo "::notice::Skipping Modrinth publish because MODRINTH_TOKEN is not set"
+            exit 0
+          fi
+          ./gradlew :voicewarden-plugin:modrinth --no-daemon
+      - name: Publish to Hangar
+        env:
+          HANGAR_API_TOKEN: ${{ secrets.HANGAR_API_TOKEN }}
+        run: |
+          if [ -z "$HANGAR_API_TOKEN" ]; then
+            echo "::notice::Skipping Hangar publish because HANGAR_API_TOKEN is not set"
+            exit 0
+          fi
+          ./gradlew :voicewarden-plugin:publishPluginPublicationToHangar --no-daemon
